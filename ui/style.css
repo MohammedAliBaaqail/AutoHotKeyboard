@@ -15,11 +15,11 @@
   
   /* Neumorphism Core Parameters (dynamically controlled by user sliders) */
   --neo-radius: 5px;
-  --neo-dist: 3px;
-  --neo-blur: 10px;
-  --neo-intensity: 14%;
-  --neo-light-intensity: 22%;
-  --neo-dark-intensity: 6%;
+  --neo-dist: 4px;
+  --neo-blur: 9px;
+  --neo-intensity: 22%;
+  --neo-light-intensity: 39%;
+  --neo-dark-intensity: 5%;
 
   /* Dynamic Border Radii (all derived dynamically from --neo-radius) */
   --radius-card: var(--neo-radius);
@@ -73,6 +73,11 @@
   --text-muted: #64748b;
   --text-disabled: #94a3b8;
   
+  /* Theme-Aware Scrollbars */
+  --scrollbar-thumb: var(--shadow-dark);
+  --scrollbar-thumb-hover: var(--accent-primary);
+  --bg-hover: var(--shadow-dark);
+
   /* Transitions */
   --transition-smooth: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -86,6 +91,44 @@
   outline: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+/* ==========================================================================
+   Global Theme-Aware Scrollbars (Matches Neumorphic Palette on All Elements)
+   ========================================================================== */
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-button,
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 button:focus,
@@ -693,6 +736,17 @@ html, body {
   padding-right: 0;
 }
 
+#profileConfigCard.profile-config-dialog.is-default-mode .profile-config-body {
+  justify-content: center;
+}
+
+#profileConfigCard.profile-config-dialog.is-default-mode .profile-form-column {
+  flex: 0 0 540px;
+  width: 540px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
 .profile-form-column {
   flex: 0 0 420px;
   width: 420px;
@@ -711,6 +765,17 @@ html, body {
   max-width: 100%;
   overflow-y: visible;
   padding-right: 0;
+}
+
+#profileConfigCard.profile-config-dialog.is-default-mode .profile-config-body {
+  justify-content: center;
+}
+
+#profileConfigCard.profile-config-dialog.is-default-mode .profile-form-column {
+  flex: 0 0 540px;
+  width: 540px;
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 .profile-apps-column {
@@ -847,6 +912,12 @@ html, body {
   background: var(--surface-color);
   box-shadow: var(--inset-sm);
   flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+
+.trigger-mode-pills.disabled-pills {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .trigger-pill {
@@ -970,8 +1041,12 @@ html, body {
 }
 
 .running-apps-scroll-area::-webkit-scrollbar-thumb {
-  background: var(--shadow-dark);
-  border-radius: 3px;
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.running-apps-scroll-area::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 .apps-empty-state {
@@ -1273,8 +1348,12 @@ html, body {
 }
 
 .modules-container::-webkit-scrollbar-thumb {
-  background: var(--shadow-dark);
-  border-radius: 3px;
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.modules-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 .module-panel {
@@ -1479,10 +1558,89 @@ html, body {
   font-size: 13px;
   color: var(--text-primary);
   line-height: 1.4;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.inset-input-box textarea::-webkit-scrollbar {
+  width: 5px;
+}
+
+.inset-input-box textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inset-input-box textarea::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.inset-input-box textarea::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+.inset-input-box textarea::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .inset-input-box textarea::placeholder {
   color: var(--text-muted);
+}
+
+/* Folder Creator Module Layout & Aesthetics */
+.fc-row-primary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.fc-row-custom-path {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.fc-row-scaffold {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+}
+
+.fc-folders-box,
+.fc-seed-box {
+  position: relative;
+}
+
+.fc-folders-box textarea,
+.fc-seed-box textarea {
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding-right: 4px;
+}
+
+.fc-hints-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 4px 6px 0;
+  gap: 6px;
+}
+
+.fc-hints-bar .hint-tag code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--accent-primary);
+  font-family: var(--font-main);
+  font-weight: 600;
 }
 
 .neumorphic-toggle-pill {
@@ -1824,20 +1982,26 @@ html, body {
 }
 
 .shortcuts-list::-webkit-scrollbar-thumb {
-  background: var(--shadow-dark);
-  border-radius: 3px;
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.shortcuts-list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 /* Card */
 .shortcut-card {
-  min-height: 56px;
+  height: 58px;
+  min-height: 58px;
+  max-height: 58px;
   border-radius: var(--radius-subcard);
   background: var(--surface-color);
   box-shadow: var(--raised-card);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  padding: 0 18px;
   margin: 14px 4px;
   transition: var(--transition-smooth);
   border: none;
@@ -3036,8 +3200,12 @@ html, body {
 }
 
 .modal-body::-webkit-scrollbar-thumb {
-  background: var(--shadow-dark);
-  border-radius: 3px;
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 .guide-item {
@@ -3072,25 +3240,162 @@ html, body {
 }
 
 /* ==========================================================================
-   Theme Customizer Modal Styling
+   Theme Customizer Full Page View
    ========================================================================== */
 
-.theme-modal-card {
-  max-width: 540px;
-  max-height: 90vh;
+#themeModal.modal-overlay.theme-page-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-color);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
+  padding: 0;
+  box-sizing: border-box;
+  animation: themePageFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.theme-modal-body {
+@keyframes themePageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.theme-modal-card {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  background: var(--bg-color);
+  box-shadow: none;
+  border-radius: 0;
+  border: none;
+  outline: none;
+  padding: 16px 28px 18px 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 24px 20px 20px 20px;
-  margin: 0 -12px -8px -12px;
+  box-sizing: border-box;
+  overflow: hidden;
+  animation: none;
+}
+
+.theme-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.theme-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.theme-header-left .btn-back {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-btn);
+  background: var(--surface-color);
+  box-shadow: var(--raised-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  color: var(--text-primary);
+  transition: var(--transition-smooth);
+}
+
+.theme-header-left .btn-back:hover {
+  color: var(--accent-primary);
+  box-shadow: var(--inset-sm);
+}
+
+.theme-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-header-info .modal-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+.theme-header-info .modal-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.theme-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.theme-modal-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 26px;
+  padding: 4px 8px 14px 0;
+  margin: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  max-height: calc(90vh - 130px);
+  min-height: 0;
+  max-height: none;
+}
+
+.theme-page-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.theme-live-preview-box {
+  border-radius: var(--radius-card);
+  background: var(--surface-color);
+  box-shadow: var(--inset-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.theme-preview-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.theme-preview-components {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .theme-modal-body::-webkit-scrollbar {
@@ -3098,8 +3403,12 @@ html, body {
 }
 
 .theme-modal-body::-webkit-scrollbar-thumb {
-  background: var(--shadow-dark);
-  border-radius: 3px;
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.theme-modal-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 /* Neumorphism Effect Sliders */
@@ -4662,3 +4971,186 @@ html, body {
 .rm-pos-sw { top: 186px; left: 41px; }
 .rm-pos-w  { top: 114px; left: 12px; }
 .rm-pos-nw { top: 41px; left: 41px; }
+
+/* ==========================================================================
+   Item Profile Badges (Shows which profiles have this script enabled)
+   ========================================================================== */
+.item-profiles-badges {
+  display: grid;
+  grid-template-columns: repeat(2, 16px);
+  gap: 2px 4px;
+  margin-right: 10px;
+  margin-left: 6px;
+  flex-shrink: 0;
+  align-content: start;
+  justify-content: center;
+  max-height: 36px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 1px 2px 1px 1px;
+}
+
+.item-profiles-badges::-webkit-scrollbar {
+  width: 3px;
+}
+
+.item-profiles-badges::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.item-profiles-badges::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+.item-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  outline: none;
+  padding: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+  position: relative;
+  user-select: none;
+  opacity: 0.75;
+}
+
+.item-profile-badge:hover {
+  transform: scale(1.2);
+  opacity: 1;
+  filter: brightness(1.15);
+}
+
+.item-profile-badge.is-current {
+  opacity: 1;
+  filter: drop-shadow(0 0 1.5px var(--accent-primary));
+}
+
+.item-profile-badge .profile-card-img {
+  width: 15px;
+  height: 15px;
+  border-radius: 2px;
+  object-fit: contain;
+  display: block;
+}
+
+.item-profile-badge .profile-card-svg {
+  width: 15px;
+  height: 15px;
+  color: var(--text-primary);
+  display: block;
+}
+
+.item-profile-badge.is-current .profile-card-svg {
+  color: var(--accent-primary);
+}
+
+.item-profile-badge .profile-card-fallback-badge {
+  width: 15px;
+  height: 15px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.item-profile-badge.is-current .profile-card-fallback-badge {
+  color: var(--accent-primary);
+}
+
+/* ==========================================================================
+   Active Scripts Overview Modal
+   ========================================================================== */
+.active-scripts-modal-card {
+  max-width: 680px;
+  width: 92%;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.active-scripts-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.active-scripts-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 24px 20px;
+  overflow-y: auto;
+  max-height: calc(84vh - 80px);
+}
+
+.active-scripts-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.active-scripts-modal-body::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.active-scripts-modal-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+.active-scripts-modal-body .shortcut-card {
+  margin: 0;
+  width: 100%;
+}
+
+.active-scripts-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 6px 2px 6px;
+  margin-top: 6px;
+}
+
+.active-scripts-category-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.active-scripts-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.active-scripts-empty svg {
+  width: 42px;
+  height: 42px;
+  opacity: 0.4;
+  color: var(--text-muted);
+}
+
+

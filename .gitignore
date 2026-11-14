@@ -1,14 +1,41 @@
+# User configuration & personal settings
+config.json
+config.backup*.json
+config.local.json
+
 # Development & Temporary files
 *.log
 *.tmp
 *.bak
+ahk_error.log
 stderr.log
 stdout.log
 
-# User uploaded / reference images
+# Scratch, test & diagnostic files
+test_*.ahk
+test_*.txt
+temp_*.ahk
+temp_*.txt
+*_diag.txt
+*_test.txt
+*_classes.txt
+*_controls.txt
+*_details.txt
+*_tabs.txt
+*_tree.txt
+is_window.txt
+win11_*.txt
+
+# Node & package artifacts
+node_modules/
+package-lock.json
+
+# User uploaded / reference images & runtime extracted app icons
 *.png.bak
 *.jpg.bak
 ref_switch.png
+ui/icons/*
+!ui/icons/.gitkeep
 
 # Operating System files
 Thumbs.db

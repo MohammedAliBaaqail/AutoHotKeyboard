@@ -12,18 +12,9 @@
 
 #Requires AutoHotkey v2
 #SingleInstance Force
+SetWorkingDir(A_ScriptDir)
 Persistent(true)
 try DllCall("shell32\SetCurrentProcessExplicitAppUserModelID", "wstr", "AutoHotKeyboard.Engine.v2")
-
-; Ensure strictly only ONE AutoHotKeyboard instance is running across processes
-curPid := DllCall("GetCurrentProcessId")
-try {
-    for proc in ComObjGet("winmgmts:").ExecQuery("Select * from Win32_Process Where Name = 'AutoHotkey64.exe'") {
-        if (proc.ProcessId != curPid && InStr(proc.CommandLine, "main.ahk")) {
-            try ProcessClose(proc.ProcessId)
-        }
-    }
-}
 
 ; Suppress hotkey flood warning dialog (e.g. for key repeat or rapid auto-clicking)
 A_MaxHotkeysPerInterval := 50000
@@ -245,6 +236,35 @@ GetDefaultConfig() {
                 Map("id", "al-3", "trigger", "@gh", "triggerType", "string", "target", "https://github.com", "name", "GitHub")
             ]
         ),
+        "folderCreator", Map(
+            "enabled", true,
+            "items", [
+                Map(
+                    "id", "fc-1",
+                    "name", "Project Scaffolding",
+                    "trigger", "@mkproj",
+                    "triggerType", "string",
+                    "targetLocation", "activeExplorer",
+                    "customPath", "",
+                    "folderPaths", "{Name}`n{Name}\src`n{Name}\docs`n{Name}\assets\images",
+                    "seedFiles", "README.md, notes.txt",
+                    "autoOpen", true,
+                    "enabled", true
+                ),
+                Map(
+                    "id", "fc-2",
+                    "name", "Dated Archive Batch",
+                    "trigger", "Ctrl+Alt+Shift+F",
+                    "triggerType", "hotkey",
+                    "targetLocation", "activeExplorer",
+                    "customPath", "",
+                    "folderPaths", "Backup-{Date}`nBackup-{Date}\Part [01-05]",
+                    "seedFiles", "manifest.txt",
+                    "autoOpen", true,
+                    "enabled", true
+                )
+            ]
+        ),
         "autoClicker", Map(
             "enabled", true,
             "hotkey", "F8",
@@ -276,11 +296,11 @@ GetDefaultConfig() {
             "bgColor", "#e8dfd5",
             "accentColor", "#d97706",
             "radius", 5,
-            "distance", 3,
-            "lightIntensity", 22,
-            "darkIntensity", 6,
-            "intensity", 14,
-            "blur", 10,
+            "distance", 4,
+            "lightIntensity", 39,
+            "darkIntensity", 5,
+            "intensity", 22,
+            "blur", 9,
             "customPresets", []
         ),
         "window", Map(
@@ -325,6 +345,7 @@ ApplyAllModules() {
     ApplyKeyRemapper()
     ApplyWindowManager()
     ApplyAppLauncher()
+    ApplyFolderCreator()
     ApplyAutoClicker()
     ApplyMacroRecorder()
     ApplyMouseGestures()
@@ -1698,12 +1719,16 @@ CheckAutoProfileSwitch() {
     if (!g_Config.Has("profiles") || !IsObject(g_Config["profiles"]))
         return
 
-    ; Check if any profile has switchOnHover enabled
+    ; Check if any profile has switchOnHover enabled (including Default)
     hasHoverProfiles := false
     for pName, pData in g_Config["profiles"] {
-        if (IsObject(pData) && pData.Has("switchOnHover") && (pData["switchOnHover"] = 1 || pData["switchOnHover"] = true)) {
-            hasHoverProfiles := true
-            break
+        if (IsObject(pData)) {
+            triggerEnabled := !pData.Has("switchTriggerEnabled") || pData["switchTriggerEnabled"] = 1 || pData["switchTriggerEnabled"] = true
+            isHover := triggerEnabled && pData.Has("switchOnHover") && (pData["switchOnHover"] = 1 || pData["switchOnHover"] = true)
+            if (isHover) {
+                hasHoverProfiles := true
+                break
+            }
         }
     }
 
@@ -1718,9 +1743,23 @@ CheckAutoProfileSwitch() {
             if (hoverHwnd && (!g_MainGui || hoverHwnd != g_MainGui.Hwnd)) {
                 hoverProc := WinGetProcessName("ahk_id " . hoverHwnd)
                 if (hoverProc != "" && hoverProc != "AutoHotkey64.exe" && hoverProc != "msedgewebview2.exe") {
-                    matchedProfile := FindProfileForProcess(hoverProc, true)
+                    matchedProfile := FindProfileForProcess(hoverProc, "hover")
                     if (matchedProfile != "") {
                         triggerProc := hoverProc
+                    } else {
+                        ; Hovered window did not match any custom hover profile.
+                        ; If it also doesn't match ANY custom profile (e.g. desktop, explorer, unassigned app),
+                        ; check if Default profile has hover enabled so it can switch back to Default on hover away!
+                        anyCustom := FindProfileForProcess(hoverProc, "any")
+                        if (anyCustom == "") {
+                            defaultProf := g_Config["profiles"].Has("Default") ? g_Config["profiles"]["Default"] : ""
+                            defaultTriggerEnabled := IsObject(defaultProf) ? (!defaultProf.Has("switchTriggerEnabled") || defaultProf["switchTriggerEnabled"] = 1 || defaultProf["switchTriggerEnabled"] = true) : true
+                            defaultHover := defaultTriggerEnabled && IsObject(defaultProf) && defaultProf.Has("switchOnHover") && (defaultProf["switchOnHover"] = 1 || defaultProf["switchOnHover"] = true)
+                            if (defaultHover) {
+                                matchedProfile := "Default"
+                                triggerProc := hoverProc
+                            }
+                        }
                     }
                 }
             }
@@ -1739,25 +1778,30 @@ CheckAutoProfileSwitch() {
             return
 
         g_LastActiveSwitchHwnd := activeHwnd
-        matchedProfile := FindProfileForProcess(activeProc, false)
+        matchedProfile := FindProfileForProcess(activeProc, "focus")
         if (matchedProfile != "") {
             triggerProc := activeProc
+        } else {
+            ; Focused window does NOT match any custom focus profile.
+            ; Check if Default profile has focus switch enabled so it can switch back on focus away!
+            defaultProf := g_Config["profiles"].Has("Default") ? g_Config["profiles"]["Default"] : ""
+            defaultTriggerEnabled := IsObject(defaultProf) ? (!defaultProf.Has("switchTriggerEnabled") || defaultProf["switchTriggerEnabled"] = 1 || defaultProf["switchTriggerEnabled"] = true) : true
+            defaultFocus := defaultTriggerEnabled && (IsObject(defaultProf) && defaultProf.Has("switchOnFocus") ? (defaultProf["switchOnFocus"] = 1 || defaultProf["switchOnFocus"] = true) : true)
+            if (defaultFocus) {
+                matchedProfile := "Default"
+                triggerProc := activeProc
+            }
         }
     }
 
-    ; 3. Fallback to Default profile if no specific profile matched
-    if (matchedProfile == "") {
-        matchedProfile := "Default"
-    }
-
     curProfile := g_Config.Has("activeProfile") ? g_Config["activeProfile"] : "Default"
-    if (matchedProfile != curProfile && g_Config["profiles"].Has(matchedProfile)) {
+    if (matchedProfile != "" && matchedProfile != curProfile && g_Config["profiles"].Has(matchedProfile)) {
         g_LastActiveSwitchProc := triggerProc
         SwitchToProfileInternal(matchedProfile, triggerProc)
     }
 }
 
-FindProfileForProcess(procName, hoverOnly := false) {
+FindProfileForProcess(procName, triggerMode := "any") {
     global g_Config
     procLower := StrLower(Trim(procName))
     if (!g_Config.Has("profiles") || !IsObject(g_Config["profiles"]))
@@ -1766,11 +1810,21 @@ FindProfileForProcess(procName, hoverOnly := false) {
     for pName, pData in g_Config["profiles"] {
         if (!IsObject(pData) || pName = "Default")
             continue
-        if (hoverOnly) {
+
+        triggerEnabled := !pData.Has("switchTriggerEnabled") || pData["switchTriggerEnabled"] = 1 || pData["switchTriggerEnabled"] = true
+        if (!triggerEnabled)
+            continue
+
+        if (triggerMode = "hover") {
             isHover := pData.Has("switchOnHover") && (pData["switchOnHover"] = 1 || pData["switchOnHover"] = true)
             if (!isHover)
                 continue
+        } else if (triggerMode = "focus") {
+            isFocus := !pData.Has("switchOnFocus") || pData["switchOnFocus"] = 1 || pData["switchOnFocus"] = true
+            if (!isFocus)
+                continue
         }
+
         targetExe := pData.Has("targetExe") ? pData["targetExe"] : ""
         if (targetExe != "") {
             for part in StrSplit(targetExe, ",") {
@@ -1836,7 +1890,7 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
     }
 
     ; Trigger App Icon OSD popup if enabled for this profile
-    showIcon := true
+    showIcon := (targetProfile != "Default")
     if (IsObject(prof) && prof.Has("showOsdIcon")) {
         showIcon := (prof["showOsdIcon"] = 1 || prof["showOsdIcon"] = true)
     }
@@ -1975,6 +2029,353 @@ RunLauncherTarget(trigger, target) {
     } catch as err {
         SoundBeep(400, 100)
         LogMessage("Run target failed: " . err.Message)
+    }
+}
+
+; ==============================================================================
+; 4.5. Folder Creator Module
+; ==============================================================================
+
+ApplyFolderCreator() {
+    global g_Config, g_ActiveHotstrings, g_ActiveHotkeys
+    
+    if (!g_Config.Has("folderCreator") || !g_Config["folderCreator"].Has("items")) {
+        return
+    }
+    
+    fcConfig := g_Config["folderCreator"]
+    if (fcConfig.Has("enabled") && !fcConfig["enabled"]) {
+        return
+    }
+    
+    for item in fcConfig["items"] {
+        if (IsObject(item) && item.Has("trigger") && item.Has("folderPaths")) {
+            trig := Trim(item["trigger"])
+            paths := Trim(item["folderPaths"])
+            type := item.Has("triggerType") ? item["triggerType"] : "string"
+            
+            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] = "1")
+            if (trig != "" && paths != "" && isEnabled) {
+                try {
+                    handler := CreateFolderCreatorHandler(item)
+                    if (type = "hotkey" || type = "shortcut") {
+                        ahkHk := NormalizeHotkeyToAhk(trig)
+                        if (ahkHk != "") {
+                            Hotkey(ahkHk, handler, "On")
+                            g_ActiveHotkeys.Push(ahkHk)
+                        }
+                    } else {
+                        Hotstring(":*:" . trig, handler, "On")
+                        g_ActiveHotstrings.Push(trig)
+                    }
+                } catch as err {
+                    LogMessage("FolderCreator error for " . trig . ": " . err.Message)
+                }
+            }
+        }
+    }
+}
+
+CreateFolderCreatorHandler(item) {
+    return (*) => ExecuteFolderCreation(item)
+}
+
+GetActiveExplorerPath() {
+    activeHwnd := WinActive("A")
+    if (!activeHwnd)
+        return A_Desktop
+        
+    wClass := ""
+    try wClass := WinGetClass("ahk_id " . activeHwnd)
+    
+    ; Desktop is focused
+    if (wClass = "Progman" || wClass = "WorkerW")
+        return A_Desktop
+
+    ; If focused control is inside Explorer, get root window
+    if (wClass != "CabinetWClass" && wClass != "ExploreWClass") {
+        rootHwnd := DllCall("GetAncestor", "ptr", activeHwnd, "uint", 2, "ptr")
+        if (rootHwnd) {
+            try {
+                rootClass := WinGetClass("ahk_id " . rootHwnd)
+                if (rootClass = "CabinetWClass" || rootClass = "ExploreWClass") {
+                    activeHwnd := rootHwnd
+                    wClass := rootClass
+                }
+            }
+        }
+    }
+
+    ; If not Explorer at all, fallback to Desktop
+    if (wClass != "CabinetWClass" && wClass != "ExploreWClass")
+        return A_Desktop
+
+    ; 1. Windows 11 Tabs detection via IShellBrowser
+    activeTab := 0
+    try {
+        activeTab := ControlGetHwnd("ShellTabWindowClass1", activeHwnd)
+    } catch {
+        try {
+            activeTab := ControlGetHwnd("TabWindowClass1", activeHwnd)
+        }
+    }
+
+    try {
+        shell := ComObject("Shell.Application")
+        if (activeTab) {
+            static IID_IShellBrowser := "{000214E2-0000-0000-C000-000000000046}"
+            for w in shell.Windows {
+                try {
+                    if (!w)
+                        continue
+                    wHwnd := w.hwnd
+                    if (wHwnd != activeHwnd && (wHwnd & 0xFFFFFFFF) != (activeHwnd & 0xFFFFFFFF))
+                        continue
+                    
+                    shellBrowser := ComObjQuery(w, IID_IShellBrowser, IID_IShellBrowser)
+                    if (!shellBrowser)
+                        continue
+                    thisTab := 0
+                    ComCall(3, shellBrowser, "uint*", &thisTab := 0)
+                    if (thisTab = activeTab) {
+                        p := w.Document.Folder.Self.Path
+                        if (p != "" && !InStr(p, "::{") && DirExist(p))
+                            return p
+                    }
+                } catch {
+                    continue
+                }
+            }
+        }
+
+        ; 2. Match by window HWND directly
+        for w in shell.Windows {
+            try {
+                if (!w)
+                    continue
+                wHwnd := w.hwnd
+                if (wHwnd = activeHwnd || (wHwnd & 0xFFFFFFFF) = (activeHwnd & 0xFFFFFFFF)) {
+                    p := w.Document.Folder.Self.Path
+                    if (p != "" && !InStr(p, "::{") && DirExist(p))
+                        return p
+                }
+            } catch {
+                continue
+            }
+        }
+
+        ; 3. Title / LocationName match for Windows 11 tabbed Explorer
+        activeTitle := WinGetTitle("ahk_id " . activeHwnd)
+        if (activeTitle != "") {
+            for w in shell.Windows {
+                try {
+                    locName := w.LocationName
+                    if (locName != "" && InStr(activeTitle, locName)) {
+                        p := w.Document.Folder.Self.Path
+                        if (p != "" && !InStr(p, "::{") && DirExist(p))
+                            return p
+                    }
+                } catch {
+                    continue
+                }
+            }
+        }
+    } catch {
+        ; COM error fallback
+    }
+
+    ; 4. Address Bar Toolbar text fallback
+    for ctrlName in ["ToolbarWindow322", "ToolbarWindow323", "ToolbarWindow321", "ToolbarWindow324"] {
+        try {
+            addrText := ControlGetText(ctrlName, "ahk_id " . activeHwnd)
+            if (InStr(addrText, "Address: ")) {
+                extracted := Trim(SubStr(addrText, 10))
+                if (extracted != "" && DirExist(extracted))
+                    return extracted
+            }
+        }
+    }
+
+    ; 5. Edit controls fallback
+    for ctrlName in ["Edit1", "Edit2", "ComboBox1"] {
+        try {
+            addrText := ControlGetText(ctrlName, "ahk_id " . activeHwnd)
+            if (addrText != "" && DirExist(addrText))
+                return addrText
+        }
+    }
+
+    ; 6. Active Explorer fallback: any valid shell window path
+    try {
+        shell := ComObject("Shell.Application")
+        for w in shell.Windows {
+            try {
+                p := w.Document.Folder.Self.Path
+                if (p != "" && !InStr(p, "::{") && DirExist(p))
+                    return p
+            } catch {
+                continue
+            }
+        }
+    } catch {
+    }
+
+    return A_Desktop
+}
+
+ExecuteFolderCreation(item) {
+    global g_Wv, g_IsEngineActive
+    if (!g_IsEngineActive)
+        return
+        
+    try {
+        ; Determine base target directory
+        locType := item.Has("targetLocation") ? item["targetLocation"] : "activeExplorer"
+        baseDir := ""
+        if (locType = "custom" && item.Has("customPath") && Trim(item["customPath"]) != "") {
+            baseDir := Trim(item["customPath"])
+        } else {
+            baseDir := GetActiveExplorerPath()
+        }
+        
+        if (baseDir = "")
+            baseDir := A_Desktop
+            
+        if (!DirExist(baseDir)) {
+            try DirCreate(baseDir)
+        }
+        
+        rawPaths := item.Has("folderPaths") ? item["folderPaths"] : ""
+        if (rawPaths = "")
+            return
+            
+        ; Check if interactive {Name} prompt is needed
+        projectName := ""
+        if (InStr(rawPaths, "{Name}") || InStr(rawPaths, "{name}")) {
+            presetLabel := item.Has("name") && item["name"] != "" ? item["name"] : "Folder Creator"
+            ib := InputBox("Enter Project / Folder Name:", presetLabel, "w340 h130")
+            if (ib.Result != "OK" || Trim(ib.Value) = "")
+                return
+            projectName := Trim(ib.Value)
+        }
+        
+        ; Replace date/time tokens
+        vYear := FormatTime(, "yyyy")
+        vMonth := FormatTime(, "MM")
+        vDay := FormatTime(, "dd")
+        vDate := FormatTime(, "yyyy-MM-dd")
+        vTime := FormatTime(, "HH-mm-ss")
+        
+        expandedPaths := rawPaths
+        if (projectName != "") {
+            expandedPaths := StrReplace(expandedPaths, "{Name}", projectName)
+            expandedPaths := StrReplace(expandedPaths, "{name}", projectName)
+        }
+        expandedPaths := StrReplace(expandedPaths, "{YYYY}", vYear)
+        expandedPaths := StrReplace(expandedPaths, "{MM}", vMonth)
+        expandedPaths := StrReplace(expandedPaths, "{DD}", vDay)
+        expandedPaths := StrReplace(expandedPaths, "{Date}", vDate)
+        expandedPaths := StrReplace(expandedPaths, "{Time}", vTime)
+        
+        ; Split by newline to process each line
+        lines := StrSplit(expandedPaths, ["`r`n", "`n", "`r"])
+        createdFolders := []
+        
+        for rawLine in lines {
+            line := Trim(rawLine)
+            if (line = "")
+                continue
+                
+            ; Check for numbered range sequence e.g. [1-10] or [01-12]
+            if RegExMatch(line, "\[(\d+)-(\d+)\]", &mSeq) {
+                numStart := Integer(mSeq[1])
+                numEnd := Integer(mSeq[2])
+                padLen := StrLen(mSeq[1])
+                step := numStart <= numEnd ? 1 : -1
+                
+                curr := numStart
+                Loop {
+                    currStr := Format("{:0" . padLen . "}", curr)
+                    seqLine := RegExReplace(line, "\[\d+-\d+\]", currStr, , 1)
+                    createdFolders.Push(seqLine)
+                    if (curr = numEnd)
+                        break
+                    curr += step
+                }
+            } else {
+                createdFolders.Push(line)
+            }
+        }
+        
+        ; Create directories on disk
+        firstCreatedPath := ""
+        for relPath in createdFolders {
+            cleanRel := StrReplace(relPath, "/", "\")
+            ; Determine if path is absolute or relative to baseDir
+            fullPath := ""
+            if (SubStr(cleanRel, 2, 1) = ":" || SubStr(cleanRel, 1, 2) = "\\") {
+                fullPath := cleanRel
+            } else {
+                fullPath := RTrim(baseDir, "\") . "\" . cleanRel
+            }
+            
+            if (!DirExist(fullPath)) {
+                try DirCreate(fullPath)
+            }
+            if (firstCreatedPath = "") {
+                firstCreatedPath := fullPath
+            }
+        }
+        
+        ; Create Seed Files if specified
+        if (item.Has("seedFiles") && Trim(item["seedFiles"]) != "") {
+            seedStr := item["seedFiles"]
+            seedList := StrSplit(RegExReplace(seedStr, "[\r\n,]+", "|"), "|")
+            
+            seedTargetDir := baseDir
+            if (projectName != "" && DirExist(baseDir . "\" . projectName)) {
+                seedTargetDir := baseDir . "\" . projectName
+            } else if (firstCreatedPath != "" && DirExist(firstCreatedPath)) {
+                seedTargetDir := firstCreatedPath
+            }
+            
+            for rawSeed in seedList {
+                seedName := Trim(rawSeed)
+                if (seedName = "")
+                    continue
+                seedFullPath := RTrim(seedTargetDir, "\") . "\" . seedName
+                if (!FileExist(seedFullPath)) {
+                    try FileAppend("", seedFullPath, "UTF-8")
+                }
+            }
+        }
+        
+        ; Sound confirmation
+        SoundBeep(1200, 70)
+        
+        ; Auto-Open in Explorer if enabled (only when user picked fixed folder option)
+        isAutoOpen := (item.Has("autoOpen") && (item["autoOpen"] = true || item["autoOpen"] = 1 || item["autoOpen"] = "1"))
+        if (isAutoOpen && locType = "custom") {
+            openTarget := baseDir
+            if (projectName != "" && DirExist(baseDir . "\" . projectName)) {
+                openTarget := baseDir . "\" . projectName
+            } else if (firstCreatedPath != "" && DirExist(firstCreatedPath)) {
+                openTarget := firstCreatedPath
+            }
+            try Run('explorer.exe "' . openTarget . '"')
+        }
+        
+        if (g_Wv) {
+            msg := JSON.stringify(Map(
+                "type", "moduleEvent",
+                "module", "folderCreator",
+                "message", "Folders created: " . createdFolders.Length . " items"
+            ))
+            g_Wv.PostWebMessageAsString(msg)
+        }
+    } catch as err {
+        SoundBeep(400, 100)
+        LogMessage("ExecuteFolderCreation failed: " . err.Message)
     }
 }
 
@@ -2773,6 +3174,22 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                     LogMessage("browseApp error: " . err.Message)
                 }
 
+            case "browseFolder":
+                try {
+                    selectedFolder := DirSelect(, 1, "Select Target Folder")
+                    if (selectedFolder != "") {
+                        if (g_Wv) {
+                            resMsg := JSON.stringify(Map(
+                                "type", "folderSelected",
+                                "path", selectedFolder
+                            ))
+                            g_Wv.PostWebMessageAsString(resMsg)
+                        }
+                    }
+                } catch as err {
+                    LogMessage("browseFolder error: " . err.Message)
+                }
+
             case "getActiveAppVolume":
                 hwnd := GetActiveExternalWindow()
                 if (hwnd) {
@@ -2959,28 +3376,36 @@ CheckScreenHotCorners() {
         return
     }
     
-    dwellMs := mg.Has("dwellDuration") ? mg["dwellDuration"] : 250
+    dwellMs := mg.Has("dwellDuration") ? Integer(mg["dwellDuration"]) : 250
+    if (dwellMs < 20) {
+        dwellMs := 20
+    }
     
     CoordMode("Mouse", "Screen")
     MouseGetPos(&mx, &my)
     
-    ; Virtual multi-monitor coordinates
-    vx := SysGet(76)
-    vy := SysGet(77)
-    vw := SysGet(78)
-    vh := SysGet(79)
-    
     cornerName := ""
-    tol := 5 ; pixels tolerance for screen edge
+    tol := 12 ; pixels tolerance for corner detection on modern high-DPI displays
     
-    if (mx <= vx + tol && my <= vy + tol) {
-        cornerName := "cornerTopLeft"
-    } else if (mx >= vx + vw - tol && my <= vy + tol) {
-        cornerName := "cornerTopRight"
-    } else if (mx <= vx + tol && my >= vy + vh - tol) {
-        cornerName := "cornerBottomLeft"
-    } else if (mx >= vx + vw - tol && my >= vy + vh - tol) {
-        cornerName := "cornerBottomRight"
+    ; Check across each individual active physical monitor
+    monCount := MonitorGetCount()
+    Loop monCount {
+        MonitorGet(A_Index, &mL, &mT, &mR, &mB)
+        ; Check if mouse is on this monitor (or within tolerance)
+        if (mx >= mL - tol && mx <= mR + tol && my >= mT - tol && my <= mB + tol) {
+            if (mx <= mL + tol && my <= mT + tol) {
+                cornerName := "cornerTopLeft"
+            } else if (mx >= mR - tol && my <= mT + tol) {
+                cornerName := "cornerTopRight"
+            } else if (mx <= mL + tol && my >= mB - tol) {
+                cornerName := "cornerBottomLeft"
+            } else if (mx >= mR - tol && my >= mB - tol) {
+                cornerName := "cornerBottomRight"
+            }
+            if (cornerName != "") {
+                break
+            }
+        }
     }
     
     if (cornerName != "") {
@@ -2991,7 +3416,7 @@ CheckScreenHotCorners() {
         } else if (!g_CornerTriggered && (A_TickCount - g_CornerTick >= dwellMs)) {
             g_CornerTriggered := true
             actionName := mg.Has(cornerName) ? mg[cornerName] : ""
-            if (actionName != "" && actionName != "None") {
+            if (actionName != "" && actionName != "None" && actionName != "none") {
                 ExecuteSystemAction(actionName, "Hot Corner: " . cornerName)
             }
         }

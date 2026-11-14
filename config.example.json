@@ -1,0 +1,88 @@
+{
+  "version": "2.0",
+  "activeProfile": "default",
+  "profiles": [
+    {
+      "id": "default",
+      "name": "Default",
+      "icon": "monitor",
+      "color": "#d97706",
+      "enabled": 1
+    }
+  ],
+  "textExpander": {
+    "enabled": 1,
+    "items": [
+      {
+        "id": "te-1",
+        "trigger": "@@email",
+        "replacement": "user@example.com",
+        "description": "Sample email snippet",
+        "enabled": 1
+      }
+    ]
+  },
+  "keyRemapper": {
+    "enabled": 1,
+    "items": []
+  },
+  "systemTools": {
+    "enabled": 1,
+    "items": []
+  },
+  "gesturesAndCorners": {
+    "enabled": 1,
+    "items": []
+  },
+  "radialMenu": {
+    "enabled": 1,
+    "items": []
+  },
+  "appLauncher": {
+    "enabled": 1,
+    "items": []
+  },
+  "folderCreator": {
+    "enabled": 1,
+    "items": [
+      {
+        "id": "fc-default-1",
+        "trigger": "Ctrl + Alt + Shift + Z",
+        "triggerType": "hotkey",
+        "targetLocation": "activeExplorer",
+        "customPath": "",
+        "folderPaths": "src\\nassets\\\\images\\ndocs",
+        "seedFiles": "README.md\\n.gitignore",
+        "autoOpen": 0,
+        "name": "Project Scaffolding",
+        "enabled": 1
+      }
+    ]
+  },
+  "autoClicker": {
+    "enabled": 0,
+    "hotkey": "F8",
+    "button": "Left",
+    "clickType": "Single",
+    "cps": 10
+  },
+  "macroRecorder": {
+    "enabled": 1,
+    "items": []
+  },
+  "theme": {
+    "bgColor": "#e8dfd5",
+    "accentColor": "#d97706",
+    "radius": 5,
+    "distance": 4,
+    "lightIntensity": 39,
+    "darkIntensity": 5,
+    "intensity": 22,
+    "blur": 9,
+    "customPresets": []
+  },
+  "window": {
+    "width": 1320,
+    "height": 760
+  }
+}

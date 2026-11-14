@@ -42,11 +42,11 @@
           parsed.bgColor = '#e8dfd5';
           parsed.accentColor = '#d97706';
           parsed.radius = 5;
-          parsed.distance = 3;
-          parsed.lightIntensity = 22;
-          parsed.darkIntensity = 6;
-          parsed.intensity = 14;
-          parsed.blur = 10;
+          parsed.distance = 4;
+          parsed.lightIntensity = 39;
+          parsed.darkIntensity = 5;
+          parsed.intensity = 22;
+          parsed.blur = 9;
           try { localStorage.setItem('ahk_theme', JSON.stringify(parsed)); } catch (e) { }
         }
         if (parsed && parsed.bgColor && parsed.accentColor) {
@@ -54,17 +54,17 @@
             bgColor: parsed.bgColor,
             accentColor: parsed.accentColor,
             radius: typeof parsed.radius !== 'undefined' ? parseInt(parsed.radius, 10) : 5,
-            distance: typeof parsed.distance !== 'undefined' ? parseInt(parsed.distance, 10) : 3,
-            lightIntensity: typeof parsed.lightIntensity !== 'undefined' ? parseInt(parsed.lightIntensity, 10) : 22,
-            darkIntensity: typeof parsed.darkIntensity !== 'undefined' ? parseInt(parsed.darkIntensity, 10) : 6,
-            intensity: typeof parsed.intensity !== 'undefined' ? parseInt(parsed.intensity, 10) : 14,
-            blur: typeof parsed.blur !== 'undefined' ? parseInt(parsed.blur, 10) : 10,
+            distance: typeof parsed.distance !== 'undefined' ? parseInt(parsed.distance, 10) : 4,
+            lightIntensity: typeof parsed.lightIntensity !== 'undefined' ? parseInt(parsed.lightIntensity, 10) : 39,
+            darkIntensity: typeof parsed.darkIntensity !== 'undefined' ? parseInt(parsed.darkIntensity, 10) : 5,
+            intensity: typeof parsed.intensity !== 'undefined' ? parseInt(parsed.intensity, 10) : 22,
+            blur: typeof parsed.blur !== 'undefined' ? parseInt(parsed.blur, 10) : 9,
             customPresets: Array.isArray(parsed.customPresets) ? parsed.customPresets : cachedCustom
           };
         }
       }
     } catch (e) { }
-    return { bgColor: '#e8dfd5', accentColor: '#d97706', radius: 5, distance: 3, lightIntensity: 22, darkIntensity: 6, intensity: 14, blur: 10, customPresets: [] };
+    return { bgColor: '#e8dfd5', accentColor: '#d97706', radius: 5, distance: 4, lightIntensity: 39, darkIntensity: 5, intensity: 22, blur: 9, customPresets: [] };
   })();
 
   let isInitialized = false;
@@ -149,6 +149,35 @@
           { id: 'al-1', trigger: '@calc', triggerType: 'string', target: 'calc.exe', name: 'Calculator' },
           { id: 'al-2', trigger: '@yt', triggerType: 'string', target: 'https://www.youtube.com', name: 'YouTube' },
           { id: 'al-3', trigger: '@gh', triggerType: 'string', target: 'https://github.com', name: 'GitHub' }
+        ]
+      },
+      folderCreator: {
+        enabled: true,
+        items: [
+          {
+            id: 'fc-1',
+            name: 'Project Scaffolding',
+            trigger: '@mkproj',
+            triggerType: 'string',
+            targetLocation: 'activeExplorer',
+            customPath: '',
+            folderPaths: '{Name}\n{Name}\\src\n{Name}\\docs\n{Name}\\assets\\images',
+            seedFiles: 'README.md, notes.txt',
+            autoOpen: 1,
+            enabled: 1
+          },
+          {
+            id: 'fc-2',
+            name: 'Dated Archive Batch',
+            trigger: 'Ctrl+Alt+Shift+F',
+            triggerType: 'hotkey',
+            targetLocation: 'activeExplorer',
+            customPath: '',
+            folderPaths: 'Backup-{Date}\nBackup-{Date}\\Part [01-05]',
+            seedFiles: 'manifest.txt',
+            autoOpen: 1,
+            enabled: 1
+          }
         ]
       },
       autoClicker: {
@@ -295,6 +324,34 @@
   const alHintTag = document.getElementById('alHintTag');
   const alLaunchersContainer = document.getElementById('alLaunchersContainer');
 
+  // Folder Creator Elements
+  const fcTriggerTypeSelector = document.getElementById('fcTriggerTypeSelector');
+  const fcTypeHotkey = document.getElementById('fcTypeHotkey');
+  const fcTypeString = document.getElementById('fcTypeString');
+  const fcTriggerIcon = document.getElementById('fcTriggerIcon');
+  const fcTriggerBox = document.getElementById('fcTriggerBox');
+  const fcInputTrigger = document.getElementById('fcInputTrigger');
+  const fcBtnClearTrigger = document.getElementById('fcBtnClearTrigger');
+  const fcInputName = document.getElementById('fcInputName');
+  const fcLocationTypeSelector = document.getElementById('fcLocationTypeSelector');
+  const fcLocActive = document.getElementById('fcLocActive');
+  const fcLocCustom = document.getElementById('fcLocCustom');
+  const fcCustomPathRow = document.getElementById('fcCustomPathRow');
+  const fcCustomPathBox = document.getElementById('fcCustomPathBox');
+  const fcInputCustomPath = document.getElementById('fcInputCustomPath');
+  const fcBtnBrowseTarget = document.getElementById('fcBtnBrowseTarget');
+  const fcToggleAutoOpen = document.getElementById('fcToggleAutoOpen');
+  const fcTextareaFolders = document.getElementById('fcTextareaFolders');
+  const fcInputSeedFiles = document.getElementById('fcInputSeedFiles');
+  const fcBtnSubmit = document.getElementById('fcBtnSubmit');
+  const fcBtnSubmitText = document.getElementById('fcBtnSubmitText');
+  const fcContainer = document.getElementById('fcContainer');
+
+  let currentFcType = 'string';
+  let currentFcLocation = 'activeExplorer';
+  let fcAutoOpen = true;
+  let editingFcId = null;
+
   // Auto Clicker Elements
   const acButtonSelector = document.getElementById('acButtonSelector');
   const acTypeSelector = document.getElementById('acTypeSelector');
@@ -418,6 +475,7 @@
         textExpander: JSON.parse(JSON.stringify(cfg.textExpander || { enabled: 1, items: [] })),
         keyRemapper: JSON.parse(JSON.stringify(cfg.keyRemapper || { enabled: 1, items: [] })),
         appLauncher: JSON.parse(JSON.stringify(cfg.appLauncher || { enabled: 1, items: [] })),
+        folderCreator: JSON.parse(JSON.stringify(cfg.folderCreator || { enabled: 1, items: [] })),
         macroRecorder: JSON.parse(JSON.stringify(cfg.macroRecorder || { enabled: 1, items: [] })),
         windowManager: JSON.parse(JSON.stringify(cfg.windowManager || {})),
         mouseGestures: JSON.parse(JSON.stringify(cfg.mouseGestures || {})),
@@ -429,7 +487,7 @@
     // Ensure all items across all modules in all profiles have an enabled property
     Object.keys(cfg.profiles).forEach(pName => {
       const p = cfg.profiles[pName];
-      ['textExpander', 'keyRemapper', 'appLauncher', 'macroRecorder'].forEach(m => {
+      ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'].forEach(m => {
         if (p[m] && Array.isArray(p[m].items)) {
           p[m].items.forEach(item => {
             if (typeof item.enabled === 'undefined') {
@@ -448,6 +506,7 @@
     cfg.textExpander = activeProf.textExpander;
     cfg.keyRemapper = activeProf.keyRemapper;
     cfg.appLauncher = activeProf.appLauncher;
+    cfg.folderCreator = activeProf.folderCreator;
     cfg.macroRecorder = activeProf.macroRecorder;
     cfg.windowManager = activeProf.windowManager;
     cfg.mouseGestures = activeProf.mouseGestures;
@@ -465,6 +524,7 @@
       textExpander: JSON.parse(JSON.stringify(state.config.textExpander || { enabled: 1, items: [] })),
       keyRemapper: JSON.parse(JSON.stringify(state.config.keyRemapper || { enabled: 1, items: [] })),
       appLauncher: JSON.parse(JSON.stringify(state.config.appLauncher || { enabled: 1, items: [] })),
+      folderCreator: JSON.parse(JSON.stringify(state.config.folderCreator || { enabled: 1, items: [] })),
       macroRecorder: JSON.parse(JSON.stringify(state.config.macroRecorder || { enabled: 1, items: [] })),
       windowManager: JSON.parse(JSON.stringify(state.config.windowManager || {})),
       mouseGestures: JSON.parse(JSON.stringify(state.config.mouseGestures || {})),
@@ -529,6 +589,63 @@
       <div class="profile-card-fallback-badge">
         <span>${escapeHtml(pName.charAt(0).toUpperCase())}</span>
       </div>`;
+  }
+
+  function renderItemProfileBadges(moduleName, itemId) {
+    if (!state.config) return '';
+    // Ensure current profile in state.config.profiles reflects live in-memory module changes
+    saveCurrentProfileState();
+    if (!state.config.profiles) return '';
+    const profiles = state.config.profiles;
+    const currentProf = state.config.activeProfile || 'Default';
+    
+    // Find all profiles where this item is enabled
+    const activeProfiles = [];
+    Object.keys(profiles).forEach(pName => {
+      const prof = profiles[pName];
+      if (prof && prof[moduleName] && Array.isArray(prof[moduleName].items)) {
+        const found = prof[moduleName].items.find(i => i.id === itemId);
+        if (found && found.enabled !== false && found.enabled !== 0) {
+          activeProfiles.push(pName);
+        }
+      }
+    });
+
+    if (activeProfiles.length === 0) return '';
+
+    const badgesHtml = activeProfiles.map(pName => {
+      const prof = profiles[pName] || {};
+      const isCur = (pName === currentProf);
+      const iconHtml = getProfileIconHtml(pName, prof);
+      const tooltip = isCur ? `Active in Profile: ${pName} (Current Profile)` : `Active in Profile: ${pName} (Click to switch)`;
+      return `<div class="item-profile-badge ${isCur ? 'is-current' : ''}" title="${escapeHtml(tooltip)}" data-switch-profile="${escapeHtml(pName)}">${iconHtml}</div>`;
+    }).join('');
+
+    return `<div class="item-profiles-badges">${badgesHtml}</div>`;
+  }
+
+  function updateCardProfileBadges(cardEl, moduleName, itemId) {
+    if (!cardEl) return;
+    let container = cardEl.querySelector('.item-profiles-badges');
+    const newHtml = renderItemProfileBadges(moduleName, itemId);
+    if (newHtml) {
+      if (container) {
+        container.outerHTML = newHtml;
+      } else {
+        // Find best insertion target depending on card structure
+        const actions = cardEl.querySelector('.card-actions');
+        if (actions) {
+          actions.insertAdjacentHTML('beforebegin', newHtml);
+        } else {
+          const cardInfo = cardEl.querySelector('.card-info') || cardEl.querySelector('.macro-card-top');
+          if (cardInfo) {
+            cardInfo.insertAdjacentHTML('beforeend', newHtml);
+          }
+        }
+      }
+    } else if (container) {
+      container.remove();
+    }
   }
 
   function renderProfilesRibbon() {
@@ -728,6 +845,7 @@
     state.config.textExpander = prof.textExpander || { enabled: 1, items: [] };
     state.config.keyRemapper = prof.keyRemapper || { enabled: 1, items: [] };
     state.config.appLauncher = prof.appLauncher || { enabled: 1, items: [] };
+    state.config.folderCreator = prof.folderCreator || { enabled: 1, items: [] };
     state.config.macroRecorder = prof.macroRecorder || { enabled: 1, items: [] };
     state.config.windowManager = prof.windowManager || {};
     state.config.mouseGestures = prof.mouseGestures || {};
@@ -746,6 +864,7 @@
       ['initMouseGestures', initMouseGestures],
       ['initRadialMenu', initRadialMenu],
       ['renderAppLauncher', renderAppLauncher],
+      ['renderFolderCreator', renderFolderCreator],
       ['renderMacroRecorder', renderMacroRecorder],
       ['updateAutoClickerUI', updateAutoClickerUI]
     ];
@@ -771,7 +890,7 @@
     showToast(`Profile: ${name}`);
   }
 
-  function createNewProfile(name, targetExe = '', switchOnHover = false, showOsdIcon = true) {
+  function createNewProfile(name, targetExe = '', switchOnHover = false, showOsdIcon = true, switchTriggerEnabled = true, switchOnFocus = true) {
     name = (name || '').trim();
     if (!name) return false;
     if (state.config.profiles && state.config.profiles[name]) {
@@ -801,6 +920,8 @@
 
     const newProfile = {
       targetExe: targetExe,
+      switchTriggerEnabled: Boolean(switchTriggerEnabled),
+      switchOnFocus: Boolean(switchOnFocus),
       switchOnHover: Boolean(switchOnHover),
       showOsdIcon: Boolean(showOsdIcon),
       textExpander: {
@@ -814,6 +935,10 @@
       appLauncher: {
         enabled: 1,
         items: cloneItems(state.config.appLauncher && state.config.appLauncher.items)
+      },
+      folderCreator: {
+        enabled: 1,
+        items: cloneItems(state.config.folderCreator && state.config.folderCreator.items)
       },
       macroRecorder: {
         enabled: 1,
@@ -834,14 +959,18 @@
     return true;
   }
 
-  function updateProfileSettings(name, targetExe, switchOnHover, showOsdIcon) {
+  function updateProfileSettings(name, targetExe, switchOnHover, showOsdIcon, switchTriggerEnabled = true, switchOnFocus = true) {
     name = (name || '').trim();
     if (!name || !state.config.profiles || !state.config.profiles[name]) return false;
     saveCurrentProfileState();
     const prof = state.config.profiles[name];
-    prof.targetExe = targetExe;
+    if (name !== 'Default') {
+      prof.targetExe = targetExe;
+      prof.showOsdIcon = Boolean(showOsdIcon);
+    }
+    prof.switchTriggerEnabled = Boolean(switchTriggerEnabled);
+    prof.switchOnFocus = Boolean(switchOnFocus);
     prof.switchOnHover = Boolean(switchOnHover);
-    prof.showOsdIcon = Boolean(showOsdIcon);
     renderProfilesRibbon();
     syncConfig();
     showToast(`Updated settings for "${name}"`);
@@ -879,40 +1008,20 @@
       return false;
     }
 
+    // Always close the modal window immediately
+    closeProfileModal();
+
     delete state.config.profiles[name];
 
     if (state.config.activeProfile === name) {
       const remaining = Object.keys(state.config.profiles);
       const fallback = remaining.includes('Default') ? 'Default' : remaining[0];
-      state.config.activeProfile = fallback;
-      const prof = state.config.profiles[fallback] || {};
-      state.config.textExpander = prof.textExpander;
-      state.config.keyRemapper = prof.keyRemapper;
-      state.config.appLauncher = prof.appLauncher;
-      state.config.macroRecorder = prof.macroRecorder;
-      state.config.windowManager = prof.windowManager;
-      state.config.mouseGestures = prof.mouseGestures;
-      state.config.radialMenu = prof.radialMenu;
-      state.config.autoClicker = prof.autoClicker;
-
-      renderProfileSelect();
-      renderTextExpander();
-      renderKeyRemapper();
-      initWindowManager();
-      initMouseGestures();
-      initRadialMenu();
-      renderAppLauncher();
-      renderMacroRecorder();
-      updateAutoClickerUI();
-      updateGlobalIndicators();
-
-      syncConfig();
+      switchProfile(fallback, true);
     } else {
       renderProfileSelect();
       syncConfig();
     }
     showToast(`Profile "${name}" deleted`);
-    closeProfileModal();
     return true;
   }
 
@@ -986,30 +1095,42 @@
   let profileModalMode = 'add'; // 'add' | 'edit' | 'rename' | 'delete'
   let cachedRunningApps = [];
 
-  function updateProfileTriggerModeUI(isHover) {
+  let modalTriggerState = {
+    enabled: true,
+    focus: true,
+    hover: false
+  };
+
+  function updateProfileTriggerModeUI(enabled, focus, hover) {
+    if (typeof enabled === 'boolean') modalTriggerState.enabled = enabled;
+    if (typeof focus === 'boolean') modalTriggerState.focus = focus;
+    if (typeof hover === 'boolean') modalTriggerState.hover = hover;
+
+    // If master switch is enabled but neither focus nor hover is true, default focus to true
+    if (modalTriggerState.enabled && !modalTriggerState.focus && !modalTriggerState.hover) {
+      modalTriggerState.focus = true;
+    }
+
     const profSwitchOnHover = document.getElementById('profSwitchOnHover');
     const profHoverTitle = document.getElementById('profHoverTitle');
-    const profHoverDesc = document.getElementById('profHoverDesc');
     const chipTriggerFocus = document.getElementById('chipTriggerFocus');
     const chipTriggerHover = document.getElementById('chipTriggerHover');
+    const triggerPills = document.querySelector('.trigger-mode-pills');
 
-    const hoverBool = Boolean(isHover);
     if (profSwitchOnHover) {
-      profSwitchOnHover.checked = hoverBool;
+      profSwitchOnHover.checked = modalTriggerState.enabled;
     }
     if (profHoverTitle) {
-      profHoverTitle.textContent = hoverBool ? 'Switch Trigger: On Mouse Hover' : 'Switch Trigger: On Window Focus';
-    }
-    if (profHoverDesc) {
-      profHoverDesc.textContent = hoverBool
-        ? 'Activate this profile immediately when the mouse cursor enters its window (no click needed).'
-        : 'Activate this profile when you click or switch focus to this application\'s window.';
+      profHoverTitle.textContent = 'Switch Trigger';
     }
     if (chipTriggerFocus) {
-      chipTriggerFocus.classList.toggle('active', !hoverBool);
+      chipTriggerFocus.classList.toggle('active', modalTriggerState.enabled && modalTriggerState.focus);
     }
     if (chipTriggerHover) {
-      chipTriggerHover.classList.toggle('active', hoverBool);
+      chipTriggerHover.classList.toggle('active', modalTriggerState.enabled && modalTriggerState.hover);
+    }
+    if (triggerPills) {
+      triggerPills.classList.toggle('disabled-pills', !modalTriggerState.enabled);
     }
   }
 
@@ -1039,7 +1160,10 @@
     profileModal.classList.toggle('has-mode-delete', isCompact);
 
     if (mode === 'delete') {
-      if (profileConfigCard) profileConfigCard.classList.add('mode-delete');
+      if (profileConfigCard) {
+        profileConfigCard.classList.add('mode-delete');
+        profileConfigCard.classList.remove('is-default-mode');
+      }
       if (profileModalTitle) profileModalTitle.textContent = 'DELETE PROFILE';
       if (profileDeleteNotice) profileDeleteNotice.classList.remove('hidden-field');
       if (profileModalDesc) profileModalDesc.textContent = `Are you sure you want to delete profile "${curName}"?`;
@@ -1055,7 +1179,11 @@
         btnConfirmProfileModal.classList.add('danger');
       }
     } else {
-      if (profileConfigCard) profileConfigCard.classList.toggle('mode-delete', isCompact);
+      const isDefault = (mode === 'edit' && curName === 'Default');
+      if (profileConfigCard) {
+        profileConfigCard.classList.toggle('mode-delete', isCompact);
+        profileConfigCard.classList.toggle('is-default-mode', isDefault);
+      }
       if (profileDeleteNotice) profileDeleteNotice.classList.add('hidden-field');
       if (profileNameGroup) profileNameGroup.classList.remove('hidden-field');
       if (profileExeGroup) profileExeGroup.classList.remove('hidden-field');
@@ -1067,7 +1195,6 @@
         btnConfirmProfileModal.classList.remove('danger');
       }
 
-      const isDefault = (mode === 'edit' && curName === 'Default');
       if (defaultProfileBadgeNotice) {
         defaultProfileBadgeNotice.classList.toggle('hidden-field', !isDefault);
       }
@@ -1075,7 +1202,7 @@
         profileExeGroup.style.display = isDefault ? 'none' : 'flex';
       }
       if (profHoverRow) {
-        profHoverRow.style.display = isDefault ? 'none' : 'flex';
+        profHoverRow.style.display = 'flex';
       }
       if (profOsdRow) {
         profOsdRow.style.display = isDefault ? 'none' : 'flex';
@@ -1095,7 +1222,7 @@
           profInputExe.value = '';
           profInputExe.disabled = false;
         }
-        updateProfileTriggerModeUI(false);
+        updateProfileTriggerModeUI(true, true, false);
         if (profSwitchOsdIcon) profSwitchOsdIcon.checked = true;
         if (btnConfirmProfileModal) btnConfirmProfileModal.textContent = 'Create Profile';
       } else if (mode === 'edit') {
@@ -1109,7 +1236,19 @@
           profInputExe.value = prof.targetExe || '';
           profInputExe.disabled = isDefault;
         }
-        updateProfileTriggerModeUI(Boolean(prof.switchOnHover));
+
+        const triggerEnabled = (typeof prof.switchTriggerEnabled !== 'undefined')
+          ? Boolean(prof.switchTriggerEnabled)
+          : true;
+
+        let triggerFocus = true;
+        let triggerHover = false;
+        if (typeof prof.switchOnFocus !== 'undefined' || typeof prof.switchOnHover !== 'undefined') {
+          triggerFocus = typeof prof.switchOnFocus !== 'undefined' ? Boolean(prof.switchOnFocus) : !prof.switchOnHover;
+          triggerHover = Boolean(prof.switchOnHover);
+        }
+
+        updateProfileTriggerModeUI(triggerEnabled, triggerFocus, triggerHover);
         if (profSwitchOsdIcon) {
           profSwitchOsdIcon.checked = typeof prof.showOsdIcon !== 'undefined' ? Boolean(prof.showOsdIcon) : true;
         }
@@ -1149,7 +1288,10 @@
       profileModal.classList.remove('has-mode-delete');
     }
     const profileConfigCard = document.getElementById('profileConfigCard');
-    if (profileConfigCard) profileConfigCard.classList.remove('mode-delete');
+    if (profileConfigCard) {
+      profileConfigCard.classList.remove('mode-delete');
+      profileConfigCard.classList.remove('is-default-mode');
+    }
     if (btnConfirmProfileModal) {
       btnConfirmProfileModal.classList.remove('danger');
       btnConfirmProfileModal.textContent = 'Save Profile';
@@ -1159,11 +1301,12 @@
   function handleProfileModalConfirm() {
     const curName = (state.config && state.config.activeProfile) || 'Default';
     const profInputExe = document.getElementById('profInputExe');
-    const profSwitchOnHover = document.getElementById('profSwitchOnHover');
     const profSwitchOsdIcon = document.getElementById('profSwitchOsdIcon');
 
     const targetExe = profInputExe ? profInputExe.value.trim() : '';
-    const switchOnHover = profSwitchOnHover ? profSwitchOnHover.checked : false;
+    const switchTriggerEnabled = modalTriggerState.enabled && (modalTriggerState.focus || modalTriggerState.hover);
+    const switchOnFocus = modalTriggerState.enabled ? Boolean(modalTriggerState.focus) : false;
+    const switchOnHover = modalTriggerState.enabled ? Boolean(modalTriggerState.hover) : false;
     const showOsdIcon = profSwitchOsdIcon ? profSwitchOsdIcon.checked : true;
 
     if (profileModalMode === 'add') {
@@ -1173,7 +1316,7 @@
         showToast('Please enter a name for the profile');
         return;
       }
-      if (createNewProfile(name, targetExe, switchOnHover, showOsdIcon)) {
+      if (createNewProfile(name, targetExe, switchOnHover, showOsdIcon, switchTriggerEnabled, switchOnFocus)) {
         closeProfileModal();
       }
     } else if (profileModalMode === 'edit') {
@@ -1182,7 +1325,7 @@
         renameProfile(curName, newName);
       }
       const actualName = (curName !== 'Default' && newName) ? newName : curName;
-      if (updateProfileSettings(actualName, targetExe, switchOnHover, showOsdIcon)) {
+      if (updateProfileSettings(actualName, targetExe, switchOnHover, showOsdIcon, switchTriggerEnabled, switchOnFocus)) {
         closeProfileModal();
       }
     } else if (profileModalMode === 'rename') {
@@ -1195,7 +1338,9 @@
         closeProfileModal();
       }
     } else if (profileModalMode === 'delete') {
-      if (deleteProfile(curName)) {
+      try {
+        deleteProfile(curName);
+      } finally {
         closeProfileModal();
       }
     }
@@ -1398,6 +1543,7 @@
 
       const isMulti = item.multiline || item.output.includes('\n');
       const previewText = item.output.replace(/\n/g, ' \\n ');
+      const profileBadgesHtml = renderItemProfileBadges('textExpander', item.id);
 
       card.innerHTML = `
         <div class="card-info">
@@ -1406,6 +1552,7 @@
           <span class="expansion-text" title="${escapeHtml(item.output)}">${escapeHtml(previewText)}</span>
           ${isMulti ? '<span class="multiline-badge">Multiline</span>' : ''}
         </div>
+        ${profileBadgesHtml}
         <div class="card-actions">
           <button class="card-btn btn-copy" title="Copy Replacement" data-id="${item.id}">
             <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1458,13 +1605,17 @@
         card.classList.toggle('is-disabled', !isChecked);
         if (badge) badge.classList.toggle('is-disabled', !isChecked);
         syncConfig();
+        updateCardProfileBadges(card, 'textExpander', item.id);
         updateGlobalIndicators();
       });
 
       card.addEventListener('click', (e) => {
         if (
           e.target.closest('.card-btn') ||
-          e.target.closest('.toggle-wrapper')
+          e.target.closest('.toggle-wrapper') ||
+          e.target.closest('.item-profiles-badges') ||
+          e.target.closest('.item-profile-badge') ||
+          e.target.closest('.item-profile-badge')
         ) return;
         sw.checked = !sw.checked;
         sw.dispatchEvent(new Event('change'));
@@ -1699,12 +1850,14 @@
       const displaySource = formatKeyDisplay(item.source);
       const displayTarget = formatKeyDisplay(item.target);
       const descText = `${displaySource} → ${displayTarget}`;
+      const profileBadgesHtml = renderItemProfileBadges('keyRemapper', item.id);
       card.innerHTML = `
         <div class="card-info">
           <span class="trigger-badge ${isEnabled ? '' : 'is-disabled'}">${escapeHtml(displaySource)}</span>
           <span class="arrow-divider"><svg class="arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span>
           <span class="expansion-text" title="${escapeHtml(descText)}"><strong>${escapeHtml(displayTarget)}</strong></span>
         </div>
+        ${profileBadgesHtml}
         <div class="card-actions">
           <button class="card-btn btn-delete" title="Delete Remap" data-id="${item.id}">
             <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1759,13 +1912,17 @@
         }
 
         syncConfig();
+        updateCardProfileBadges(card, 'keyRemapper', item.id);
         updateGlobalIndicators();
       });
 
       card.addEventListener('click', (e) => {
         if (
           e.target.closest('.card-btn') ||
-          e.target.closest('.toggle-wrapper')
+          e.target.closest('.toggle-wrapper') ||
+          e.target.closest('.item-profiles-badges') ||
+          e.target.closest('.item-profile-badge') ||
+          e.target.closest('.item-profile-badge')
         ) return;
         sw.checked = !sw.checked;
         sw.dispatchEvent(new Event('change'));
@@ -2673,6 +2830,7 @@
         : `<span class="multiline-badge">STRING</span>`;
 
       const displayTrig = isHotkey ? formatKeyDisplay(item.trigger) : item.trigger;
+      const profileBadgesHtml = renderItemProfileBadges('appLauncher', item.id);
 
       card.innerHTML = `
         <div class="card-info">
@@ -2681,6 +2839,7 @@
           <span class="expansion-text"><strong>${escapeHtml(item.name || 'Launch')}</strong>: ${escapeHtml(item.target)}</span>
           ${typeBadge}
         </div>
+        ${profileBadgesHtml}
         <div class="card-actions">
           <button class="card-btn btn-run" title="Test Launch" data-target="${escapeHtml(item.target)}">
             <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2732,13 +2891,17 @@
         card.classList.toggle('is-disabled', !isChecked);
         if (badge) badge.classList.toggle('is-disabled', !isChecked);
         syncConfig();
+        updateCardProfileBadges(card, 'appLauncher', item.id);
         updateGlobalIndicators();
       });
 
       card.addEventListener('click', (e) => {
         if (
           e.target.closest('.card-btn') ||
-          e.target.closest('.toggle-wrapper')
+          e.target.closest('.toggle-wrapper') ||
+          e.target.closest('.item-profiles-badges') ||
+          e.target.closest('.item-profile-badge') ||
+          e.target.closest('.item-profile-badge')
         ) return;
         sw.checked = !sw.checked;
         sw.dispatchEvent(new Event('change'));
@@ -2819,6 +2982,418 @@
     state.config.appLauncher.items = state.config.appLauncher.items.filter(s => s.id !== id);
     renderAppLauncher();
     syncConfig();
+  }
+
+  // ============================================================================
+  // Module 4.5: Folder Creator
+  // ============================================================================
+
+  function setFcTriggerType(type) {
+    currentFcType = type;
+    if (type === 'hotkey') {
+      if (fcTypeHotkey) fcTypeHotkey.classList.add('active');
+      if (fcTypeString) fcTypeString.classList.remove('active');
+      if (fcTriggerIcon) {
+        fcTriggerIcon.innerHTML = `
+          <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+          <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path>
+        `;
+      }
+      if (fcInputTrigger) {
+        fcInputTrigger.placeholder = 'Press keys (e.g. Ctrl+Alt+Shift+F)...';
+      }
+    } else {
+      if (fcTypeString) fcTypeString.classList.add('active');
+      if (fcTypeHotkey) fcTypeHotkey.classList.remove('active');
+      if (fcTriggerIcon) {
+        fcTriggerIcon.innerHTML = `
+          <polyline points="4 17 10 11 4 5"></polyline>
+          <line x1="12" y1="19" x2="20" y2="19"></line>
+        `;
+      }
+      if (fcInputTrigger) {
+        fcInputTrigger.placeholder = 'Trigger (e.g. @mkproj, @folders)';
+      }
+    }
+  }
+
+  function setFcLocation(loc) {
+    currentFcLocation = loc;
+    if (loc === 'custom') {
+      if (fcLocCustom) fcLocCustom.classList.add('active');
+      if (fcLocActive) fcLocActive.classList.remove('active');
+      if (fcCustomPathRow) fcCustomPathRow.classList.remove('hidden-field');
+      if (fcCustomPathBox) fcCustomPathBox.classList.remove('hidden-field');
+      if (fcToggleAutoOpen) fcToggleAutoOpen.classList.remove('hidden-field');
+    } else {
+      if (fcLocActive) fcLocActive.classList.add('active');
+      if (fcLocCustom) fcLocCustom.classList.remove('active');
+      if (fcCustomPathRow) fcCustomPathRow.classList.add('hidden-field');
+      if (fcCustomPathBox) fcCustomPathBox.classList.add('hidden-field');
+      if (fcToggleAutoOpen) fcToggleAutoOpen.classList.add('hidden-field');
+    }
+  }
+
+  function handleFcTriggerKeydown(e) {
+    if (currentFcType === 'hotkey') {
+      if (e.key === 'Tab') return;
+      if (e.key === 'Enter') {
+        if (!fcTextareaFolders.value.trim()) fcTextareaFolders.focus();
+        else submitFolderCreator();
+        return;
+      }
+
+      const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(e.key);
+      const hasModifier = e.ctrlKey || e.altKey || e.metaKey || (e.shiftKey && (e.ctrlKey || e.altKey || e.metaKey));
+      const isSpecialKey = [
+        'Escape', 'CapsLock', 'Space', 'Backspace', 'Delete', 'Insert',
+        'Home', 'End', 'PageUp', 'PageDown', 'ArrowUp', 'ArrowDown',
+        'ArrowLeft', 'ArrowRight', 'Tab', 'NumLock', 'ScrollLock', 'PrintScreen'
+      ].includes(e.key) || /^F\d{1,2}$/i.test(e.key);
+
+      if ((e.key === 'Backspace' || e.key === 'Delete') && !hasModifier && !e.shiftKey) {
+        fcInputTrigger.value = '';
+        if (fcBtnClearTrigger) fcBtnClearTrigger.classList.add('hidden-field');
+        e.preventDefault();
+        return;
+      }
+
+      if (hasModifier || isModifier || isSpecialKey) {
+        e.preventDefault();
+
+        const parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.metaKey) parts.push('Win');
+
+        if (isModifier) {
+          if (parts.length > 0) {
+            fcInputTrigger.value = parts.join(' + ');
+            if (fcBtnClearTrigger) fcBtnClearTrigger.classList.remove('hidden-field');
+          }
+          return;
+        }
+
+        let key = e.key;
+        if (e.code && e.code.startsWith('Key')) {
+          key = e.code.slice(3).toUpperCase();
+        } else if (e.code && e.code.startsWith('Digit')) {
+          key = e.code.slice(5);
+        } else if (e.code && e.code.startsWith('Numpad')) {
+          key = e.code;
+        } else if (key === ' ') {
+          key = 'Space';
+        } else if (key === 'Escape' || key === 'Esc') {
+          key = 'Escape';
+        } else if (key === 'ArrowUp') {
+          key = 'Up';
+        } else if (key === 'ArrowDown') {
+          key = 'Down';
+        } else if (key === 'ArrowLeft') {
+          key = 'Left';
+        } else if (key === 'ArrowRight') {
+          key = 'Right';
+        } else if (key === 'PageUp') {
+          key = 'PgUp';
+        } else if (key === 'PageDown') {
+          key = 'PgDn';
+        } else if (key.length === 1) {
+          key = key.toUpperCase();
+        }
+
+        if (!parts.includes(key)) {
+          parts.push(key);
+        }
+
+        fcInputTrigger.value = parts.join(' + ');
+        if (fcBtnClearTrigger) fcBtnClearTrigger.classList.remove('hidden-field');
+      }
+    }
+  }
+
+  function renderFolderCreator() {
+    if (!fcContainer) return;
+    fcContainer.innerHTML = '';
+    if (!state.config.folderCreator) {
+      state.config.folderCreator = { enabled: true, items: [] };
+    }
+    const items = state.config.folderCreator.items || [];
+
+    if (items.length === 0) {
+      fcContainer.innerHTML = `
+        <div class="empty-state">
+          <span>No folder creators configured</span>
+          <span style="font-size: 11px;">Configure a trigger and folder structure above</span>
+        </div>
+      `;
+      return;
+    }
+
+    items.forEach(item => {
+      const isHotkey = item.triggerType === 'hotkey';
+      const isEnabled = item.enabled !== false && item.enabled !== 0;
+      const card = document.createElement('div');
+      card.className = `shortcut-card ${isEnabled ? '' : 'is-disabled'}`;
+
+      const badgeIcon = isHotkey
+        ? `<svg class="badge-key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path></svg>`
+        : '';
+
+      const typeBadge = isHotkey
+        ? `<span class="multiline-badge hotkey-tag">SHORTCUT</span>`
+        : `<span class="multiline-badge">TEXT</span>`;
+
+      const displayTrig = isHotkey ? formatKeyDisplay(item.trigger) : item.trigger;
+      const folderCount = item.folderPaths ? item.folderPaths.split(/\r?\n/).filter(l => l.trim()).length : 0;
+      const displayName = item.name ? item.name : `${folderCount} Folders`;
+      const locLabel = item.targetLocation === 'custom' ? (item.customPath || 'Fixed') : 'Active Explorer';
+      const profileBadgesHtml = renderItemProfileBadges('folderCreator', item.id);
+
+      card.innerHTML = `
+        <div class="card-info">
+          <span class="trigger-badge ${isHotkey ? 'trigger-badge-hotkey' : ''} ${isEnabled ? '' : 'is-disabled'}">${badgeIcon}${escapeHtml(displayTrig)}</span>
+          <span class="arrow-divider"><svg class="arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span>
+          <span class="expansion-text" title="${escapeHtml(item.folderPaths || '')}"><strong>${escapeHtml(displayName)}</strong> <span style="font-size:10px; opacity:0.75; font-weight:normal;">(${escapeHtml(locLabel)})</span></span>
+          ${typeBadge}
+        </div>
+        ${profileBadgesHtml}
+        <div class="card-actions">
+          <button class="card-btn btn-duplicate" title="Duplicate Folder Creator">
+            <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+          <button class="card-btn btn-edit" title="Edit Folder Creator" data-id="${item.id}">
+            <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+          </button>
+          <button class="card-btn btn-delete" title="Delete Folder Creator" data-id="${item.id}">
+            <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+          <div class="toggle-wrapper" title="Enable / Disable Folder Creator">
+            <input class="toggle-checkbox fc-switch" type="checkbox" ${isEnabled ? 'checked' : ''}>
+            <div class="toggle-container">
+              <div class="toggle-button"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      card.querySelector('.btn-duplicate').addEventListener('click', (e) => {
+        e.stopPropagation();
+        duplicateFc(item);
+      });
+
+      card.querySelector('.btn-edit').addEventListener('click', (e) => {
+        e.stopPropagation();
+        editFc(item);
+      });
+
+      card.querySelector('.btn-delete').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteFc(item.id);
+      });
+
+      const sw = card.querySelector('.fc-switch');
+      const badge = card.querySelector('.trigger-badge');
+      sw.addEventListener('change', () => {
+        const isChecked = sw.checked;
+        item.enabled = isChecked ? 1 : 0;
+        card.classList.toggle('is-disabled', !isChecked);
+        if (badge) badge.classList.toggle('is-disabled', !isChecked);
+        syncConfig();
+        updateCardProfileBadges(card, 'folderCreator', item.id);
+        updateGlobalIndicators();
+      });
+
+      card.addEventListener('click', (e) => {
+        if (
+          e.target.closest('.card-btn') ||
+          e.target.closest('.toggle-wrapper') ||
+          e.target.closest('.item-profiles-badges') ||
+          e.target.closest('.item-profile-badge')
+        ) return;
+        sw.checked = !sw.checked;
+        sw.dispatchEvent(new Event('change'));
+      });
+
+      fcContainer.appendChild(card);
+    });
+  }
+
+  function submitFolderCreator() {
+    const trig = fcInputTrigger.value.trim();
+    const paths = fcTextareaFolders.value.trim();
+    const name = fcInputName.value.trim();
+    const seedFiles = fcInputSeedFiles.value.trim();
+    const customPath = fcInputCustomPath ? fcInputCustomPath.value.trim() : '';
+
+    if (!trig) {
+      showToast('Please enter or record a trigger');
+      fcInputTrigger.focus();
+      return;
+    }
+    if (!paths) {
+      showToast('Please specify at least one folder path');
+      fcTextareaFolders.focus();
+      return;
+    }
+
+    if (!state.config.folderCreator) {
+      state.config.folderCreator = { enabled: 1, items: [] };
+    }
+    if (!Array.isArray(state.config.folderCreator.items)) {
+      state.config.folderCreator.items = [];
+    }
+
+    if (editingFcId) {
+      const idx = state.config.folderCreator.items.findIndex(s => s.id === editingFcId);
+      if (idx !== -1) {
+        state.config.folderCreator.items[idx] = {
+          ...state.config.folderCreator.items[idx],
+          trigger: trig,
+          triggerType: currentFcType,
+          targetLocation: currentFcLocation,
+          customPath: customPath,
+          folderPaths: paths,
+          seedFiles: seedFiles,
+          autoOpen: fcAutoOpen ? 1 : 0,
+          name: name
+        };
+        updateItemAcrossProfiles('folderCreator', state.config.folderCreator.items[idx]);
+        showToast(`Updated folder creator "${name || trig}"`);
+      }
+      editingFcId = null;
+      if (fcBtnSubmitText) fcBtnSubmitText.textContent = 'ADD';
+    } else {
+      const newFc = {
+        id: 'fc-' + Date.now(),
+        trigger: trig,
+        triggerType: currentFcType,
+        targetLocation: currentFcLocation,
+        customPath: customPath,
+        folderPaths: paths,
+        seedFiles: seedFiles,
+        autoOpen: fcAutoOpen ? 1 : 0,
+        name: name,
+        enabled: 1
+      };
+      state.config.folderCreator.items.unshift(newFc);
+      addItemAcrossProfiles('folderCreator', newFc);
+      showToast(`Added folder creator "${name || trig}"`);
+    }
+
+    fcInputTrigger.value = '';
+    fcTextareaFolders.value = '';
+    fcInputName.value = '';
+    fcInputSeedFiles.value = '';
+    if (fcBtnClearTrigger) fcBtnClearTrigger.classList.add('hidden-field');
+    renderFolderCreator();
+    updateGlobalIndicators();
+    syncConfig();
+  }
+
+  function editFc(item) {
+    editingFcId = item.id;
+    if (fcBtnSubmitText) fcBtnSubmitText.textContent = 'SAVE';
+    setFcTriggerType(item.triggerType || 'string');
+    fcInputTrigger.value = item.trigger || '';
+    if (fcBtnClearTrigger && item.trigger) {
+      fcBtnClearTrigger.classList.remove('hidden-field');
+    }
+    if (fcInputName) fcInputName.value = item.name || '';
+    if (fcTextareaFolders) fcTextareaFolders.value = item.folderPaths || '';
+    if (fcInputSeedFiles) fcInputSeedFiles.value = item.seedFiles || '';
+    if (fcInputCustomPath) fcInputCustomPath.value = item.customPath || '';
+    setFcLocation(item.targetLocation || 'activeExplorer');
+    fcAutoOpen = item.autoOpen !== false && item.autoOpen !== 0;
+    if (fcToggleAutoOpen) {
+      fcToggleAutoOpen.classList.toggle('active', fcAutoOpen);
+    }
+    fcInputTrigger.focus();
+  }
+
+  function deleteFc(id) {
+    if (editingFcId === id) {
+      editingFcId = null;
+      if (fcBtnSubmitText) fcBtnSubmitText.textContent = 'ADD';
+      fcInputTrigger.value = '';
+      fcTextareaFolders.value = '';
+      fcInputName.value = '';
+      fcInputSeedFiles.value = '';
+    }
+    deleteItemAcrossProfiles('folderCreator', id);
+    state.config.folderCreator.items = state.config.folderCreator.items.filter(s => s.id !== id);
+    renderFolderCreator();
+    updateGlobalIndicators();
+    syncConfig();
+    showToast('Folder creator deleted');
+  }
+
+  function duplicateFc(item) {
+    const copy = {
+      ...JSON.parse(JSON.stringify(item)),
+      id: 'fc-' + Date.now(),
+      name: item.name ? `${item.name} (Copy)` : 'Copy',
+      enabled: 1
+    };
+    state.config.folderCreator.items.unshift(copy);
+    addItemAcrossProfiles('folderCreator', copy);
+    renderFolderCreator();
+    updateGlobalIndicators();
+    syncConfig();
+    showToast(`Duplicated "${copy.name}"`);
+  }
+
+  function initFolderCreator() {
+    if (fcTypeString) {
+      fcTypeString.addEventListener('click', () => setFcTriggerType('string'));
+    }
+    if (fcTypeHotkey) {
+      fcTypeHotkey.addEventListener('click', () => setFcTriggerType('hotkey'));
+    }
+    if (fcLocActive) {
+      fcLocActive.addEventListener('click', () => setFcLocation('activeExplorer'));
+    }
+    if (fcLocCustom) {
+      fcLocCustom.addEventListener('click', () => setFcLocation('custom'));
+    }
+    if (fcToggleAutoOpen) {
+      fcToggleAutoOpen.addEventListener('click', () => {
+        fcAutoOpen = !fcAutoOpen;
+        fcToggleAutoOpen.classList.toggle('active', fcAutoOpen);
+      });
+    }
+    if (fcBtnBrowseTarget) {
+      fcBtnBrowseTarget.addEventListener('click', () => {
+        sendToAhk('browseFolder');
+      });
+    }
+    if (fcInputTrigger) {
+      fcInputTrigger.addEventListener('keydown', handleFcTriggerKeydown);
+      fcInputTrigger.addEventListener('input', () => {
+        if (fcBtnClearTrigger) {
+          fcBtnClearTrigger.classList.toggle('hidden-field', !fcInputTrigger.value);
+        }
+      });
+    }
+    if (fcBtnClearTrigger) {
+      fcBtnClearTrigger.addEventListener('click', () => {
+        fcInputTrigger.value = '';
+        fcBtnClearTrigger.classList.add('hidden-field');
+        fcInputTrigger.focus();
+      });
+    }
+    if (fcBtnSubmit) {
+      fcBtnSubmit.addEventListener('click', submitFolderCreator);
+    }
   }
 
   // ============================================================================
@@ -3213,6 +3788,7 @@
       card.dataset.id = item.id;
       card.setAttribute('draggable', 'true');
       const stepsCount = (item.steps && Array.isArray(item.steps)) ? item.steps.length : 0;
+      const profileBadgesHtml = renderItemProfileBadges('macroRecorder', item.id);
 
       let modeTag = 'Once';
       let modeClass = '';
@@ -3245,7 +3821,7 @@
             </div>
           </div>
         </div>
-
+        ${profileBadgesHtml}
         <div class="card-actions">
           <button class="card-btn btn-test-run" title="Test Run Macro">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;">
@@ -3365,12 +3941,16 @@
         if (badge) badge.classList.toggle('is-disabled', !isChecked);
         if (iconBadge) iconBadge.classList.toggle('is-disabled', !isChecked);
         syncConfig();
+        updateCardProfileBadges(card, 'macroRecorder', item.id);
+        updateGlobalIndicators();
       });
 
       card.addEventListener('click', (e) => {
         if (
           e.target.closest('.card-btn') ||
           e.target.closest('.toggle-wrapper') ||
+          e.target.closest('.item-profiles-badges') ||
+          e.target.closest('.item-profile-badge') ||
           card.classList.contains('is-dragging')
         ) return;
         sw.checked = !sw.checked;
@@ -3698,6 +4278,12 @@
         totalItems += al.items.filter(i => i && i.enabled !== false && i.enabled !== 0).length;
       }
 
+      // 3.5. Folder Creator items
+      const fc = prof.folderCreator || (state.config && state.config.folderCreator);
+      if (fc && fc.enabled !== false && fc.enabled !== 0 && Array.isArray(fc.items)) {
+        totalItems += fc.items.filter(i => i && i.enabled !== false && i.enabled !== 0).length;
+      }
+
       // 4. Macro Recorder items
       const mr = prof.macroRecorder || (state.config && state.config.macroRecorder);
       if (mr && mr.enabled !== false && mr.enabled !== 0 && Array.isArray(mr.items)) {
@@ -3751,6 +4337,369 @@
       const circumference = 150.79;
       const offset = circumference - (progress * circumference * 0.75);
       gauge.style.strokeDashoffset = offset;
+    }
+  }
+
+  // ============================================================================
+  // Active Scripts Overview Modal (Quick Switchboard for Current Profile)
+  // ============================================================================
+
+  function openActiveScriptsModal() {
+    const modal = document.getElementById('activeScriptsModal');
+    const body = document.getElementById('activeScriptsModalBody');
+    const titleEl = document.getElementById('activeScriptsModalTitle');
+    const subtitleEl = document.getElementById('activeScriptsModalSubtitle');
+    if (!modal || !body) return;
+
+    saveCurrentProfileState();
+    const currentProfName = (state.config && state.config.activeProfile) || 'Default';
+    const prof = (state.config && state.config.profiles && state.config.profiles[currentProfName])
+      ? state.config.profiles[currentProfName]
+      : (state.config || {});
+
+    if (titleEl) {
+      titleEl.textContent = `ACTIVE SCRIPTS (${currentProfName.toUpperCase()})`;
+    }
+
+    body.innerHTML = '';
+    let totalActive = 0;
+
+    function createActiveItemCard(item, moduleName, displayTitle, displayMeta, onToggle) {
+      const card = document.createElement('div');
+      card.className = 'shortcut-card';
+      const isEnabled = item.enabled !== false && item.enabled !== 0;
+
+      card.innerHTML = `
+        <div class="card-info">
+          <span class="trigger-badge">${escapeHtml(displayTitle)}</span>
+          <span class="arrow-divider"><svg class="arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span>
+          <span class="expansion-text" title="${escapeHtml(displayMeta)}">${escapeHtml(displayMeta)}</span>
+        </div>
+        <div class="card-actions">
+          <div class="toggle-wrapper" title="Toggle On / Off in current profile">
+            <input class="toggle-checkbox active-overview-switch" type="checkbox" ${isEnabled ? 'checked' : ''}>
+            <div class="toggle-container">
+              <div class="toggle-button"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const sw = card.querySelector('.active-overview-switch');
+      sw.addEventListener('change', () => {
+        const checked = sw.checked;
+        item.enabled = checked ? 1 : 0;
+        card.classList.toggle('is-disabled', !checked);
+        if (typeof onToggle === 'function') onToggle(checked);
+        syncConfig();
+        updateGlobalIndicators();
+        // Re-sync subtitle count
+        if (subtitleEl) {
+          const count = body.querySelectorAll('.active-overview-switch:checked').length;
+          subtitleEl.textContent = `Profile: ${currentProfName} • ${count} Active`;
+        }
+      });
+
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.toggle-wrapper')) return;
+        sw.checked = !sw.checked;
+        sw.dispatchEvent(new Event('change'));
+      });
+
+      return card;
+    }
+
+    function appendSection(title, cards) {
+      if (!cards || cards.length === 0) return;
+      const header = document.createElement('div');
+      header.className = 'active-scripts-category-header';
+      header.innerHTML = `
+        <span class="active-scripts-category-title">
+          <svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+          ${escapeHtml(title)}
+        </span>
+        <span class="multiline-badge">${cards.length}</span>
+      `;
+      body.appendChild(header);
+      cards.forEach(c => body.appendChild(c));
+    }
+
+    // 1. Text Expander
+    const te = prof.textExpander || {};
+    if (te.items && Array.isArray(te.items)) {
+      const activeTe = te.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+      const cards = activeTe.map(item => {
+        totalActive++;
+        return createActiveItemCard(
+          item,
+          'textExpander',
+          item.input,
+          item.output.replace(/\n/g, ' \\n '),
+          (checked) => {
+            if (state.config && state.config.textExpander && Array.isArray(state.config.textExpander.items)) {
+              const live = state.config.textExpander.items.find(x => x.id === item.id);
+              if (live) live.enabled = checked ? 1 : 0;
+            }
+            renderTextExpander();
+          }
+        );
+      });
+      appendSection('Text Expander', cards);
+    }
+
+    // 2. Key Remapper
+    const kr = prof.keyRemapper || {};
+    if (kr.items && Array.isArray(kr.items)) {
+      const activeKr = kr.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+      const cards = activeKr.map(item => {
+        totalActive++;
+        const src = formatKeyDisplay(item.source);
+        const tgt = formatKeyDisplay(item.target);
+        return createActiveItemCard(
+          item,
+          'keyRemapper',
+          src,
+          tgt,
+          (checked) => {
+            if (state.config && state.config.keyRemapper && Array.isArray(state.config.keyRemapper.items)) {
+              const live = state.config.keyRemapper.items.find(x => x.id === item.id);
+              if (live) live.enabled = checked ? 1 : 0;
+            }
+            renderKeyRemapper();
+          }
+        );
+      });
+      appendSection('Key Remapper', cards);
+    }
+
+    // 3. App Launcher
+    const al = prof.appLauncher || {};
+    if (al.items && Array.isArray(al.items)) {
+      const activeAl = al.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+      const cards = activeAl.map(item => {
+        totalActive++;
+        const trig = item.triggerType === 'hotkey' ? formatKeyDisplay(item.trigger) : item.trigger;
+        return createActiveItemCard(
+          item,
+          'appLauncher',
+          trig,
+          `${item.name || 'Launch'}: ${item.target}`,
+          (checked) => {
+            if (state.config && state.config.appLauncher && Array.isArray(state.config.appLauncher.items)) {
+              const live = state.config.appLauncher.items.find(x => x.id === item.id);
+              if (live) live.enabled = checked ? 1 : 0;
+            }
+            renderAppLauncher();
+          }
+        );
+      });
+      appendSection('App Launcher', cards);
+    }
+
+    // 3.5. Folder Creator
+    const fc = prof.folderCreator || {};
+    if (fc.items && Array.isArray(fc.items)) {
+      const activeFc = fc.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+      const cards = activeFc.map(item => {
+        totalActive++;
+        const isHk = item.triggerType === 'hotkey';
+        const trig = isHk ? formatKeyDisplay(item.trigger || 'No Key') : (item.trigger || 'No Trigger');
+        return createActiveItemCard(
+          item,
+          'folderCreator',
+          trig,
+          item.name || 'Folder Creator',
+          (checked) => {
+            if (state.config && state.config.folderCreator && Array.isArray(state.config.folderCreator.items)) {
+              const live = state.config.folderCreator.items.find(x => x.id === item.id);
+              if (live) live.enabled = checked ? 1 : 0;
+            }
+            renderFolderCreator();
+          }
+        );
+      });
+      appendSection('Folder Creator', cards);
+    }
+
+    // 4. Macro Recorder
+    const mr = prof.macroRecorder || {};
+    if (mr.items && Array.isArray(mr.items)) {
+      const activeMr = mr.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+      const cards = activeMr.map(item => {
+        totalActive++;
+        const trig = formatKeyDisplay(item.trigger || 'No Key');
+        const count = (item.steps && Array.isArray(item.steps)) ? item.steps.length : 0;
+        return createActiveItemCard(
+          item,
+          'macroRecorder',
+          trig,
+          `${item.name || 'Macro'} (${count} steps)`,
+          (checked) => {
+            if (state.config && state.config.macroRecorder && Array.isArray(state.config.macroRecorder.items)) {
+              const live = state.config.macroRecorder.items.find(x => x.id === item.id);
+              if (live) live.enabled = checked ? 1 : 0;
+            }
+            renderMacroRecorder();
+          }
+        );
+      });
+      appendSection('Macro Recorder', cards);
+    }
+
+    // 5. Window Tools
+    const wm = prof.windowManager || {};
+    const wmDefinitions = [
+      { key: 'alwaysOnTopEnabled', title: 'Always on Top', meta: wm.alwaysOnTopHotkey ? formatKeyDisplay(wm.alwaysOnTopHotkey) : 'Ctrl+Space' },
+      { key: 'centerWindowEnabled', title: 'Center Window', meta: wm.centerWindowHotkey ? formatKeyDisplay(wm.centerWindowHotkey) : 'Ctrl+Alt+C' },
+      { key: 'hideWindowEnabled', title: 'Hide to Tray', meta: wm.hideWindowHotkey ? formatKeyDisplay(wm.hideWindowHotkey) : 'Ctrl+Alt+H' },
+      { key: 'borderlessEnabled', title: 'Borderless Fullscreen', meta: wm.borderlessHotkey ? formatKeyDisplay(wm.borderlessHotkey) : 'Ctrl+Alt+Enter' },
+      { key: 'windowShadeEnabled', title: 'Window Shade Roll-Up', meta: wm.windowShadeHotkey ? formatKeyDisplay(wm.windowShadeHotkey) : 'Ctrl+Alt+R' },
+      { key: 'appVolumeWheel', title: 'Hover App Volume Wheel', meta: 'Alt + Mouse Wheel over window' },
+      { key: 'appVolumeMuteEnabled', title: 'App Volume Mute', meta: wm.appVolumeMuteHotkey ? formatKeyDisplay(wm.appVolumeMuteHotkey) : 'Alt+M' },
+      { key: 'masterAudioMuteEnabled', title: 'Master Audio Mute', meta: 'Alt+M (Mute Speakers)' },
+      { key: 'transparencyWheel', title: 'Window Transparency Wheel', meta: 'Ctrl + Alt + Mouse Wheel' },
+      { key: 'clickThroughGhost', title: 'Ghost Click-Through Window', meta: wm.clickThroughGhostHotkey ? formatKeyDisplay(wm.clickThroughGhostHotkey) : 'Ctrl+Alt+G' },
+      { key: 'textTransformEnabled', title: 'Uppercase Transformation', meta: 'Convert selected text' },
+      { key: 'textTransformCleanEnabled', title: 'Clean String Stripper', meta: 'Strip symbols & spaces' },
+      { key: 'screenOcrEnabled', title: 'Screen Text OCR Snipper', meta: 'Copy text directly from screen' },
+      { key: 'colorPickerEnabled', title: 'Precision Color Eyedropper', meta: 'Pick hex colors from pixels' },
+      { key: 'virtualDesktopsEnabled', title: 'Virtual Desktop Taskbar Switch', meta: 'Mouse wheel over taskbar' },
+      { key: 'taskbarScrollEnabled', title: 'Taskbar Volume Control', meta: 'Mouse wheel over taskbar' }
+    ];
+
+    const activeWmCards = [];
+    wmDefinitions.forEach(def => {
+      if (wm[def.key] === 1 || wm[def.key] === true) {
+        totalActive++;
+        const dummyItem = { enabled: 1 };
+        const c = createActiveItemCard(
+          dummyItem,
+          'windowManager',
+          def.title,
+          def.meta,
+          (checked) => {
+            wm[def.key] = checked ? 1 : 0;
+            if (state.config && state.config.windowManager) {
+              state.config.windowManager[def.key] = checked ? 1 : 0;
+            }
+            initWindowManager();
+          }
+        );
+        activeWmCards.push(c);
+      }
+    });
+    appendSection('Window Tools & Productivity', activeWmCards);
+
+    // 6. Mouse Gestures & Corners
+    const mg = prof.mouseGestures || {};
+    const mgCards = [];
+    if (mg.cornersEnabled === 1 || mg.cornersEnabled === true) {
+      totalActive++;
+      const dummyItem = { enabled: 1 };
+      mgCards.push(createActiveItemCard(
+        dummyItem,
+        'mouseGestures',
+        'Screen Hot Corners',
+        `Top-Left: ${mg.cornerTopLeft || 'None'} • Top-Right: ${mg.cornerTopRight || 'None'}`,
+        (checked) => {
+          mg.cornersEnabled = checked ? 1 : 0;
+          if (state.config && state.config.mouseGestures) {
+            state.config.mouseGestures.cornersEnabled = checked ? 1 : 0;
+          }
+          initMouseGestures();
+        }
+      ));
+    }
+    if (mg.gesturesEnabled === 1 || mg.gesturesEnabled === true) {
+      totalActive++;
+      const dummyItem = { enabled: 1 };
+      mgCards.push(createActiveItemCard(
+        dummyItem,
+        'mouseGestures',
+        'Mouse Gestures',
+        `Trigger: ${mg.triggerButton || 'MButton'}`,
+        (checked) => {
+          mg.gesturesEnabled = checked ? 1 : 0;
+          if (state.config && state.config.mouseGestures) {
+            state.config.mouseGestures.gesturesEnabled = checked ? 1 : 0;
+          }
+          initMouseGestures();
+        }
+      ));
+    }
+    appendSection('Mouse Gestures & Hot Corners', mgCards);
+
+    // 7. Radial Menu
+    const rm = prof.radialMenu || {};
+    if (rm.enabled === 1 || rm.enabled === true) {
+      totalActive++;
+      const dummyItem = { enabled: 1 };
+      const c = createActiveItemCard(
+        dummyItem,
+        'radialMenu',
+        'Radial Menu (Pie Wheel)',
+        `Trigger: ${rm.triggerButton || '^SPACE'} • Radius: ${rm.wheelRadius || 190}px`,
+        (checked) => {
+          rm.enabled = checked ? 1 : 0;
+          if (state.config && state.config.radialMenu) {
+            state.config.radialMenu.enabled = checked ? 1 : 0;
+          }
+          initRadialMenu();
+        }
+      );
+      appendSection('Radial Menu', [c]);
+    }
+
+    // 8. Auto Clicker
+    const ac = prof.autoClicker || {};
+    if (ac.enabled === 1 || ac.enabled === true) {
+      totalActive++;
+      const dummyItem = { enabled: 1 };
+      const c = createActiveItemCard(
+        dummyItem,
+        'autoClicker',
+        'Auto Clicker',
+        `Speed: ${ac.cps || 20} CPS • Button: ${ac.button || 'Left'} • Hotkey: ${ac.hotkey || 'F8'}`,
+        (checked) => {
+          ac.enabled = checked ? 1 : 0;
+          if (state.config && state.config.autoClicker) {
+            state.config.autoClicker.enabled = checked ? 1 : 0;
+          }
+          initAutoClicker();
+        }
+      );
+      appendSection('Auto Clicker', [c]);
+    }
+
+    if (totalActive === 0) {
+      body.innerHTML = `
+        <div class="active-scripts-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span style="font-weight: 700; font-size: 14px;">No Active Scripts in "${escapeHtml(currentProfName)}"</span>
+          <span style="font-size: 12px; max-width: 320px;">Turn on any script switch in the tabs to activate it for this profile.</span>
+        </div>
+      `;
+    }
+
+    if (subtitleEl) {
+      subtitleEl.textContent = `Profile: ${currentProfName} • ${totalActive} Active`;
+    }
+
+    modal.classList.remove('hidden-field');
+  }
+
+  function closeActiveScriptsModal() {
+    const modal = document.getElementById('activeScriptsModal');
+    if (modal) {
+      modal.classList.add('hidden-field');
+      syncConfig();
+      updateGlobalIndicators();
     }
   }
 
@@ -3915,10 +4864,10 @@
       bgColor: '#e8dfd5',
       accentColor: '#d97706',
       radius: 5,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 14,
-      blur: 10
+      distance: 4,
+      lightIntensity: 39,
+      darkIntensity: 5,
+      blur: 9
     },
     'sage-mint': {
       name: 'Sage Mint',
@@ -4115,10 +5064,10 @@
       bgColor: '#e8dfd5',
       accentColor: '#d97706',
       radius: 5,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 6,
-      blur: 10
+      distance: 4,
+      lightIntensity: 39,
+      darkIntensity: 5,
+      blur: 9
     },
     'brutalist-amber': {
       name: 'Brutalist Amber',
@@ -4279,16 +5228,6 @@
       lightIntensity: 85,
       darkIntensity: 18,
       blur: 10
-    },
-    'polar-glacier': {
-      name: 'Polar Glacier',
-      bgColor: '#dbe4ee',
-      accentColor: '#0284c7',
-      radius: 14,
-      distance: 4,
-      lightIntensity: 75,
-      darkIntensity: 22,
-      blur: 9
     },
     'graphite-carbon': {
       name: 'Graphite Studio',
@@ -4635,6 +5574,11 @@
     root.style.setProperty('--accent-gradient', accGradient);
     root.style.setProperty('--accent-trough-gradient', accTroughGrad);
     root.style.setProperty('--accent-trough-shadow', accTroughShadow);
+
+    // Dynamic theme-matching scrollbar variables
+    root.style.setProperty('--scrollbar-thumb', shadowDark);
+    root.style.setProperty('--scrollbar-thumb-hover', accentColor);
+    root.style.setProperty('--bg-hover', shadowDark);
 
     // Apply dynamic Neumorphism core parameters
     root.style.setProperty('--neo-radius', `${radius}px`);
@@ -5068,21 +6012,45 @@
     const profSwitchOnHover = document.getElementById('profSwitchOnHover');
     if (profSwitchOnHover) {
       profSwitchOnHover.addEventListener('change', () => {
-        updateProfileTriggerModeUI(profSwitchOnHover.checked);
+        const isChecked = profSwitchOnHover.checked;
+        if (isChecked) {
+          const f = modalTriggerState.focus || (!modalTriggerState.focus && !modalTriggerState.hover);
+          updateProfileTriggerModeUI(true, f, modalTriggerState.hover);
+        } else {
+          updateProfileTriggerModeUI(false, modalTriggerState.focus, modalTriggerState.hover);
+        }
       });
     }
     const chipTriggerFocus = document.getElementById('chipTriggerFocus');
     if (chipTriggerFocus) {
       chipTriggerFocus.addEventListener('click', (e) => {
         e.stopPropagation();
-        updateProfileTriggerModeUI(false);
+        if (!modalTriggerState.enabled) {
+          updateProfileTriggerModeUI(true, true, modalTriggerState.hover);
+          return;
+        }
+        const newFocus = !modalTriggerState.focus;
+        if (!newFocus && !modalTriggerState.hover) {
+          updateProfileTriggerModeUI(false, false, false);
+        } else {
+          updateProfileTriggerModeUI(true, newFocus, modalTriggerState.hover);
+        }
       });
     }
     const chipTriggerHover = document.getElementById('chipTriggerHover');
     if (chipTriggerHover) {
       chipTriggerHover.addEventListener('click', (e) => {
         e.stopPropagation();
-        updateProfileTriggerModeUI(true);
+        if (!modalTriggerState.enabled) {
+          updateProfileTriggerModeUI(true, modalTriggerState.focus, true);
+          return;
+        }
+        const newHover = !modalTriggerState.hover;
+        if (!newHover && !modalTriggerState.focus) {
+          updateProfileTriggerModeUI(false, false, false);
+        } else {
+          updateProfileTriggerModeUI(true, modalTriggerState.focus, newHover);
+        }
       });
     }
     if (btnConfirmProfileModal) {
@@ -5117,6 +6085,19 @@
     teBtnSubmit.addEventListener('click', submitTextExpander);
     teToggleMultiline.addEventListener('click', () => toggleMultiline());
     teSearchFilter.addEventListener('input', renderTextExpander);
+
+    // Global click delegate for switching profile when clicking a profile badge on any script card
+    document.addEventListener('click', (e) => {
+      const badge = e.target.closest('.item-profile-badge');
+      if (badge && badge.dataset.switchProfile) {
+        e.stopPropagation();
+        e.preventDefault();
+        const targetProfile = badge.dataset.switchProfile;
+        if (state.config && state.config.activeProfile !== targetProfile) {
+          switchProfile(targetProfile);
+        }
+      }
+    }, true);
 
     teInputTrigger.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -5317,11 +6298,43 @@
       });
     }
 
+    const btnBackThemeModal = document.getElementById('btnBackThemeModal');
+    if (btnBackThemeModal) {
+      btnBackThemeModal.addEventListener('click', () => {
+        syncConfig();
+        if (themeModal) themeModal.classList.add('hidden-field');
+      });
+    }
+
     if (themeModal) {
       themeModal.addEventListener('click', (e) => {
         if (e.target === themeModal) {
           syncConfig();
           themeModal.classList.add('hidden-field');
+        }
+      });
+    }
+
+    // Active Items Count button click -> opens Active Scripts Overview Modal
+    const btnStats = document.getElementById('btnStats');
+    if (btnStats) {
+      btnStats.addEventListener('click', () => {
+        openActiveScriptsModal();
+      });
+    }
+
+    const btnCloseActiveScriptsModal = document.getElementById('btnCloseActiveScriptsModal');
+    if (btnCloseActiveScriptsModal) {
+      btnCloseActiveScriptsModal.addEventListener('click', () => {
+        closeActiveScriptsModal();
+      });
+    }
+
+    const activeScriptsModal = document.getElementById('activeScriptsModal');
+    if (activeScriptsModal) {
+      activeScriptsModal.addEventListener('click', (e) => {
+        if (e.target === activeScriptsModal) {
+          closeActiveScriptsModal();
         }
       });
     }
@@ -5517,6 +6530,7 @@
     }
 
     initMacroRecorder();
+    initFolderCreator();
   }
 
   // Handle IPC Messages from AHK
@@ -5599,6 +6613,11 @@
             alInputName.value = msg.name;
           }
           alInputTarget.focus();
+        }
+      } else if (msg.type === 'folderSelected') {
+        if (msg.path && fcInputCustomPath) {
+          fcInputCustomPath.value = msg.path;
+          fcInputCustomPath.focus();
         }
       } else if (msg.type === 'activeAppVolumeChanged') {
         if (msg.name) {
@@ -5702,6 +6721,7 @@
     initMouseGestures();
     initRadialMenu();
     renderAppLauncher();
+    renderFolderCreator();
     initAutoClicker();
     renderMacroRecorder();
     updateGlobalIndicators();
