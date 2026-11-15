@@ -1,98 +1,140 @@
 # AutoHotKeyboard
 
-AutoHotKeyboard is an advanced Windows automation suite and productivity desktop utility. It combines **AutoHotkey v2** as the native automation engine with **Microsoft Edge WebView2** for a hardware-accelerated, tactile Neumorphic (Soft UI) interface.
+AutoHotKeyboard is an advanced Windows automation suite and desktop productivity utility. It combines **AutoHotkey v2** as the low-level automation engine with **Microsoft Edge WebView2** for a hardware-accelerated, tactile Neumorphic (Soft UI) interface.
 
 ![AutoHotKeyboard Overview](docs/screenshots/overview.png)
 
 ---
 
-## Core Features
+## Application Profiles
 
-### Application Profiles
-* **Context-Aware Profiles**: Automatically switch active scripts and shortcuts based on active window focus or mouse hover.
-* **Per-Profile Automation**: Assign dedicated hotkeys, macros, and text expansions per game or application.
-* **Cross-Profile Sharing**: Right-click to copy and paste active script setups between profiles, or force individual scripts to run across all profiles simultaneously.
+The top ribbon bar provides application-specific profile management:
 
-![Application Profiles](docs/screenshots/profiles.png)
+* **Automatic Context Switching**: Automatically activate scripts based on **Window Focus** or **Mouse Hover** over target application windows, or set to **Fully Off** for manual switching.
+* **Per-Profile Automation**: Isolate hotkeys, macros, and text snippets to specific applications or games.
+* **Cross-Profile Sharing**: Right-click any profile to copy and paste its active scripts into another profile.
+* **Universal Script Forcing**: Right-click any script or toggle to force it to run globally across all profiles simultaneously with a single status indicator.
 
-### Neumorphic Radial Menu
-* **8-Slice Quick Wheel**: Access essential actions with a customizable radial wheel triggered by global hotkeys.
-* **Interactive Configuration**: Live diameter scaling, slice assignment, and instant visual preview.
-* **Default Actions**: Screen OCR, Color Picker, Always-on-Top, Task View, Virtual Desktop Navigation, and Audio Controls.
-
-![Radial Menu](docs/screenshots/radial-menu.png)
-
-### Hot Corners & Mouse Gestures
-* **Screen Hot Corners**: Execute actions by moving the cursor into screen corners with configurable dwell time.
-* **Mouse Stroke Gestures**: Directional strokes (Up, Down, Left, Right, Diagonals) while holding a trigger button.
-* **Rocker & Wheel Gestures**: Quick two-button rocker clicks and mouse wheel actions over targeted windows.
-
-### System Tools & Screen Utilities
-* **Precision Color Picker**: Real-time 60 FPS magnifying loupe following the mouse cursor across multi-monitor setups. Supports HEX, RGB, HSL, HSV, and CMYK formats.
-* **Screen OCR (Text Grabber)**: Instant selection marquee to extract text from any screen region directly to clipboard.
-* **Window Management**: Always-on-Top toggle, window shading (roll up to title bar), center window, boss key hide, and transparency adjustment.
-* **Quick PC Sleep Timer**: Configurable countdown timer with sleep and hibernate modes.
-* **Per-App Audio Control**: Mute and adjust volume for active background applications.
-
-### Automation Modules
-* **Text Expander**: Zero-latency text replacement with multiline formatting and clipboard preservation.
-* **Key Remapper**: Low-level keyboard hook remapping for single keys and complex modifier combinations.
-* **App Launcher**: Instant launch via custom keyboard shortcuts or prefix string triggers.
-* **Macro Recorder**: Record and replay keyboard actions with configurable playback modes and loop intervals.
-* **Auto Clicker**: High-performance click engine up to 60 CPS with single and double click modes.
+![Application Profile Settings](docs/screenshots/profile-settings.png)
 
 ---
 
-## Tactile Neumorphic Theming
+## Script Categories
 
-Customize the entire interface using hardware-accelerated CSS custom properties:
-* Curated presets including Soft Clay, Obsidian Dark, Warm Sand, Retro Sharp, and Cyber Violet.
-* Real-time sliders for corner radius, elevation distance, blur radius, and shadow contrast.
-* Custom background and accent color picker with live contrast calculation.
+### 1. Text Expander
+Instant snippet expansion that triggers immediately upon typing the final character anywhere in Windows. Supports multiline formatting for signatures, email templates, and code blocks without clearing the clipboard.
+
+![Text Expander](docs/screenshots/text-expander.png)
+
+---
+
+### 2. Key Remapper
+Remaps single keys and key combinations at the Windows low-level keyboard hook layer. Allows reassigning navigation keys, function keys, and custom modifiers with zero input latency.
+
+![Key Remapper](docs/screenshots/key-remapper.png)
+
+---
+
+### 3. System Tools
+A centralized collection of window management and screen productivity utilities:
+* **Precision Color Picker**: 60 FPS magnifying loupe following the mouse cursor with live multi-format conversion (HEX, RGB, HSL, HSV, CMYK).
+* **Screen OCR (Text Grabber)**: Instant selection marquee to extract text from any screen area directly to clipboard.
+* **Window Controls**: Always-on-Top toggle, window shading (collapse window up into its title bar), center window, boss key hide, and transparency wheel.
+* **Quick PC Sleep Timer**: Countdown sleep and hibernation timer with Esc cancel hook.
+* **Audio Controls**: Per-app volume adjustment and instant mute hotkeys.
+
+![System Tools](docs/screenshots/system-tools.png)
+
+---
+
+### 4. Gestures & Corners
+Cursor-driven productivity shortcuts that do not require keyboard input:
+* **Screen Hot Corners**: Dwell cursor in any display corner to trigger custom actions.
+* **Mouse Stroke Gestures**: Hold a trigger button (e.g., Middle Mouse Button) and draw directional strokes (Up, Down, Left, Right, Diagonals) to navigate tabs or manage windows.
+* **Rocker Gestures**: Instant actions triggered by clicking Left and Right mouse buttons in sequence.
+* **Taskbar Wheel Hopping**: Scroll the mouse wheel over the Windows taskbar to cycle virtual desktops.
+
+![Gestures & Corners](docs/screenshots/gestures-corners.png)
+
+---
+
+### 5. Radial Menu
+A modern 8-slice circular wheel menu accessible via global hotkey:
+* **Interactive Configuration**: Live diameter slider (140px to 260px) and instant visual preview.
+* **Slice Remapping**: Assign actions such as Screen OCR, Color Picker, Always-on-Top, Task View, and Media controls to individual slices.
+* **Fast Selection**: Flick the mouse in the direction of any slice to execute without navigating menus.
+
+![Radial Menu](docs/screenshots/radial-menu.png)
+
+---
+
+### 6. App Launcher
+Launch applications, documents, shell scripts, or URLs through two trigger modes:
+* **String Triggers**: Type a short prefix in any text field (e.g., `@calc` for Calculator, `@gh` for GitHub).
+* **Keyboard Hotkeys**: Trigger directly with global shortcut combinations.
+* Includes a built-in file browser to locate executables and shortcuts.
+
+![App Launcher](docs/screenshots/app-launcher.png)
+
+---
+
+### 7. Folder Creator
+Automates batch directory scaffold creation. Define folder structures and generate complex directory hierarchies across your file system with a single click.
+
+![Folder Creator](docs/screenshots/folder-creator.png)
+
+---
+
+### 8. Auto Clicker
+High-frequency automated mouse clicking engine:
+* **Adjustable Speed**: Dial click rates from 1 to 60 Clicks Per Second (CPS).
+* **Click Modes**: Left, Right, or Middle mouse button in Single or Double click modes.
+* **Global Hotkey**: Toggle clicking on and off with acoustic feedback.
+
+![Auto Clicker](docs/screenshots/auto-clicker.png)
+
+---
+
+### 9. Macro Recorder
+Records sequential keyboard inputs and plays them back on demand:
+* **Configurable Timing**: Use standard fixed delays or preserve real-time user keystroke intervals.
+* **Playback Modes**: Execute once or loop continuously until cancelled.
+* **Trigger Binding**: Trigger macros via custom global hotkeys.
+
+![Macro Recorder](docs/screenshots/macro-recorder.png)
+
+---
+
+## Neumorphic Theme Customizer
+
+The tactile Neumorphic (Soft UI) interface is fully customizable in real time:
+* **Curated Presets**: Soft Clay, Obsidian Dark, Warm Sand, Retro Sharp, Cyber Violet, Sage Mint, and Arctic Frost.
+* **Dynamic Sliders**: Granular control over corner radius, elevation distance, blur radius, light shadow intensity, and dark shadow depth.
+* **Color Selection**: Custom background surface and accent primary colors with automatic text contrast optimization.
 
 ![Neumorphic Theme Customizer](docs/screenshots/theme-customizer.png)
 
 ---
 
-## Installation & Usage
+## Installation & Binaries
 
-### Prebuilt Binaries
-Precompiled releases are available in the repository root:
-* **Standalone Portable Executable**: `AutoHotKeyboard.exe`
-* **Windows Setup Installer**: `AutoHotKeyboard_Setup.exe`
+### Precompiled Releases
+Prebuilt binaries are available in the repository root:
+* **Standalone Portable Executable**: `AutoHotKeyboard.exe` (1.53 MB)
+* **Windows Setup Installer**: `AutoHotKeyboard_Setup.exe` (2.78 MB)
 
 ### Running from Source
-1. Ensure **Windows 10 / 11** with the Edge WebView2 runtime is installed.
+1. Ensure **Windows 10 / 11** with Edge WebView2 runtime is installed.
 2. Install **AutoHotkey v2** from [autohotkey.com](https://www.autohotkey.com/v2/).
-3. Clone the repository and execute:
+3. Run the application:
    ```powershell
    & "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe" "main.ahk"
    ```
 
 ### Building Release Binaries
-To compile both the standalone executable and the setup installer:
+Compile the standalone executable and Inno Setup installer:
 ```powershell
 .\build.ps1
-```
-
----
-
-## Project Structure
-
-```text
-AutoHotKeyboard/
-├── main.ahk                  # AutoHotkey v2 core engine & IPC dispatcher
-├── build.ps1                 # Automated compiler & installer pipeline
-├── config.json               # User profile state & configuration
-├── installer/
-│   └── installer.iss         # Inno Setup installer script
-├── docs/
-│   └── screenshots/          # Application screenshots
-├── lib/                      # Core dependencies (JSON, OCR, Promise, WebView2)
-└── ui/                       # Front-end user interface
-    ├── index.html            # Semantic layout & modals
-    ├── style.css             # Neumorphic design system & dynamic variables
-    └── app.js                # Two-way WebView2 IPC bridge
 ```
 
 ---
