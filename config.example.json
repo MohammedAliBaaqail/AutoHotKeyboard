@@ -1,6 +1,7 @@
 {
   "version": "2.0",
   "activeProfile": "default",
+  "activeTab": "textExpander",
   "profiles": [
     {
       "id": "default",
@@ -82,7 +83,7 @@
     "customPresets": []
   },
   "window": {
-    "width": 1320,
-    "height": 760
+    "widthPercent": 70,
+    "heightPercent": 75
   }
 }

@@ -31,9 +31,57 @@ A_MenuMaskKey := "vkE8"
 
 ; Global constants and variables
 global APP_NAME := "AutoHotKeyboard"
-global APP_WIDTH := 1320
-global APP_HEIGHT := 760
+global DEFAULT_WINDOW_WIDTH_PCT := 70   ; Default 70% of screen work area
+global DEFAULT_WINDOW_HEIGHT_PCT := 75  ; Default 75% of screen work area
 global CONFIG_FILE := A_ScriptDir . "\config.json"
+
+GetDefaultWindowSize(&defW, &defH, &defX, &defY, monIndex := 1) {
+    global DEFAULT_WINDOW_WIDTH_PCT, DEFAULT_WINDOW_HEIGHT_PCT
+    try {
+        monCount := MonitorGetCount()
+        if (monIndex < 1 || monIndex > monCount) {
+            try monIndex := MonitorGetPrimary()
+            catch
+                monIndex := 1
+        }
+        MonitorGetWorkArea(monIndex, &wL, &wT, &wR, &wB)
+        monW := wR - wL
+        monH := wB - wT
+    } catch {
+        wL := 0, wT := 0
+        monW := A_ScreenWidth
+        monH := A_ScreenHeight
+    }
+    pctW := (DEFAULT_WINDOW_WIDTH_PCT > 0) ? (DEFAULT_WINDOW_WIDTH_PCT / 100.0) : 0.70
+    pctH := (DEFAULT_WINDOW_HEIGHT_PCT > 0) ? (DEFAULT_WINDOW_HEIGHT_PCT / 100.0) : 0.75
+
+    defW := Max(720, Min(monW - 40, Round(monW * pctW)))
+    defH := Max(520, Min(monH - 60, Round(monH * pctH)))
+    defX := wL + Max(0, (monW - defW) // 2)
+    defY := wT + Max(0, (monH - defH) // 2)
+}
+
+GetMonitorFromRect(x, y, w, h) {
+    cx := x + (w // 2)
+    cy := y + (h // 2)
+    try {
+        monCount := MonitorGetCount()
+        loop monCount {
+            MonitorGet(A_Index, &mL, &mT, &mR, &mB)
+            if (cx >= mL && cx < mR && cy >= mT && cy < mB)
+                return A_Index
+        }
+        loop monCount {
+            MonitorGet(A_Index, &mL, &mT, &mR, &mB)
+            if (x < mR && (x + w) > mL && y < mB && (y + h) > mT)
+                return A_Index
+        }
+    }
+    try {
+        return MonitorGetPrimary()
+    }
+    return 1
+}
 
 global g_MainGui := 0
 global g_Wvc := 0
@@ -63,6 +111,7 @@ global g_MacroIsExecuting := false
 
 LogMessage(msg) {
     OutputDebug("[AutoHotKeyboard] " . msg)
+    try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") . " [AutoHotKeyboard] " . msg . "`n", A_ScriptDir . "\debug.log", "UTF-8")
 }
 
 ; Initialize Application
@@ -78,7 +127,7 @@ OnExit(OnAppExit)
 
 SaveWindowState() {
     global g_MainGui, g_Config
-    if (!g_MainGui)
+    if (!g_MainGui || !g_MainGui.Hwnd)
         return
     try {
         minMax := WinGetMinMax("ahk_id " . g_MainGui.Hwnd)
@@ -90,13 +139,27 @@ SaveWindowState() {
         }
         g_Config["window"]["isMaximized"] := isMax ? 1 : 0
         
+        g_MainGui.GetPos(&curX, &curY, &curW, &curH)
+        targetMon := GetMonitorFromRect(curX, curY, curW, curH)
+        g_Config["window"]["monitor"] := targetMon
+        
         ; Only save restored dimensions when the window is neither maximized nor minimized
         if (!isMax && !isMin) {
-            ; GetClientPos returns true client area dimensions without non-client borders/caption
-            g_MainGui.GetClientPos(,, &cliW, &cliH)
-            if (cliW >= 720 && cliH >= 520 && cliW <= A_ScreenWidth && cliH <= A_ScreenHeight) {
-                g_Config["window"]["width"] := cliW
-                g_Config["window"]["height"] := cliH
+            if (curW >= 720 && curH >= 520) {
+                g_Config["window"]["width"] := curW
+                g_Config["window"]["height"] := curH
+                g_Config["window"]["x"] := curX
+                g_Config["window"]["y"] := curY
+                try {
+                    MonitorGetWorkArea(targetMon, &wL, &wT, &wR, &wB)
+                    monW := wR - wL
+                    monH := wB - wT
+                    if (monW > 0 && monH > 0) {
+                        g_Config["window"]["widthPercent"] := Round((curW / Float(monW)) * 100, 1)
+                        g_Config["window"]["heightPercent"] := Round((curH / Float(monH)) * 100, 1)
+                    }
+                }
+                g_Config["window"]["userCustomized"] := 1
             }
         }
     }
@@ -145,6 +208,8 @@ InitConfig() {
                         g_Config[modName] := modVal
                     }
                 }
+                ; Always default to Text Expander tab on startup
+                g_Config["activeTab"] := "textExpander"
                 
                 ; Ensure theme has all Neumorphism parameters
                 if (g_Config.Has("theme") && IsObject(g_Config["theme"])) {
@@ -174,14 +239,8 @@ InitConfig() {
                 
                 ; Ensure window custom size is tracked and valid
                 if (!g_Config.Has("window") || !IsObject(g_Config["window"])) {
-                    g_Config["window"] := Map("width", APP_WIDTH, "height", APP_HEIGHT)
-                } else {
-                    if (!g_Config["window"].Has("width") || g_Config["window"]["width"] < 720) {
-                        g_Config["window"]["width"] := APP_WIDTH
-                    }
-                    if (!g_Config["window"].Has("height") || g_Config["window"]["height"] < 520) {
-                        g_Config["window"]["height"] := APP_HEIGHT
-                    }
+                    GetDefaultWindowSize(&defW, &defH, &defX, &defY)
+                    g_Config["window"] := Map("widthPercent", DEFAULT_WINDOW_WIDTH_PCT, "heightPercent", DEFAULT_WINDOW_HEIGHT_PCT, "width", defW, "height", defH)
                 }
             } else {
                 g_Config := GetDefaultConfig()
@@ -322,8 +381,8 @@ GetDefaultConfig() {
             "customPresets", []
         ),
         "window", Map(
-            "width", 1320,
-            "height", 760
+            "widthPercent", DEFAULT_WINDOW_WIDTH_PCT,
+            "heightPercent", DEFAULT_WINDOW_HEIGHT_PCT
         )
     )
 }
@@ -1883,7 +1942,7 @@ class ProfileAppScanner {
             width := 0, height := 0
             DllCall("gdiplus\GdipGetImageWidth", "Ptr", pBitmap, "UInt*", &width)
             DllCall("gdiplus\GdipGetImageHeight", "Ptr", pBitmap, "UInt*", &height)
-            if (width < 4 || height < 4)
+            if (width < 4 || height < 4 || width > 128 || height > 128)
                 return
 
             ; Check if top-left corner is solid white or near-white (common GDI+ artifact from masked icons)
@@ -1899,7 +1958,9 @@ class ProfileAppScanner {
             ; Flood-fill from 4 outer corners to convert connected white background to alpha 0
             queue := [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1]]
             visited := Map()
-            while (queue.Length > 0) {
+            maxIters := 2000
+            iter := 0
+            while (queue.Length > 0 && ++iter <= maxIters) {
                 pt := queue.Pop()
                 x := pt[1], y := pt[2]
                 if (x < 0 || x >= width || y < 0 || y >= height)
@@ -1957,9 +2018,15 @@ class ProfileAppScanner {
 
     static ExtractWindowIcon(hwnd, outPng) {
         try {
-            hIcon := SendMessage(0x007F, 1, 0, hwnd) ; WM_GETICON, ICON_BIG
-            if (!hIcon)
-                hIcon := SendMessage(0x007F, 0, 0, hwnd) ; WM_GETICON, ICON_SMALL
+            hIcon := 0
+            res := 0
+            ; Use SendMessageTimeout with 150ms to prevent hanging on unresponsive or suspended windows
+            if (DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 1, "Ptr", 0, "UInt", 0x0002, "UInt", 150, "Ptr*", &res)) {
+                hIcon := res
+            }
+            if (!hIcon && DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 0, "Ptr", 0, "UInt", 0x0002, "UInt", 150, "Ptr*", &res)) {
+                hIcon := res
+            }
             if (!hIcon)
                 hIcon := DllCall("GetClassLongPtr", "Ptr", hwnd, "Int", -14, "Ptr") ; GCLP_HICON
             if (!hIcon)
@@ -2099,6 +2166,25 @@ class ProfileAppScanner {
         if (!DirExist(outDir)) {
             try DirCreate(outDir)
         }
+        myPid := DllCall("GetCurrentProcessId", "UInt")
+        thisExe := StrLower(A_ScriptName)
+        cleanThisExe := RegExReplace(thisExe, "i)\.ahk$", ".exe")
+
+        skipProcesses := Map(
+            "explorer.exe", 1,
+            "autohotkey64.exe", 1,
+            "autohotkey32.exe", 1,
+            "autohotkeyboard.exe", 1,
+            "msedgewebview2.exe", 1,
+            "applicationframehost.exe", 1,
+            "systemsettings.exe", 1,
+            "shellexperiencehost.exe", 1,
+            "searchhost.exe", 1,
+            "startmenuexperiencehost.exe", 1,
+            "lockapp.exe", 1,
+            cleanThisExe, 1
+        )
+
         try {
             hwndList := WinGetList()
             for hwnd in hwndList {
@@ -2108,31 +2194,44 @@ class ProfileAppScanner {
                 if (title == "" || title == "Program Manager")
                     continue
                 try {
+                    winPid := WinGetPID("ahk_id " . hwnd)
+                    if (winPid = myPid)
+                        continue
+                } catch {
+                    continue
+                }
+                try {
                     pname := WinGetProcessName(hwnd)
-                    if (pname != "" && !procs.Has(pname)) {
-                        if (pname != "explorer.exe" && pname != "AutoHotkey64.exe" && pname != "msedgewebview2.exe" && pname != "ApplicationFrameHost.exe" && pname != "SystemSettings.exe") {
-                            cleanProc := RegExReplace(pname, "i)\.exe$", "")
-                            iconFile := outDir . "\" . cleanProc . ".png"
-                            if (!FileExist(iconFile)) {
-                                exePath := ""
-                                try exePath := WinGetProcessPath(hwnd)
-                                if (exePath != "" && FileExist(exePath)) {
-                                    this.ExtractExeIcon(exePath, iconFile)
-                                }
-                                if (!FileExist(iconFile)) {
-                                    this.ExtractWindowIcon(hwnd, iconFile)
-                                }
-                            }
-                            hasIcon := FileExist(iconFile) ? 1 : 0
-                            procs[pname] := { title: title, icon: cleanProc, hasIcon: hasIcon }
+                    if (pname == "")
+                        continue
+                    lowPname := StrLower(pname)
+                    if (skipProcesses.Has(lowPname) || procs.Has(lowPname))
+                        continue
+
+                    cleanProc := RegExReplace(pname, "i)\.exe$", "")
+                    iconFile := outDir . "\" . cleanProc . ".png"
+                    if (!FileExist(iconFile)) {
+                        exePath := ""
+                        try exePath := WinGetProcessPath(hwnd)
+                        if (exePath != "" && FileExist(exePath)) {
+                            this.ExtractExeIcon(exePath, iconFile)
+                        }
+                        if (!FileExist(iconFile)) {
+                            this.ExtractWindowIcon(hwnd, iconFile)
                         }
                     }
+                    hasIcon := FileExist(iconFile) ? 1 : 0
+                    procs[lowPname] := { title: title, icon: cleanProc, hasIcon: hasIcon, process: pname }
+                } catch {
+                    continue
                 }
             }
+        } catch as err {
+            LogMessage("GetRunningApps scan error: " . err.Message)
         }
         out := []
-        for pname, info in procs {
-            out.Push(Map("process", pname, "title", info.title, "icon", info.icon, "hasIcon", info.hasIcon))
+        for lowPname, info in procs {
+            out.Push(Map("process", info.process, "title", info.title, "icon", info.icon, "hasIcon", info.hasIcon))
         }
         return out
     }
@@ -3440,25 +3539,98 @@ CreateMainWindow() {
     }
     g_MainGui.BackColor := initBg
     
-    winW := APP_WIDTH
-    winH := APP_HEIGHT
-    isStartMax := 0
+    targetMon := 1
     if (g_Config.Has("window") && IsObject(g_Config["window"])) {
-        if (g_Config["window"].Has("width") && g_Config["window"]["width"] >= 720) {
-            winW := Integer(g_Config["window"]["width"])
+        winCfg := g_Config["window"]
+        if (winCfg.Has("monitor") && Integer(winCfg["monitor"]) > 0) {
+            targetMon := Integer(winCfg["monitor"])
+        } else if (winCfg.Has("x") && winCfg.Has("y") && winCfg.Has("width") && winCfg.Has("height")) {
+            targetMon := GetMonitorFromRect(Integer(winCfg["x"]), Integer(winCfg["y"]), Integer(winCfg["width"]), Integer(winCfg["height"]))
         }
-        if (g_Config["window"].Has("height") && g_Config["window"]["height"] >= 520) {
-            winH := Integer(g_Config["window"]["height"])
+    }
+
+    try {
+        monCount := MonitorGetCount()
+        if (targetMon > monCount || targetMon < 1) {
+            try targetMon := MonitorGetPrimary()
+            catch
+                targetMon := 1
         }
-        if (g_Config["window"].Has("isMaximized") && g_Config["window"]["isMaximized"]) {
+    } catch {
+        targetMon := 1
+    }
+
+    GetDefaultWindowSize(&defW, &defH, &defX, &defY, targetMon)
+    
+    winW := defW
+    winH := defH
+    posX := defX
+    posY := defY
+    isStartMax := 0
+
+    if (g_Config.Has("window") && IsObject(g_Config["window"])) {
+        winCfg := g_Config["window"]
+        try {
+            MonitorGetWorkArea(targetMon, &wL, &wT, &wR, &wB)
+            monW := wR - wL
+            monH := wB - wT
+        } catch {
+            wL := 0, wT := 0
+            monW := A_ScreenWidth
+            monH := A_ScreenHeight
+        }
+
+        isUserCustomized := (winCfg.Has("userCustomized") && winCfg["userCustomized"])
+
+        ; Width
+        if (isUserCustomized && winCfg.Has("width") && Integer(winCfg["width"]) >= 720) {
+            winW := Min(Integer(winCfg["width"]), monW - 20)
+        } else if (winCfg.Has("widthPercent") && Float(winCfg["widthPercent"]) > 0) {
+            valPct := Float(winCfg["widthPercent"])
+            if (isUserCustomized || valPct >= 50.0 || monW < 1400) {
+                winW := Max(720, Min(monW - 40, Round(monW * (valPct / 100.0))))
+            } else {
+                winW := defW
+            }
+        } else {
+            winW := defW
+        }
+
+        ; Height
+        if (isUserCustomized && winCfg.Has("height") && Integer(winCfg["height"]) >= 520) {
+            winH := Min(Integer(winCfg["height"]), monH - 20)
+        } else if (winCfg.Has("heightPercent") && Float(winCfg["heightPercent"]) > 0) {
+            valHPct := Float(winCfg["heightPercent"])
+            if (isUserCustomized || valHPct >= 50.0 || monH < 900) {
+                winH := Max(520, Min(monH - 60, Round(monH * (valHPct / 100.0))))
+            } else {
+                winH := defH
+            }
+        } else {
+            winH := defH
+        }
+
+        ; Position
+        if (isUserCustomized && winCfg.Has("x") && winCfg.Has("y")) {
+            savedX := Integer(winCfg["x"])
+            savedY := Integer(winCfg["y"])
+            ; Validate that saved coordinates are visible on target monitor
+            if (savedX >= (wL - winW + 100) && savedX <= (wR - 100) && savedY >= (wT - 20) && savedY <= (wB - 100)) {
+                posX := Max(wL, Min(wR - winW, savedX))
+                posY := Max(wT, Min(wB - winH, savedY))
+            } else {
+                posX := wL + Max(0, (monW - winW) // 2)
+                posY := wT + Max(0, (monH - winH) // 2)
+            }
+        } else {
+            posX := wL + Max(0, (monW - winW) // 2)
+            posY := wT + Max(0, (monH - winH) // 2)
+        }
+
+        if (winCfg.Has("isMaximized") && winCfg["isMaximized"]) {
             isStartMax := 1
         }
     }
-    winW := Min(winW, A_ScreenWidth - 40)
-    winH := Min(winH, A_ScreenHeight - 60)
-    
-    posX := Max(0, (A_ScreenWidth - winW) // 2)
-    posY := Max(0, (A_ScreenHeight - winH) // 2)
     
     g_MainGui.OnEvent("Close", (*) => ExitApp())
     g_MainGui.OnEvent("Size", OnGuiSize)
@@ -3471,6 +3643,7 @@ CreateMainWindow() {
     ; Suppress Windows default top non-client frame calculation to eliminate the top white line artifact
     OnMessage(0x0083, OnNcCalcSize)
     OnMessage(0x0024, OnGetMinMaxInfo)
+    OnMessage(0x0232, OnExitSizeMove)
     
     ; Set App Icon for Windows Taskbar & System Tray
     iconPath := A_ScriptDir . "\app-icon.ico"
@@ -3644,7 +3817,7 @@ InitWebView2() {
 }
 
 OnGuiSize(guiObj, minMax, width, height) {
-    global g_Wvc, g_Wv, g_Config
+    global g_Wvc, g_Wv, g_Config, g_MainGui
     if (g_Wvc && minMax != -1) {
         try g_Wvc.Fill()
     }
@@ -3660,14 +3833,42 @@ OnGuiSize(guiObj, minMax, width, height) {
         }
         g_Config["window"]["width"] := width
         g_Config["window"]["height"] := height
+        try {
+            g_MainGui.GetPos(&curX, &curY)
+            targetMon := GetMonitorFromRect(curX, curY, width, height)
+            MonitorGetWorkArea(targetMon, &wL, &wT, &wR, &wB)
+            monW := wR - wL
+            monH := wB - wT
+            if (monW > 0 && monH > 0) {
+                g_Config["window"]["widthPercent"] := Round((width / Float(monW)) * 100, 1)
+                g_Config["window"]["heightPercent"] := Round((height / Float(monH)) * 100, 1)
+                g_Config["window"]["userCustomized"] := 1
+                g_Config["window"]["monitor"] := targetMon
+                g_Config["window"]["x"] := curX
+                g_Config["window"]["y"] := curY
+            }
+        }
         g_Config["window"]["isMaximized"] := 0
         SetTimer(SaveWindowSizeDebounced, -600)
     } else if (minMax = 1) {
         if (!g_Config.Has("window") || !IsObject(g_Config["window"])) {
             g_Config["window"] := Map()
         }
+        try {
+            g_MainGui.GetPos(&curX, &curY, &curW, &curH)
+            targetMon := GetMonitorFromRect(curX, curY, curW, curH)
+            g_Config["window"]["monitor"] := targetMon
+        }
         g_Config["window"]["isMaximized"] := 1
         SetTimer(SaveWindowSizeDebounced, -600)
+    }
+}
+
+OnExitSizeMove(wParam, lParam, msg, hwnd) {
+    global g_MainGui
+    if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+        SaveWindowState()
+        SetTimer(SaveWindowSizeDebounced, -300)
     }
 }
 
@@ -3904,6 +4105,12 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                     }
                 } catch as err {
                     LogMessage("getRunningApps error: " . err.Message)
+                    if (g_Wv) {
+                        try g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                            "type", "runningAppsList",
+                            "apps", []
+                        )))
+                    }
                 }
 
             case "browseProfileApp":

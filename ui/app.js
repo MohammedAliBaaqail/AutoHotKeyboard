@@ -219,7 +219,7 @@
 
   if (window.__INITIAL_CONFIG__) {
     state.config = { ...state.config, ...window.__INITIAL_CONFIG__ };
-    if (window.__INITIAL_CONFIG__.activeTab) state.activeTab = window.__INITIAL_CONFIG__.activeTab;
+    state.activeTab = 'textExpander';
     if (typeof window.__INITIAL_CONFIG__.enabled === 'boolean') state.enabled = window.__INITIAL_CONFIG__.enabled;
     isInitialized = true;
   }
@@ -676,7 +676,6 @@
     { id: 'mgWheelSwitch', module: 'mouseGestures', key: 'wheelGestureEnabled' },
     // Radial Menu
     { id: 'rmMasterSwitch', module: 'radialMenu', key: 'enabled' },
-    { id: 'rmControlsSwitch', module: 'radialMenu', key: 'enabled' },
     // System Tools (Window Manager)
     { id: 'wmSwitchAlwaysOnTop', module: 'windowManager', key: 'alwaysOnTopEnabled' },
     { id: 'wmSwitchCenterWindow', module: 'windowManager', key: 'centerWindowEnabled' },
@@ -4345,9 +4344,8 @@
     }
     const rm = state.config.radialMenu;
 
-    // Master switches (both preview wheel and controls setup column)
+    // Master switch for Radial Menu
     const rmMasterSwitch = document.getElementById('rmMasterSwitch');
-    const rmControlsSwitch = document.getElementById('rmControlsSwitch');
     const previewCol = document.querySelector('.rm-column-preview');
     const controlsCol = document.querySelector('.rm-column-controls');
     const rmTriggerSelect = document.getElementById('rmTriggerSelect');
@@ -4357,7 +4355,6 @@
     function syncRadialMenuState(enabled) {
       state.config.radialMenu.enabled = enabled ? 1 : 0;
       if (rmMasterSwitch) rmMasterSwitch.checked = !!enabled;
-      if (rmControlsSwitch) rmControlsSwitch.checked = !!enabled;
       if (previewCol) previewCol.classList.toggle('is-disabled', !enabled);
       if (controlsCol) controlsCol.classList.toggle('is-disabled', !enabled);
       if (rmTriggerSelect) {
@@ -4380,16 +4377,6 @@
         rmMasterSwitch.dataset.bound = 'true';
         rmMasterSwitch.addEventListener('change', () => {
           syncRadialMenuState(rmMasterSwitch.checked);
-        });
-      }
-    }
-
-    if (rmControlsSwitch) {
-      rmControlsSwitch.checked = isRm;
-      if (!rmControlsSwitch.dataset.bound) {
-        rmControlsSwitch.dataset.bound = 'true';
-        rmControlsSwitch.addEventListener('change', () => {
-          syncRadialMenuState(rmControlsSwitch.checked);
         });
       }
     }
@@ -9198,7 +9185,11 @@
         if (msg.config) {
           state.config = msg.config;
           ensureProfilesConfig(state.config);
-          if (msg.config.activeTab) state.activeTab = msg.config.activeTab;
+          if (msg.type === 'init') {
+            state.activeTab = 'textExpander';
+          } else if (msg.config.activeTab) {
+            state.activeTab = msg.config.activeTab;
+          }
           if (msg.config.theme && msg.config.theme.bgColor && msg.config.theme.accentColor) {
             applyTheme(
               msg.config.theme.bgColor,
