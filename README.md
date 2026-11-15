@@ -1,115 +1,102 @@
 # AutoHotKeyboard
 
-**AutoHotKeyboard** is a modern Windows desktop utility powered by **AutoHotkey v2** as the native automation engine and **Microsoft Edge WebView2** for a pixel-perfect, hardware-accelerated **Neumorphic (Soft UI)** tactile user interface.
+AutoHotKeyboard is an advanced Windows automation suite and productivity desktop utility. It combines **AutoHotkey v2** as the native automation engine with **Microsoft Edge WebView2** for a hardware-accelerated, tactile Neumorphic (Soft UI) interface.
+
+![AutoHotKeyboard Overview](docs/screenshots/overview.png)
 
 ---
 
-## ✨ Features & Modules
+## Core Features
 
-### 1. ⚡ Text Expander & Multiline Snippets
-* **Zero-Latency Expansion**: Triggers (e.g. `@@1`) expand instantly upon typing the last character anywhere in Windows (no Space or Enter required).
-* **Multiline Support**: Toggle multiline expansion for full email templates, code boilerplate, or addresses with preserved formatting.
-* **Pre-configured Examples**:
-  * `@@1` $\rightarrow$ `myemail@gmail.com`
-  * `@@sig` $\rightarrow$ Multi-line professional signature
+### Application Profiles
+* **Context-Aware Profiles**: Automatically switch active scripts and shortcuts based on active window focus or mouse hover.
+* **Per-Profile Automation**: Assign dedicated hotkeys, macros, and text expansions per game or application.
+* **Cross-Profile Sharing**: Right-click to copy and paste active script setups between profiles, or force individual scripts to run across all profiles simultaneously.
 
-### 2. ⌨️ Key Remapper & Custom Shortcuts
-* **Low-Level Hook Remapping**: Seamlessly remap keys at the Windows keyboard hook layer.
-* **Pre-configured Examples**:
-  * `CapsLock` $\rightarrow$ `Control` (essential for programmers/vim users).
-  * `Ctrl + Alt + M` $\rightarrow$ Mute/Unmute master volume with acoustic chime feedback.
+![Application Profiles](docs/screenshots/profiles.png)
 
-### 3. 🪟 Window Management
-* **Always-on-Top (`Ctrl + Space`)**: Pin the active window above all others.
-* **Center Window (`Ctrl + Alt + C`)**: Snaps the foreground window to the exact center of your screen.
-* **Boss Key (`Ctrl + Alt + H`)**: Instantly hides the active window.
-* **Scrollwheel Opacity (`Win + Mouse Wheel`)**: Dynamically adjust any window's transparency on the fly.
-* **Soft UI Opacity Slider**: Live interactive translucency preview.
+### Neumorphic Radial Menu
+* **8-Slice Quick Wheel**: Access essential actions with a customizable radial wheel triggered by global hotkeys.
+* **Interactive Configuration**: Live diameter scaling, slice assignment, and instant visual preview.
+* **Default Actions**: Screen OCR, Color Picker, Always-on-Top, Task View, Virtual Desktop Navigation, and Audio Controls.
 
-### 4. 🚀 Quick App Launcher & Command Runner
-* **Dual Trigger Modes**: Launch apps, open URLs, or run shell scripts by typing a text trigger (e.g. `@calc`) OR by pressing a custom global shortcut (e.g. `Ctrl+Alt+D`).
-* **Built-in File Browser**: One-click file picker to locate `.exe`, `.lnk`, or application paths directly from the UI.
-* **Pre-configured Examples**:
-  * `@calc` $\rightarrow$ Windows Calculator
-  * `@yt` $\rightarrow$ YouTube
-  * `@gh` $\rightarrow$ GitHub
+![Radial Menu](docs/screenshots/radial-menu.png)
 
-### 5. 🖱️ Auto-Clicker & Key Repeater
-* **High-Speed Non-Blocking Engine**: Accurate timer-based clicker capable of up to 60 Clicks Per Second (CPS).
-* **Tactile CPS Slider**: Smoothly dial CPS from 1 to 60.
-* **Flexible Action Types**: Left, Right, or Middle click; Single or Double click.
-* **Global Hotkey (`F8`)**: Toggle clicking on/off anywhere in Windows with chime feedback.
+### Hot Corners & Mouse Gestures
+* **Screen Hot Corners**: Execute actions by moving the cursor into screen corners with configurable dwell time.
+* **Mouse Stroke Gestures**: Directional strokes (Up, Down, Left, Right, Diagonals) while holding a trigger button.
+* **Rocker & Wheel Gestures**: Quick two-button rocker clicks and mouse wheel actions over targeted windows.
 
----
+### System Tools & Screen Utilities
+* **Precision Color Picker**: Real-time 60 FPS magnifying loupe following the mouse cursor across multi-monitor setups. Supports HEX, RGB, HSL, HSV, and CMYK formats.
+* **Screen OCR (Text Grabber)**: Instant selection marquee to extract text from any screen region directly to clipboard.
+* **Window Management**: Always-on-Top toggle, window shading (roll up to title bar), center window, boss key hide, and transparency adjustment.
+* **Quick PC Sleep Timer**: Configurable countdown timer with sleep and hibernate modes.
+* **Per-App Audio Control**: Mute and adjust volume for active background applications.
 
-## 🎨 Advanced Neumorphic Theming Engine
-
-AutoHotKeyboard features a custom HSL-based clay extrusion engine with 7 handcrafted presets and granular live sliders:
-
-* **7 Curated Presets**:
-  * **Soft Clay** (`#e0e5ec`): Classic balanced cool-gray neumorphic clay.
-  * **Obsidian** (`#1e222b`): Stealth midnight dark mode with electric cyan accents.
-  * **Retro Sharp** (`#f2f4f7`): Embossed brutalist mechanical look with **0px blur** and sharp **6px corners**.
-  * **Warm Sand** (`#e8dfd5`): Ultra-curved organic pebble shape with **30px radius** and pillowy diffused shadows.
-  * **Cyber Violet** (`#2b2640`): Moody chromatic plum twilight with neon lavender accents.
-  * **Sage Mint** (`#dbe5de`): Botanical pastel with calming **24px rounded corners**.
-  * **Arctic Frost** (`#edf2f7`): High-key silver with strong **60% luminous light highlight pop**.
-* **5 Fine-Tuning Sliders**:
-  * **Radius** (`0px` – `40px`): Dynamic squircle roundness.
-  * **Distance** (`1px` – `15px`): 3D clay extrusion offset.
-  * **Light Shadow** (`1%` – `100%`): Independent intensity for top-left luminous highlight.
-  * **Dark Shadow** (`1%` – `100%`): Independent intensity for bottom-right depth shadow.
-  * **Blur** (`0px` – `25px`): From sharp hard-edge embossing (0px) to ultra-soft ambient clay diffusion.
-* **Custom Color Pickers**: Full hexadecimal and native color picker support with high-contrast dual-rim indicators.
+### Automation Modules
+* **Text Expander**: Zero-latency text replacement with multiline formatting and clipboard preservation.
+* **Key Remapper**: Low-level keyboard hook remapping for single keys and complex modifier combinations.
+* **App Launcher**: Instant launch via custom keyboard shortcuts or prefix string triggers.
+* **Macro Recorder**: Record and replay keyboard actions with configurable playback modes and loop intervals.
+* **Auto Clicker**: High-performance click engine up to 60 CPS with single and double click modes.
 
 ---
 
-## 📂 Project Structure
+## Tactile Neumorphic Theming
 
-```text
-AutoHotKeyboard/
-├── main.ahk              # AutoHotkey v2 core engine & IPC dispatcher
-├── Run-App.bat           # 1-click launcher script
-├── config.json           # User configuration & persistent state
-├── .gitignore            # Git exclusion rules
-├── README.md             # Project documentation
-├── lib/                  # AutoHotkey v2 dependencies
-│   ├── ComVar.ahk        # COM variable wrapper
-│   ├── JSON.ahk          # High-performance JSON parser & serializer
-│   ├── Promise.ahk       # Async promise implementation
-│   └── WebView2/         # WebView2 wrapper & native loader DLLs
-│       ├── WebView2.ahk
-│       ├── 32bit/WebView2Loader.dll
-│       └── 64bit/WebView2Loader.dll
-└── ui/                   # Front-end user interface
-    ├── index.html        # HTML5 semantic structure
-    ├── style.css         # Neumorphic CSS design system & dynamic variables
-    └── app.js            # Two-way WebView2 IPC bridge & state management
+Customize the entire interface using hardware-accelerated CSS custom properties:
+* Curated presets including Soft Clay, Obsidian Dark, Warm Sand, Retro Sharp, and Cyber Violet.
+* Real-time sliders for corner radius, elevation distance, blur radius, and shadow contrast.
+* Custom background and accent color picker with live contrast calculation.
+
+![Neumorphic Theme Customizer](docs/screenshots/theme-customizer.png)
+
+---
+
+## Installation & Usage
+
+### Prebuilt Binaries
+Precompiled releases are available in the repository root:
+* **Standalone Portable Executable**: `AutoHotKeyboard.exe`
+* **Windows Setup Installer**: `AutoHotKeyboard_Setup.exe`
+
+### Running from Source
+1. Ensure **Windows 10 / 11** with the Edge WebView2 runtime is installed.
+2. Install **AutoHotkey v2** from [autohotkey.com](https://www.autohotkey.com/v2/).
+3. Clone the repository and execute:
+   ```powershell
+   & "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe" "main.ahk"
+   ```
+
+### Building Release Binaries
+To compile both the standalone executable and the setup installer:
+```powershell
+.\build.ps1
 ```
 
 ---
 
-## 🚀 Getting Started
+## Project Structure
 
-### Prerequisites
-1. **Windows 10 / 11** (with Edge WebView2 runtime installed, built-in by default).
-2. **AutoHotkey v2** (Download from [autohotkey.com](https://www.autohotkey.com/v2/)).
-
-### Running the App
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/MohammedAliBaaqail/Auto-Keyboard.git
-   ```
-2. Navigate into the folder:
-   ```bash
-   cd Auto-Keyboard
-   ```
-3. Run `Run-App.bat` or launch with AutoHotkey v2:
-   ```bash
-   "C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe" main.ahk
-   ```
+```text
+AutoHotKeyboard/
+├── main.ahk                  # AutoHotkey v2 core engine & IPC dispatcher
+├── build.ps1                 # Automated compiler & installer pipeline
+├── config.json               # User profile state & configuration
+├── installer/
+│   └── installer.iss         # Inno Setup installer script
+├── docs/
+│   └── screenshots/          # Application screenshots
+├── lib/                      # Core dependencies (JSON, OCR, Promise, WebView2)
+└── ui/                       # Front-end user interface
+    ├── index.html            # Semantic layout & modals
+    ├── style.css             # Neumorphic design system & dynamic variables
+    └── app.js                # Two-way WebView2 IPC bridge
+```
 
 ---
 
-## 📄 License
-MIT License. Open-source for personal and commercial productivity.
+## License
+
+MIT License. Open-source for personal and commercial use.

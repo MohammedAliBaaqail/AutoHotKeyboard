@@ -109,7 +109,10 @@
         colorPickerEnabled: 1,
         colorPickerHotkey: '^!p',
         virtualDesktopsEnabled: 1,
-        taskbarScrollEnabled: 1
+        taskbarScrollEnabled: 1,
+        sleepEnabled: 1,
+        sleepHotkey: '#s',
+        sleepModeHibernate: 0
       },
       mouseGestures: {
         cornersEnabled: 1,
@@ -226,6 +229,8 @@
   const appCard = document.getElementById('appCard');
   const btnClose = document.getElementById('btnClose');
   const btnMinimize = document.getElementById('btnMinimize');
+  const btnMaximize = document.getElementById('btnMaximize');
+  const svgMaximizeIcon = document.getElementById('svgMaximizeIcon');
   const btnRefresh = document.getElementById('btnRefresh');
   const btnTheme = document.getElementById('btnTheme');
   const themeModal = document.getElementById('themeModal');
@@ -598,7 +603,15 @@
     if (!state.config.profiles) return '';
     const profiles = state.config.profiles;
     const currentProf = state.config.activeProfile || 'Default';
-    
+    const totalProfCount = Object.keys(profiles).length;
+
+    let isForcedAll = false;
+    const curProf = profiles[currentProf];
+    if (curProf && curProf[moduleName] && Array.isArray(curProf[moduleName].items)) {
+      const it = curProf[moduleName].items.find(i => i.id === itemId);
+      if (it && (it.forcedAllProfiles || it.allProfiles)) isForcedAll = true;
+    }
+
     // Find all profiles where this item is enabled
     const activeProfiles = [];
     Object.keys(profiles).forEach(pName => {
@@ -607,11 +620,17 @@
         const found = prof[moduleName].items.find(i => i.id === itemId);
         if (found && found.enabled !== false && found.enabled !== 0) {
           activeProfiles.push(pName);
+          if (found.forcedAllProfiles || found.allProfiles) isForcedAll = true;
         }
       }
     });
 
     if (activeProfiles.length === 0) return '';
+
+    // If forced on all profiles: ONLY SHOW ONE ICON, NOT ALL PROFILES ICON!
+    if (isForcedAll || (totalProfCount > 1 && activeProfiles.length === totalProfCount)) {
+      return `<div class="item-profiles-badges is-forced-all" data-count="1" data-forced-all="true" data-module="${escapeHtml(moduleName)}" data-id="${escapeHtml(itemId)}"><div class="item-profile-badge is-all-profiles is-current" title="Forced on All Profiles (${activeProfiles.length}/${totalProfCount}) • Right-click to manage" data-forced-all="true" data-module="${escapeHtml(moduleName)}" data-id="${escapeHtml(itemId)}"><svg class="profile-badge-svg all-profiles-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></div></div>`;
+    }
 
     const badgesHtml = activeProfiles.map(pName => {
       const prof = profiles[pName] || {};
@@ -621,7 +640,8 @@
       return `<div class="item-profile-badge ${isCur ? 'is-current' : ''}" title="${escapeHtml(tooltip)}" data-switch-profile="${escapeHtml(pName)}">${iconHtml}</div>`;
     }).join('');
 
-    return `<div class="item-profiles-badges">${badgesHtml}</div>`;
+    const hasScrollbar = activeProfiles.length > 4;
+    return `<div class="item-profiles-badges ${hasScrollbar ? 'has-scrollbar' : ''}" data-count="${activeProfiles.length}" data-module="${escapeHtml(moduleName)}" data-id="${escapeHtml(itemId)}">${badgesHtml}</div>`;
   }
 
   function updateCardProfileBadges(cardEl, moduleName, itemId) {
@@ -646,6 +666,135 @@
     } else if (container) {
       container.remove();
     }
+  }
+
+  const FEATURE_SWITCH_DEFINITIONS = [
+    // Gestures & Corners
+    { id: 'hcMasterSwitch', module: 'mouseGestures', key: 'cornersEnabled' },
+    { id: 'mgMasterSwitch', module: 'mouseGestures', key: 'gesturesEnabled' },
+    { id: 'mgRockerSwitch', module: 'mouseGestures', key: 'rockerEnabled' },
+    { id: 'mgWheelSwitch', module: 'mouseGestures', key: 'wheelGestureEnabled' },
+    // Radial Menu
+    { id: 'rmMasterSwitch', module: 'radialMenu', key: 'enabled' },
+    { id: 'rmControlsSwitch', module: 'radialMenu', key: 'enabled' },
+    // System Tools (Window Manager)
+    { id: 'wmSwitchAlwaysOnTop', module: 'windowManager', key: 'alwaysOnTopEnabled' },
+    { id: 'wmSwitchCenterWindow', module: 'windowManager', key: 'centerWindowEnabled' },
+    { id: 'wmSwitchHideWindow', module: 'windowManager', key: 'hideWindowEnabled' },
+    { id: 'wmSwitchTransparencyWheel', module: 'windowManager', key: 'transparencyWheel' },
+    { id: 'wmSwitchAppVolumeWheel', module: 'windowManager', key: 'appVolumeWheel' },
+    { id: 'wmSwitchAppVolumeMute', module: 'windowManager', key: 'appVolumeMuteEnabled' },
+    { id: 'wmSwitchMasterAudioMute', module: 'windowManager', key: 'masterAudioMuteEnabled' },
+    { id: 'wmSwitchWindowShade', module: 'windowManager', key: 'windowShadeEnabled' },
+    { id: 'wmSwitchBorderless', module: 'windowManager', key: 'borderlessEnabled' },
+    { id: 'wmSwitchTextTransform', module: 'windowManager', key: 'textTransformEnabled' },
+    { id: 'wmSwitchCleanText', module: 'windowManager', key: 'textTransformCleanEnabled' },
+    { id: 'wmSwitchScreenOcr', module: 'windowManager', key: 'screenOcrEnabled' },
+    { id: 'wmSwitchColorPicker', module: 'windowManager', key: 'colorPickerEnabled' },
+    { id: 'wmSwitchVirtualDesktops', module: 'windowManager', key: 'virtualDesktopsEnabled' },
+    { id: 'wmSwitchSleep', module: 'windowManager', key: 'sleepEnabled' }
+  ];
+
+  function updateAllFeatureProfileBadges() {
+    if (!state.config) return;
+    saveCurrentProfileState();
+    if (!state.config.profiles) return;
+
+    const profiles = state.config.profiles;
+    const currentProf = state.config.activeProfile || 'Default';
+
+    FEATURE_SWITCH_DEFINITIONS.forEach(({ id, module, key }) => {
+      const sw = document.getElementById(id);
+      if (!sw) return;
+
+      const toggleWrapper = sw.closest('.toggle-wrapper');
+      if (!toggleWrapper) return;
+
+      const parent = toggleWrapper.parentElement;
+      if (!parent) return;
+
+      let container = parent.querySelector(`.item-profiles-badges[data-feature-key="${key}"]`);
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'item-profiles-badges';
+        container.setAttribute('data-feature-key', key);
+        parent.insertBefore(container, toggleWrapper);
+      }
+
+      const activeProfiles = [];
+      Object.keys(profiles).forEach(pName => {
+        const prof = profiles[pName];
+        if (prof) {
+          const mod = prof[module] || (pName === 'Default' ? state.config[module] : null);
+          if (mod) {
+            let isEnabled = false;
+            if (key === 'enabled') {
+              isEnabled = (mod.enabled !== false && mod.enabled !== 0);
+            } else if (key === 'cornersEnabled' || key === 'gesturesEnabled') {
+              isEnabled = (mod[key] !== false && mod[key] !== 0);
+            } else {
+              isEnabled = (mod[key] === true || mod[key] === 1);
+            }
+            if (isEnabled) {
+              activeProfiles.push(pName);
+            }
+          }
+        }
+      });
+
+      if (activeProfiles.length === 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        container.classList.remove('has-scrollbar');
+        return;
+      }
+
+      const totalProfCount = Object.keys(profiles).length;
+      const isForcedFeature = Boolean((state.config.forcedFeatures && state.config.forcedFeatures[`${module}.${key}`]) ||
+        (totalProfCount > 1 && activeProfiles.length === totalProfCount));
+
+      if (isForcedFeature) {
+        container.className = 'item-profiles-badges is-forced-all';
+        container.setAttribute('data-count', '1');
+        container.setAttribute('data-forced-all', 'true');
+        container.setAttribute('data-module', module);
+        container.setAttribute('data-feature-key', key);
+        container.style.display = 'grid';
+        container.innerHTML = `
+          <div class="item-profile-badge is-all-profiles is-current" 
+               title="Forced on All Profiles (${activeProfiles.length}/${totalProfCount}) • Right-click to manage" 
+               data-forced-all="true" 
+               data-module="${escapeHtml(module)}" 
+               data-feature-key="${escapeHtml(key)}">
+            <svg class="profile-badge-svg all-profiles-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </div>
+        `;
+        return;
+      }
+
+      const hasMoreThan4 = activeProfiles.length > 4;
+      container.className = `item-profiles-badges ${hasMoreThan4 ? 'has-scrollbar' : ''}`;
+      container.setAttribute('data-count', activeProfiles.length);
+      container.setAttribute('data-module', module);
+      container.setAttribute('data-feature-key', key);
+
+      const badgesHtml = activeProfiles.map(pName => {
+        const prof = profiles[pName] || {};
+        const isCur = (pName === currentProf);
+        const iconHtml = getProfileIconHtml(pName, prof);
+        const tooltip = isCur
+          ? `Active in Profile: ${pName} (Current Profile)`
+          : `Active in Profile: ${pName} (Click to switch)`;
+        return `<div class="item-profile-badge ${isCur ? 'is-current' : ''}" title="${escapeHtml(tooltip)}" data-switch-profile="${escapeHtml(pName)}">${iconHtml}</div>`;
+      }).join('');
+
+      container.innerHTML = badgesHtml;
+      container.style.display = 'grid';
+    });
   }
 
   function renderProfilesRibbon() {
@@ -777,6 +926,7 @@
         }
       });
       updateProfileGlider(false);
+      updateProfilesScrollButtons();
     } else {
       // Structure changed: remove cards only (glider remains!) and re-append cards
       existingCards.forEach(c => c.remove());
@@ -785,7 +935,30 @@
       });
       requestAnimationFrame(() => {
         updateProfileGlider(false);
+        updateProfilesScrollButtons();
       });
+    }
+  }
+
+  function updateProfilesScrollButtons() {
+    const track = document.getElementById('lgsProfilesTrack');
+    const btnLeft = document.getElementById('btnScrollProfilesLeft');
+    const btnRight = document.getElementById('btnScrollProfilesRight');
+    if (!track) return;
+
+    const cards = track.querySelectorAll('.lgs-profile-card');
+    const profileCount = cards.length;
+    // Don't show scrollbar/scroll buttons unless the icons don't fit AND there are more than 4 profile icons
+    const isOverflowing = track.scrollWidth > (track.clientWidth + 4);
+    const shouldShow = (profileCount > 4) && isOverflowing;
+
+    if (btnLeft) {
+      btnLeft.style.display = shouldShow ? 'flex' : 'none';
+      btnLeft.classList.toggle('disabled-scroll', track.scrollLeft <= 2);
+    }
+    if (btnRight) {
+      btnRight.style.display = shouldShow ? 'flex' : 'none';
+      btnRight.classList.toggle('disabled-scroll', track.scrollLeft + track.clientWidth >= track.scrollWidth - 2);
     }
   }
 
@@ -834,6 +1007,7 @@
   function switchProfile(name, shouldSync = true) {
     if (!state.config.profiles || !state.config.profiles[name]) return;
     try {
+      if (typeof stopActiveBadgeRecording === 'function') stopActiveBadgeRecording(true);
       saveCurrentProfileState();
     } catch (e) {
       console.warn('saveCurrentProfileState error:', e);
@@ -866,7 +1040,9 @@
       ['renderAppLauncher', renderAppLauncher],
       ['renderFolderCreator', renderFolderCreator],
       ['renderMacroRecorder', renderMacroRecorder],
-      ['updateAutoClickerUI', updateAutoClickerUI]
+      ['updateAutoClickerUI', updateAutoClickerUI],
+      ['refreshAllActionSelects', refreshAllActionSelects],
+      ['updateAllFeatureProfileBadges', updateAllFeatureProfileBadges]
     ];
 
     for (const [stepName, fn] of renderSteps) {
@@ -905,7 +1081,7 @@
     const newWm = JSON.parse(JSON.stringify(curWm));
     ['alwaysOnTopEnabled', 'appVolumeMuteEnabled', 'masterAudioMuteEnabled', 'appVolumeWheel', 'borderlessEnabled',
       'centerWindowEnabled', 'clickThroughGhost', 'hideWindowEnabled', 'transparencyWheel', 'windowShadeEnabled',
-      'textTransformEnabled', 'textTransformCleanEnabled', 'screenOcrEnabled', 'colorPickerEnabled', 'virtualDesktopsEnabled', 'taskbarScrollEnabled'].forEach(k => {
+      'textTransformEnabled', 'textTransformCleanEnabled', 'screenOcrEnabled', 'colorPickerEnabled', 'virtualDesktopsEnabled', 'taskbarScrollEnabled', 'sleepEnabled'].forEach(k => {
         newWm[k] = 0;
       });
 
@@ -1025,6 +1201,811 @@
     return true;
   }
 
+  // ==========================================================================
+  // Profile Context Menu & Active Scripts Copy / Paste Engine
+  // ==========================================================================
+  let activeContextProfile = null;
+  let profileScriptsClipboard = null;
+  try {
+    const saved = localStorage.getItem('ahk_profile_clipboard');
+    if (saved) profileScriptsClipboard = JSON.parse(saved);
+  } catch (e) { }
+
+  function getProfileActiveScriptsCount(pName) {
+    if (!state.config || !state.config.profiles || !state.config.profiles[pName]) return 0;
+    if (state.config.activeProfile === pName) {
+      saveCurrentProfileState();
+    }
+    const prof = state.config.profiles[pName];
+    let count = 0;
+
+    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'];
+    listModules.forEach(mod => {
+      if (prof[mod] && Array.isArray(prof[mod].items)) {
+        prof[mod].items.forEach(item => {
+          if (item && item.enabled !== false && item.enabled !== 0) {
+            count++;
+          }
+        });
+      }
+    });
+
+    if (prof.windowManager) {
+      const wmKeys = [
+        'alwaysOnTopEnabled', 'centerWindowEnabled', 'hideWindowEnabled',
+        'appVolumeMuteEnabled', 'masterAudioMuteEnabled', 'windowShadeEnabled',
+        'borderlessEnabled', 'textTransformEnabled', 'textTransformCleanEnabled',
+        'screenOcrEnabled', 'colorPickerEnabled', 'virtualDesktopsEnabled', 'sleepEnabled'
+      ];
+      wmKeys.forEach(k => {
+        if (prof.windowManager[k] === 1 || prof.windowManager[k] === true) count++;
+      });
+    }
+
+    if (prof.mouseGestures) {
+      if (prof.mouseGestures.cornersEnabled === 1 || prof.mouseGestures.cornersEnabled === true) count++;
+      if (prof.mouseGestures.gesturesEnabled === 1 || prof.mouseGestures.gesturesEnabled === true) count++;
+    }
+
+    if (prof.radialMenu && (prof.radialMenu.enabled === 1 || prof.radialMenu.enabled === true)) count++;
+    if (prof.autoClicker && (prof.autoClicker.enabled === 1 || prof.autoClicker.enabled === true)) count++;
+
+    return count;
+  }
+
+  function copyProfileActiveScripts(pName) {
+    if (!state.config || !state.config.profiles || !state.config.profiles[pName]) return;
+    if (state.config.activeProfile === pName) {
+      saveCurrentProfileState();
+    }
+    const prof = state.config.profiles[pName];
+
+    const snapshot = {
+      sourceProfile: pName,
+      copiedAt: Date.now(),
+      listModules: {},
+      windowManager: {},
+      mouseGestures: {},
+      radialMenu: {},
+      autoClicker: {}
+    };
+
+    let totalActive = 0;
+
+    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'];
+    listModules.forEach(mod => {
+      snapshot.listModules[mod] = [];
+      if (prof[mod] && Array.isArray(prof[mod].items)) {
+        prof[mod].items.forEach(item => {
+          if (item && item.enabled !== false && item.enabled !== 0) {
+            snapshot.listModules[mod].push(JSON.parse(JSON.stringify(item)));
+            totalActive++;
+          }
+        });
+      }
+    });
+
+    if (prof.windowManager) {
+      const wmKeys = [
+        'alwaysOnTopEnabled', 'centerWindowEnabled', 'hideWindowEnabled',
+        'appVolumeMuteEnabled', 'masterAudioMuteEnabled', 'windowShadeEnabled',
+        'borderlessEnabled', 'textTransformEnabled', 'textTransformCleanEnabled',
+        'screenOcrEnabled', 'colorPickerEnabled', 'virtualDesktopsEnabled', 'sleepEnabled'
+      ];
+      wmKeys.forEach(k => {
+        if (prof.windowManager[k] === 1 || prof.windowManager[k] === true) {
+          snapshot.windowManager[k] = 1;
+          totalActive++;
+        }
+      });
+      const hkFields = [
+        'alwaysOnTopHotkey', 'centerWindowHotkey', 'hideWindowHotkey',
+        'appVolumeMuteHotkey', 'masterAudioMuteHotkey', 'windowShadeHotkey',
+        'borderlessHotkey', 'textTransformHotkey', 'textTransformCleanHotkey',
+        'screenOcrHotkey', 'colorPickerHotkey', 'sleepHotkey', 'sleepModeHibernate',
+        'sleepTimerSeconds'
+      ];
+      hkFields.forEach(hk => {
+        if (prof.windowManager[hk] !== undefined) {
+          snapshot.windowManager[hk] = prof.windowManager[hk];
+        }
+      });
+    }
+
+    if (prof.mouseGestures) {
+      if (prof.mouseGestures.cornersEnabled === 1 || prof.mouseGestures.cornersEnabled === true) {
+        snapshot.mouseGestures.cornersEnabled = 1;
+        totalActive++;
+      }
+      if (prof.mouseGestures.gesturesEnabled === 1 || prof.mouseGestures.gesturesEnabled === true) {
+        snapshot.mouseGestures.gesturesEnabled = 1;
+        totalActive++;
+      }
+      Object.keys(prof.mouseGestures).forEach(k => {
+        if (k !== 'cornersEnabled' && k !== 'gesturesEnabled') {
+          snapshot.mouseGestures[k] = prof.mouseGestures[k];
+        }
+      });
+    }
+
+    if (prof.radialMenu && (prof.radialMenu.enabled === 1 || prof.radialMenu.enabled === true)) {
+      snapshot.radialMenu = JSON.parse(JSON.stringify(prof.radialMenu));
+      snapshot.radialMenu.enabled = 1;
+      totalActive++;
+    }
+
+    if (prof.autoClicker && (prof.autoClicker.enabled === 1 || prof.autoClicker.enabled === true)) {
+      snapshot.autoClicker = JSON.parse(JSON.stringify(prof.autoClicker));
+      snapshot.autoClicker.enabled = 1;
+      totalActive++;
+    }
+
+    snapshot.activeCount = totalActive;
+    profileScriptsClipboard = snapshot;
+    window.__profileScriptsClipboard = snapshot;
+    try {
+      localStorage.setItem('ahk_profile_clipboard', JSON.stringify(snapshot));
+    } catch (e) { }
+
+    showToast(`Copied ${totalActive} active script${totalActive === 1 ? '' : 's'} from "${pName}"`);
+  }
+
+  function pasteProfileActiveScripts(targetProfileName) {
+    const clipboard = profileScriptsClipboard || window.__profileScriptsClipboard;
+    if (!clipboard) {
+      showToast('Clipboard is empty. Right-click a profile to copy first.', 'error');
+      return;
+    }
+    if (!state.config || !state.config.profiles || !state.config.profiles[targetProfileName]) {
+      showToast(`Target profile "${targetProfileName}" does not exist.`, 'error');
+      return;
+    }
+
+    const targetProf = state.config.profiles[targetProfileName];
+    let pastedCount = 0;
+
+    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'];
+    listModules.forEach(mod => {
+      const sourceActiveItems = (clipboard.listModules && clipboard.listModules[mod]) || [];
+      if (!targetProf[mod]) {
+        targetProf[mod] = { enabled: 1, items: [] };
+      }
+      if (!Array.isArray(targetProf[mod].items)) {
+        targetProf[mod].items = [];
+      }
+
+      sourceActiveItems.forEach(srcItem => {
+        let match = null;
+        if (srcItem.id) {
+          match = targetProf[mod].items.find(t => t.id === srcItem.id);
+        }
+        if (!match) {
+          if (mod === 'textExpander') {
+            match = targetProf[mod].items.find(t => t.trigger === srcItem.trigger);
+          } else if (mod === 'keyRemapper') {
+            match = targetProf[mod].items.find(t => t.originalKey === srcItem.originalKey);
+          } else if (mod === 'appLauncher' || mod === 'folderCreator') {
+            match = targetProf[mod].items.find(t => t.path === srcItem.path || t.name === srcItem.name);
+          } else if (mod === 'macroRecorder') {
+            match = targetProf[mod].items.find(t => t.name === srcItem.name);
+          }
+        }
+
+        if (match) {
+          match.enabled = 1;
+          pastedCount++;
+        } else {
+          const newItem = JSON.parse(JSON.stringify(srcItem));
+          newItem.enabled = 1;
+          targetProf[mod].items.push(newItem);
+          pastedCount++;
+        }
+      });
+    });
+
+    if (clipboard.windowManager && Object.keys(clipboard.windowManager).length > 0) {
+      if (!targetProf.windowManager) targetProf.windowManager = {};
+      Object.keys(clipboard.windowManager).forEach(k => {
+        targetProf.windowManager[k] = clipboard.windowManager[k];
+        if (k.endsWith('Enabled') && clipboard.windowManager[k] === 1) {
+          pastedCount++;
+        }
+      });
+    }
+
+    if (clipboard.mouseGestures && Object.keys(clipboard.mouseGestures).length > 0) {
+      if (!targetProf.mouseGestures) targetProf.mouseGestures = {};
+      Object.keys(clipboard.mouseGestures).forEach(k => {
+        targetProf.mouseGestures[k] = clipboard.mouseGestures[k];
+        if ((k === 'cornersEnabled' || k === 'gesturesEnabled') && clipboard.mouseGestures[k] === 1) {
+          pastedCount++;
+        }
+      });
+    }
+
+    if (clipboard.radialMenu && clipboard.radialMenu.enabled === 1) {
+      targetProf.radialMenu = JSON.parse(JSON.stringify(clipboard.radialMenu));
+      pastedCount++;
+    }
+
+    if (clipboard.autoClicker && clipboard.autoClicker.enabled === 1) {
+      targetProf.autoClicker = JSON.parse(JSON.stringify(clipboard.autoClicker));
+      pastedCount++;
+    }
+
+    if (state.config.activeProfile === targetProfileName) {
+      state.config.textExpander = targetProf.textExpander;
+      state.config.keyRemapper = targetProf.keyRemapper;
+      state.config.appLauncher = targetProf.appLauncher;
+      state.config.folderCreator = targetProf.folderCreator;
+      state.config.macroRecorder = targetProf.macroRecorder;
+      state.config.windowManager = targetProf.windowManager;
+      state.config.mouseGestures = targetProf.mouseGestures;
+      state.config.radialMenu = targetProf.radialMenu;
+      state.config.autoClicker = targetProf.autoClicker;
+
+      renderAll(true);
+    } else {
+      updateAllFeatureProfileBadges();
+      syncConfig();
+    }
+
+    showToast(`Pasted active scripts from "${clipboard.sourceProfile}" into "${targetProfileName}"!`);
+  }
+
+  function showProfileContextMenu(e, pName) {
+    const menu = document.getElementById('profileContextMenu');
+    if (!menu) return;
+
+    activeContextProfile = pName;
+    const prof = (state.config && state.config.profiles && state.config.profiles[pName]) || {};
+    const count = getProfileActiveScriptsCount(pName);
+
+    const titleEl = document.getElementById('profileCtxTitle');
+    const iconEl = document.getElementById('profileCtxIcon');
+    const subEl = document.getElementById('profileCtxSub');
+    const copyHintEl = document.getElementById('profileCtxCopyHint');
+    const btnPaste = document.getElementById('btnCtxPasteProfile');
+    const pasteHintEl = document.getElementById('profileCtxPasteHint');
+    const btnSwitch = document.getElementById('btnCtxSwitchProfile');
+
+    if (titleEl) titleEl.textContent = pName;
+    if (iconEl) iconEl.innerHTML = getProfileIconHtml(pName, prof);
+    if (subEl) subEl.textContent = `${count} active script${count === 1 ? '' : 's'}`;
+
+    if (copyHintEl) {
+      copyHintEl.textContent = count > 0
+        ? `Copy ${count} active script${count === 1 ? '' : 's'} from this profile`
+        : 'Copy active scripts from this profile';
+    }
+
+    const clipboard = profileScriptsClipboard || window.__profileScriptsClipboard;
+    if (btnPaste) {
+      if (!clipboard || !clipboard.sourceProfile) {
+        btnPaste.classList.add('is-disabled');
+        if (pasteHintEl) pasteHintEl.textContent = 'Clipboard is empty. Copy a profile first';
+      } else {
+        btnPaste.classList.remove('is-disabled');
+        if (pasteHintEl) {
+          pasteHintEl.textContent = `Apply ${clipboard.activeCount || 0} active script(s) from "${clipboard.sourceProfile}"`;
+        }
+      }
+    }
+
+    if (btnSwitch) {
+      const isCur = (state.config && state.config.activeProfile === pName);
+      btnSwitch.classList.toggle('is-disabled', isCur);
+    }
+
+    menu.classList.add('is-visible');
+    const menuW = 270;
+    const menuH = 190;
+    let posX = e.clientX;
+    let posY = e.clientY;
+
+    if (posX + menuW > window.innerWidth - 10) {
+      posX = window.innerWidth - menuW - 10;
+    }
+    if (posY + menuH > window.innerHeight - 10) {
+      posY = window.innerHeight - menuH - 10;
+    }
+    posX = Math.max(10, posX);
+    posY = Math.max(10, posY);
+
+    menu.style.left = `${posX}px`;
+    menu.style.top = `${posY}px`;
+  }
+
+  function closeProfileContextMenu() {
+    const menu = document.getElementById('profileContextMenu');
+    if (menu) {
+      menu.classList.remove('is-visible');
+      menu.style.display = 'none';
+    }
+    activeContextProfile = null;
+  }
+
+  function initProfileContextMenu() {
+    const menu = document.getElementById('profileContextMenu');
+    const btnCopy = document.getElementById('btnCtxCopyProfile');
+    const btnPaste = document.getElementById('btnCtxPasteProfile');
+    const btnSwitch = document.getElementById('btnCtxSwitchProfile');
+
+    if (btnCopy) {
+      btnCopy.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeContextProfile) {
+          copyProfileActiveScripts(activeContextProfile);
+        }
+        closeProfileContextMenu();
+      });
+    }
+
+    if (btnPaste) {
+      btnPaste.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeContextProfile) {
+          pasteProfileActiveScripts(activeContextProfile);
+        }
+        closeProfileContextMenu();
+      });
+    }
+
+    if (btnSwitch) {
+      btnSwitch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeContextProfile && state.config && state.config.activeProfile !== activeContextProfile) {
+          switchProfile(activeContextProfile);
+        }
+        closeProfileContextMenu();
+      });
+    }
+
+    // Dismiss context menu on click-outside, escape, or resize
+    function onDismissProfileMenu(e) {
+      if (menu && menu.classList.contains('is-visible') && !menu.contains(e.target)) {
+        closeProfileContextMenu();
+      }
+    }
+    document.addEventListener('pointerdown', onDismissProfileMenu, true);
+    document.addEventListener('mousedown', onDismissProfileMenu, true);
+    document.addEventListener('click', onDismissProfileMenu, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeProfileContextMenu();
+    });
+
+    window.addEventListener('resize', closeProfileContextMenu);
+    window.addEventListener('scroll', closeProfileContextMenu, true);
+
+    // Global right-click delegation
+    document.addEventListener('contextmenu', (e) => {
+      // 1. Profile cards in top ribbon
+      const profCard = e.target.closest('.lgs-profile-card');
+      if (profCard) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeScriptContextMenu();
+        const pName = profCard.getAttribute('data-profile');
+        if (pName) showProfileContextMenu(e, pName);
+        return;
+      }
+
+      // 2. Script or item with switch / profile badge
+      const scriptInfo = getScriptInfo(e.target);
+      if (scriptInfo) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeProfileContextMenu();
+        showScriptContextMenu(e, scriptInfo);
+        return;
+      }
+
+      // 3. Normal profile badge fallback
+      const badge = e.target.closest('.item-profile-badge');
+      if (badge) {
+        const pName = badge.getAttribute('data-switch-profile');
+        if (pName) {
+          e.preventDefault();
+          e.stopPropagation();
+          showProfileContextMenu(e, pName);
+        }
+      }
+    });
+  }
+
+  // ============================================================================
+  // Script / Switch Neumorphic Context Menu (Force on All Profiles)
+  // ============================================================================
+
+  let activeScriptContextInfo = null;
+
+  function closeScriptContextMenu() {
+    const menu = document.getElementById('scriptContextMenu');
+    if (menu) {
+      menu.classList.remove('is-visible');
+      menu.style.display = 'none';
+    }
+    activeScriptContextInfo = null;
+  }
+
+  function getModuleDisplayName(mod) {
+    switch (mod) {
+      case 'textExpander': return 'Text Expander';
+      case 'keyRemapper': return 'Key Remapper';
+      case 'appLauncher': return 'App Launcher';
+      case 'folderCreator': return 'Folder Creator';
+      case 'macroRecorder': return 'Macro Recorder';
+      case 'windowManager': return 'System Tools';
+      case 'mouseGestures': return 'Gestures & Corners';
+      case 'radialMenu': return 'Radial Menu';
+      case 'autoClicker': return 'Auto Clicker';
+      default: return mod;
+    }
+  }
+
+  function getFeatureFriendlyTitle(mod, key) {
+    const titles = {
+      alwaysOnTopEnabled: 'Pin Always on Top',
+      centerWindowEnabled: 'Center Active Window',
+      hideWindowEnabled: 'Boss Key (Hide Window)',
+      transparencyWheel: 'Scrollwheel Transparency',
+      appVolumeWheel: 'Hover App Volume Wheel',
+      appVolumeMuteEnabled: 'Mute Active App',
+      masterAudioMuteEnabled: 'Mute Master Audio',
+      windowShadeEnabled: 'Window Shade Roll-Up',
+      borderlessEnabled: 'Borderless Fullscreen',
+      textTransformEnabled: 'Text Case Transformer',
+      textTransformCleanEnabled: 'Clean Plain Text',
+      screenOcrEnabled: 'Instant Screen OCR',
+      colorPickerEnabled: 'Color Picker Eyedropper',
+      virtualDesktopsEnabled: 'Virtual Desktop Navigation',
+      sleepEnabled: 'Quick Sleep / Hibernate',
+      cornersEnabled: 'Screen Hot Corners',
+      gesturesEnabled: 'Mouse Gestures',
+      rockerEnabled: 'Rocker Gestures',
+      wheelGestureEnabled: 'Gesture Wheel Action'
+    };
+    if (titles[key]) return titles[key];
+    if (key === 'enabled') return mod === 'radialMenu' ? 'Radial Menu' : 'Auto Clicker';
+    return key;
+  }
+
+  function resolveScriptInfo(moduleName, itemId, featureKey, cardEl, switchEl) {
+    if (!state.config) return null;
+    saveCurrentProfileState();
+    const currentProfName = state.config.activeProfile || 'Default';
+    const prof = (state.config.profiles && state.config.profiles[currentProfName]) || state.config;
+
+    if (!switchEl && cardEl) {
+      switchEl = cardEl.querySelector('.toggle-checkbox');
+    }
+
+    if (itemId) {
+      const items = (prof[moduleName] && prof[moduleName].items) || [];
+      const item = items.find(i => i.id === itemId);
+      if (!item) return null;
+
+      let title = item.name || '';
+      if (!title) {
+        if (moduleName === 'textExpander') title = item.input ? `${item.input} → ${item.output.slice(0, 24)}` : 'Text Expander';
+        else if (moduleName === 'keyRemapper') title = `${formatKeyDisplay(item.source)} → ${formatKeyDisplay(item.target)}`;
+        else if (moduleName === 'appLauncher') title = item.trigger ? `${item.trigger} (Launch)` : (item.target || 'Launcher');
+        else if (moduleName === 'folderCreator') title = item.trigger ? `${item.trigger} (Folder)` : 'Folder Creator';
+        else if (moduleName === 'macroRecorder') title = item.trigger ? `${item.trigger} (Macro)` : 'Macro';
+        else title = 'Script Item';
+      }
+
+      const modDisplayName = getModuleDisplayName(moduleName);
+      const isForced = Boolean(item.forcedAllProfiles || item.allProfiles);
+      const isEnabled = (item.enabled !== false && item.enabled !== 0);
+
+      return {
+        type: 'item',
+        moduleName,
+        itemId,
+        featureKey: null,
+        item,
+        title,
+        sub: modDisplayName,
+        isForced,
+        isEnabled,
+        cardEl,
+        switchEl
+      };
+    } else if (featureKey) {
+      const mod = prof[moduleName] || {};
+      let isEnabled = false;
+      if (featureKey === 'enabled' || featureKey === 'cornersEnabled' || featureKey === 'gesturesEnabled') {
+        isEnabled = (mod[featureKey] !== false && mod[featureKey] !== 0);
+      } else {
+        isEnabled = (mod[featureKey] === 1 || mod[featureKey] === true);
+      }
+
+      const featureId = `${moduleName}.${featureKey}`;
+      const isForced = Boolean((state.config.forcedFeatures && state.config.forcedFeatures[featureId]) ||
+        (prof[moduleName] && prof[moduleName].forcedAllProfiles && prof[moduleName].forcedAllProfiles[featureKey]));
+
+      const title = getFeatureFriendlyTitle(moduleName, featureKey);
+      const modDisplayName = getModuleDisplayName(moduleName);
+
+      return {
+        type: 'feature',
+        moduleName,
+        itemId: null,
+        featureKey,
+        item: null,
+        title,
+        sub: modDisplayName,
+        isForced,
+        isEnabled,
+        cardEl,
+        switchEl
+      };
+    }
+
+    return null;
+  }
+
+  function getScriptInfo(target) {
+    if (!target) return null;
+
+    // Check if directly clicking a badge with module info
+    const badge = target.closest('.item-profile-badge, .item-profiles-badges');
+    if (badge && badge.dataset.module && (badge.dataset.id || badge.dataset.featureKey)) {
+      return resolveScriptInfo(badge.dataset.module, badge.dataset.id, badge.dataset.featureKey, badge);
+    }
+
+    // Check if inside a card with data-module
+    const card = target.closest('.shortcut-card, .key-remap-card, .app-card, .folder-card, .macro-card, .wm-card, .active-script-card');
+    if (card) {
+      const mod = card.dataset.module;
+      const itemId = card.dataset.id;
+      const fKey = card.dataset.featureKey;
+      if (mod && (itemId || fKey)) {
+        return resolveScriptInfo(mod, itemId, fKey, card);
+      }
+
+      // Check if card has a switch in FEATURE_SWITCH_DEFINITIONS
+      const sw = card.querySelector('.toggle-checkbox');
+      if (sw && sw.id) {
+        const def = FEATURE_SWITCH_DEFINITIONS.find(d => d.id === sw.id);
+        if (def) {
+          return resolveScriptInfo(def.module, null, def.key, card, sw);
+        }
+      }
+    }
+
+    // Check if directly on or inside a toggle-wrapper
+    const toggleWrap = target.closest('.toggle-wrapper');
+    if (toggleWrap) {
+      const sw = toggleWrap.querySelector('.toggle-checkbox');
+      if (sw && sw.id) {
+        const def = FEATURE_SWITCH_DEFINITIONS.find(d => d.id === sw.id);
+        if (def) {
+          return resolveScriptInfo(def.module, null, def.key, toggleWrap, sw);
+        }
+      }
+      const parentCard = toggleWrap.closest('[data-module]');
+      if (parentCard) {
+        return resolveScriptInfo(parentCard.dataset.module, parentCard.dataset.id, parentCard.dataset.featureKey, parentCard, sw);
+      }
+    }
+
+    return null;
+  }
+
+  function showScriptContextMenu(e, info) {
+    const menu = document.getElementById('scriptContextMenu');
+    if (!menu || !info) return;
+
+    closeProfileContextMenu();
+    activeScriptContextInfo = info;
+
+    const titleEl = document.getElementById('scriptCtxTitle');
+    const subEl = document.getElementById('scriptCtxSub');
+    const forceTitleEl = document.getElementById('scriptCtxForceTitle');
+    const forceHintEl = document.getElementById('scriptCtxForceHint');
+    const toggleTitleEl = document.getElementById('scriptCtxToggleTitle');
+    const toggleHintEl = document.getElementById('scriptCtxToggleHint');
+
+    if (titleEl) titleEl.textContent = info.title;
+    if (subEl) {
+      subEl.textContent = info.isForced
+        ? `⚡ Forced on All Profiles • ${info.sub}`
+        : `${info.sub} • Active in: ${state.config.activeProfile || 'Default'}`;
+    }
+
+    if (forceTitleEl) {
+      forceTitleEl.textContent = info.isForced
+        ? 'Unforce from All Profiles'
+        : 'Force on All Profiles';
+    }
+    if (forceHintEl) {
+      forceHintEl.textContent = info.isForced
+        ? `Restore to run only in "${state.config.activeProfile || 'Default'}"`
+        : 'Force this script to run active across every profile';
+    }
+
+    if (toggleTitleEl) {
+      toggleTitleEl.textContent = info.isEnabled ? 'Turn Off Script' : 'Turn On Script';
+    }
+    if (toggleHintEl) {
+      toggleHintEl.textContent = info.isEnabled ? 'Currently Active' : 'Currently Disabled';
+    }
+
+    menu.style.display = 'flex';
+    menu.classList.add('is-visible');
+
+    const menuW = 270;
+    const menuH = 150;
+    let posX = e.clientX;
+    let posY = e.clientY;
+
+    if (posX + menuW > window.innerWidth - 12) {
+      posX = window.innerWidth - menuW - 12;
+    }
+    if (posY + menuH > window.innerHeight - 12) {
+      posY = window.innerHeight - menuH - 12;
+    }
+    if (posX < 8) posX = 8;
+    if (posY < 8) posY = 8;
+
+    menu.style.left = `${posX}px`;
+    menu.style.top = `${posY}px`;
+  }
+
+  function toggleForceScript(info) {
+    if (!info) return;
+    const newForcedState = !info.isForced;
+    const profiles = state.config.profiles || {};
+    const curProfName = state.config.activeProfile || 'Default';
+
+    if (info.type === 'item') {
+      const { moduleName, itemId } = info;
+      const targetItem = info.item;
+      targetItem.forcedAllProfiles = newForcedState;
+      if (newForcedState) targetItem.enabled = 1;
+
+      Object.keys(profiles).forEach(pName => {
+        const p = profiles[pName];
+        if (!p[moduleName]) p[moduleName] = { items: [] };
+        if (!Array.isArray(p[moduleName].items)) p[moduleName].items = [];
+
+        const existingIdx = p[moduleName].items.findIndex(i => i.id === itemId);
+        if (newForcedState) {
+          const cloned = JSON.parse(JSON.stringify(targetItem));
+          cloned.enabled = 1;
+          cloned.forcedAllProfiles = true;
+          if (existingIdx !== -1) {
+            p[moduleName].items[existingIdx] = cloned;
+          } else {
+            p[moduleName].items.unshift(cloned);
+          }
+        } else {
+          if (existingIdx !== -1) {
+            p[moduleName].items[existingIdx].forcedAllProfiles = false;
+            if (pName !== curProfName) {
+              p[moduleName].items[existingIdx].enabled = 0;
+            }
+          }
+        }
+      });
+
+      if (state.config[moduleName] && Array.isArray(state.config[moduleName].items)) {
+        const mem = state.config[moduleName].items.find(i => i.id === itemId);
+        if (mem) {
+          mem.forcedAllProfiles = newForcedState;
+          if (newForcedState) mem.enabled = 1;
+        }
+      }
+
+      if (info.cardEl) {
+        updateCardProfileBadges(info.cardEl, moduleName, itemId);
+        if (newForcedState) {
+          info.cardEl.classList.remove('is-disabled');
+          const sw = info.cardEl.querySelector('.toggle-checkbox');
+          if (sw) sw.checked = true;
+          const badge = info.cardEl.querySelector('.trigger-badge');
+          if (badge) badge.classList.remove('is-disabled');
+        }
+      }
+
+      showToast(newForcedState
+        ? `⚡ "${info.title}" is now forced on ALL profiles!`
+        : `"${info.title}" will now run only in "${curProfName}".`
+      );
+    } else if (info.type === 'feature') {
+      const { moduleName, featureKey } = info;
+      if (!state.config.forcedFeatures) state.config.forcedFeatures = {};
+      const fId = `${moduleName}.${featureKey}`;
+      state.config.forcedFeatures[fId] = newForcedState;
+
+      Object.keys(profiles).forEach(pName => {
+        const p = profiles[pName];
+        if (!p[moduleName]) p[moduleName] = {};
+        if (newForcedState) {
+          p[moduleName][featureKey] = 1;
+          p[moduleName].forcedAllProfiles = p[moduleName].forcedAllProfiles || {};
+          p[moduleName].forcedAllProfiles[featureKey] = true;
+        } else {
+          if (p[moduleName].forcedAllProfiles) {
+            delete p[moduleName].forcedAllProfiles[featureKey];
+          }
+          if (pName !== curProfName) {
+            p[moduleName][featureKey] = 0;
+          }
+        }
+      });
+
+      if (state.config[moduleName]) {
+        if (newForcedState) state.config[moduleName][featureKey] = 1;
+      }
+
+      if (info.switchEl) {
+        if (newForcedState) {
+          info.switchEl.checked = true;
+          const col = info.switchEl.closest('.mg-column, .wm-card');
+          if (col) col.classList.remove('is-disabled');
+        }
+      }
+
+      updateAllFeatureProfileBadges();
+
+      showToast(newForcedState
+        ? `⚡ "${info.title}" is now forced on ALL profiles!`
+        : `"${info.title}" will now run only in "${curProfName}".`
+      );
+    }
+
+    saveCurrentProfileState();
+    syncConfig();
+    updateGlobalIndicators();
+  }
+
+  function initScriptContextMenu() {
+    const menu = document.getElementById('scriptContextMenu');
+    const btnForce = document.getElementById('btnCtxForceAllProfiles');
+    const btnToggle = document.getElementById('btnCtxToggleScript');
+
+    if (btnForce) {
+      btnForce.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeScriptContextInfo) {
+          toggleForceScript(activeScriptContextInfo);
+        }
+        closeScriptContextMenu();
+      });
+    }
+
+    if (btnToggle) {
+      btnToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeScriptContextInfo && activeScriptContextInfo.switchEl) {
+          activeScriptContextInfo.switchEl.checked = !activeScriptContextInfo.switchEl.checked;
+          activeScriptContextInfo.switchEl.dispatchEvent(new Event('change'));
+        }
+        closeScriptContextMenu();
+      });
+    }
+
+    function onDismissScriptMenu(e) {
+      if (menu && menu.classList.contains('is-visible') && !menu.contains(e.target)) {
+        closeScriptContextMenu();
+      }
+    }
+    document.addEventListener('pointerdown', onDismissScriptMenu, true);
+    document.addEventListener('mousedown', onDismissScriptMenu, true);
+    document.addEventListener('click', onDismissScriptMenu, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeScriptContextMenu();
+    });
+
+    window.addEventListener('resize', closeScriptContextMenu);
+    window.addEventListener('scroll', closeScriptContextMenu, true);
+  }
+
   function addItemAcrossProfiles(moduleName, item) {
     if (state.config && state.config.profiles) {
       const currentProf = state.config.activeProfile || 'Default';
@@ -1095,42 +2076,39 @@
   let profileModalMode = 'add'; // 'add' | 'edit' | 'rename' | 'delete'
   let cachedRunningApps = [];
 
-  let modalTriggerState = {
-    enabled: true,
-    focus: true,
-    hover: false
-  };
+  // 3-State Profile Trigger: 'off' | 'focus' | 'hover'
+  let modalTriggerMode = 'focus';
 
-  function updateProfileTriggerModeUI(enabled, focus, hover) {
-    if (typeof enabled === 'boolean') modalTriggerState.enabled = enabled;
-    if (typeof focus === 'boolean') modalTriggerState.focus = focus;
-    if (typeof hover === 'boolean') modalTriggerState.hover = hover;
-
-    // If master switch is enabled but neither focus nor hover is true, default focus to true
-    if (modalTriggerState.enabled && !modalTriggerState.focus && !modalTriggerState.hover) {
-      modalTriggerState.focus = true;
+  function updateProfileTriggerModeUI(mode) {
+    if (mode === 'off' || mode === 'focus' || mode === 'hover') {
+      modalTriggerMode = mode;
+    } else if (typeof mode === 'boolean') {
+      modalTriggerMode = mode ? 'focus' : 'off';
     }
 
-    const profSwitchOnHover = document.getElementById('profSwitchOnHover');
-    const profHoverTitle = document.getElementById('profHoverTitle');
+    const chipTriggerOff = document.getElementById('chipTriggerOff');
     const chipTriggerFocus = document.getElementById('chipTriggerFocus');
     const chipTriggerHover = document.getElementById('chipTriggerHover');
-    const triggerPills = document.querySelector('.trigger-mode-pills');
+    const profTriggerDesc = document.getElementById('profTriggerDesc');
 
-    if (profSwitchOnHover) {
-      profSwitchOnHover.checked = modalTriggerState.enabled;
-    }
-    if (profHoverTitle) {
-      profHoverTitle.textContent = 'Switch Trigger';
+    if (chipTriggerOff) {
+      chipTriggerOff.classList.toggle('active', modalTriggerMode === 'off');
     }
     if (chipTriggerFocus) {
-      chipTriggerFocus.classList.toggle('active', modalTriggerState.enabled && modalTriggerState.focus);
+      chipTriggerFocus.classList.toggle('active', modalTriggerMode === 'focus');
     }
     if (chipTriggerHover) {
-      chipTriggerHover.classList.toggle('active', modalTriggerState.enabled && modalTriggerState.hover);
+      chipTriggerHover.classList.toggle('active', modalTriggerMode === 'hover');
     }
-    if (triggerPills) {
-      triggerPills.classList.toggle('disabled-pills', !modalTriggerState.enabled);
+
+    if (profTriggerDesc) {
+      if (modalTriggerMode === 'off') {
+        profTriggerDesc.textContent = 'Disabled. This profile will only be activated manually.';
+      } else if (modalTriggerMode === 'focus') {
+        profTriggerDesc.textContent = 'Active. Switches to this profile whenever its target window gains focus.';
+      } else if (modalTriggerMode === 'hover') {
+        profTriggerDesc.textContent = 'Active. Switches to this profile whenever your mouse cursor hovers over its window.';
+      }
     }
   }
 
@@ -1150,7 +2128,6 @@
     const profileInfoTip = document.getElementById('profileInfoTip');
 
     const profInputExe = document.getElementById('profInputExe');
-    const profSwitchOnHover = document.getElementById('profSwitchOnHover');
     const profSwitchOsdIcon = document.getElementById('profSwitchOsdIcon');
     const runningAppsFilterInput = document.getElementById('runningAppsFilterInput');
 
@@ -1222,7 +2199,7 @@
           profInputExe.value = '';
           profInputExe.disabled = false;
         }
-        updateProfileTriggerModeUI(true, true, false);
+        updateProfileTriggerModeUI('focus');
         if (profSwitchOsdIcon) profSwitchOsdIcon.checked = true;
         if (btnConfirmProfileModal) btnConfirmProfileModal.textContent = 'Create Profile';
       } else if (mode === 'edit') {
@@ -1241,14 +2218,16 @@
           ? Boolean(prof.switchTriggerEnabled)
           : true;
 
-        let triggerFocus = true;
-        let triggerHover = false;
-        if (typeof prof.switchOnFocus !== 'undefined' || typeof prof.switchOnHover !== 'undefined') {
-          triggerFocus = typeof prof.switchOnFocus !== 'undefined' ? Boolean(prof.switchOnFocus) : !prof.switchOnHover;
-          triggerHover = Boolean(prof.switchOnHover);
+        let triggerMode = 'focus';
+        if (!triggerEnabled) {
+          triggerMode = 'off';
+        } else if (prof.switchOnHover) {
+          triggerMode = 'hover';
+        } else {
+          triggerMode = 'focus';
         }
 
-        updateProfileTriggerModeUI(triggerEnabled, triggerFocus, triggerHover);
+        updateProfileTriggerModeUI(triggerMode);
         if (profSwitchOsdIcon) {
           profSwitchOsdIcon.checked = typeof prof.showOsdIcon !== 'undefined' ? Boolean(prof.showOsdIcon) : true;
         }
@@ -1304,9 +2283,9 @@
     const profSwitchOsdIcon = document.getElementById('profSwitchOsdIcon');
 
     const targetExe = profInputExe ? profInputExe.value.trim() : '';
-    const switchTriggerEnabled = modalTriggerState.enabled && (modalTriggerState.focus || modalTriggerState.hover);
-    const switchOnFocus = modalTriggerState.enabled ? Boolean(modalTriggerState.focus) : false;
-    const switchOnHover = modalTriggerState.enabled ? Boolean(modalTriggerState.hover) : false;
+    const switchTriggerEnabled = (modalTriggerMode !== 'off');
+    const switchOnFocus = (modalTriggerMode === 'focus');
+    const switchOnHover = (modalTriggerMode === 'hover');
     const showOsdIcon = profSwitchOsdIcon ? profSwitchOsdIcon.checked : true;
 
     if (profileModalMode === 'add') {
@@ -1434,6 +2413,23 @@
   // Tab Management
   // ============================================================================
 
+  function updateTabsScrollButtons() {
+    const bar = document.getElementById('segmentedBar');
+    const btnLeft = document.getElementById('btnScrollTabsLeft');
+    const btnRight = document.getElementById('btnScrollTabsRight');
+    if (!bar) return;
+
+    const isOverflowing = bar.scrollWidth > (bar.clientWidth + 4);
+    if (btnLeft) {
+      btnLeft.style.display = isOverflowing ? 'flex' : 'none';
+      btnLeft.classList.toggle('disabled-scroll', bar.scrollLeft <= 2);
+    }
+    if (btnRight) {
+      btnRight.style.display = isOverflowing ? 'flex' : 'none';
+      btnRight.classList.toggle('disabled-scroll', bar.scrollLeft + bar.clientWidth >= bar.scrollWidth - 2);
+    }
+  }
+
   function updateSegmentedGlider(instant = false) {
     const segmentedBar = document.getElementById('segmentedBar');
     const glider = document.getElementById('segmentedGlider');
@@ -1445,16 +2441,13 @@
       return;
     }
 
-    const barRect = segmentedBar.getBoundingClientRect();
-    const btnRect = activeBtn.getBoundingClientRect();
+    const left = activeBtn.offsetLeft;
+    const width = activeBtn.offsetWidth;
 
-    if (btnRect.width === 0) {
+    if (width === 0) {
       requestAnimationFrame(() => updateSegmentedGlider(instant));
       return;
     }
-
-    const left = btnRect.left - barRect.left;
-    const width = btnRect.width;
 
     if (instant) {
       glider.style.transition = 'none';
@@ -1470,18 +2463,42 @@
       glider.offsetHeight;
       glider.style.transition = '';
     }
+
+    updateTabsScrollButtons();
   }
 
   function switchTab(tabName, shouldSync = true) {
+    if (typeof stopActiveBadgeRecording === 'function') stopActiveBadgeRecording(true);
     state.activeTab = tabName;
-    document.querySelectorAll('.segment-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === tabName);
-    });
+    const segmentedBar = document.getElementById('segmentedBar');
+    let activeBtn = null;
+    if (segmentedBar) {
+      segmentedBar.querySelectorAll('.segment-btn').forEach(btn => {
+        const isMatch = btn.dataset.tab === tabName;
+        btn.classList.toggle('active', isMatch);
+        if (isMatch) activeBtn = btn;
+      });
+    } else {
+      document.querySelectorAll('.segment-btn').forEach(btn => {
+        const isMatch = btn.dataset.tab === tabName;
+        btn.classList.toggle('active', isMatch);
+        if (isMatch) activeBtn = btn;
+      });
+    }
     document.querySelectorAll('.module-panel').forEach(panel => {
       panel.classList.toggle('active', panel.id === `panel-${tabName}`);
     });
-    if (tabName === 'windowManager') {
-      sendToAhk('getActiveAppVolume');
+    if (tabName === 'windowManager' || tabName === 'mouseGestures' || tabName === 'radialMenu') {
+      updateAllFeatureProfileBadges();
+      if (tabName === 'windowManager') {
+        sendToAhk('getActiveAppVolume');
+      }
+      if (tabName === 'mouseGestures' || tabName === 'radialMenu') {
+        refreshAllActionSelects();
+      }
+    }
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
     updateSegmentedGlider(false);
     if (shouldSync && isInitialized) {
@@ -1540,6 +2557,8 @@
       const isEnabled = item.enabled !== false && item.enabled !== 0;
       const card = document.createElement('div');
       card.className = `shortcut-card ${isEnabled ? '' : 'is-disabled'} ${state.editingTeId === item.id ? 'editing' : ''}`;
+      card.dataset.module = 'textExpander';
+      card.dataset.id = item.id;
 
       const isMulti = item.multiline || item.output.includes('\n');
       const previewText = item.output.replace(/\n/g, ' \\n ');
@@ -1824,6 +2843,28 @@
     return all.length > 0 ? all.join(' + ') : raw;
   }
 
+  function comboToAhk(combo) {
+    if (!combo || typeof combo !== 'string') return '';
+    const clean = combo.trim();
+    if (!clean) return '';
+    if (/^[\$*~<>\^!+#]+[A-Za-z0-9_]+$/.test(clean)) return clean;
+    const parts = clean.split('+').map(p => p.trim());
+    let mods = '';
+    let key = '';
+    for (const part of parts) {
+      const lower = part.toLowerCase();
+      if (lower === 'ctrl' || lower === 'control') mods += '^';
+      else if (lower === 'alt' || lower === 'menu') mods += '!';
+      else if (lower === 'shift') mods += '+';
+      else if (lower === 'win' || lower === 'windows' || lower === 'meta' || lower === 'cmd') mods += '#';
+      else {
+        key = part;
+      }
+    }
+    if (!key) return clean;
+    return mods + key;
+  }
+
   function isSameSourceKey(src1, src2) {
     if (!src1 || !src2) return false;
     return normalizeKeySource(src1) === normalizeKeySource(src2);
@@ -1847,6 +2888,8 @@
       const isEnabled = item.enabled !== false && item.enabled !== 0;
       const card = document.createElement('div');
       card.className = `shortcut-card ${isEnabled ? '' : 'is-disabled'}`;
+      card.dataset.module = 'keyRemapper';
+      card.dataset.id = item.id;
       const displaySource = formatKeyDisplay(item.source);
       const displayTarget = formatKeyDisplay(item.target);
       const descText = `${displaySource} → ${displayTarget}`;
@@ -2195,6 +3238,198 @@
     slider.style.setProperty('--progress', `${pct}%`);
   }
 
+  let activeRecordingBadge = null;
+  let activeRecordingCleanup = null;
+
+  function stopActiveBadgeRecording(restore = true) {
+    if (activeRecordingCleanup) {
+      activeRecordingCleanup(restore);
+      activeRecordingCleanup = null;
+      activeRecordingBadge = null;
+    }
+  }
+
+  function setupEditableHotkeyBadge(badgeEl, configPropKey, defaultAhkHotkey, onUpdateCallback) {
+    if (!badgeEl) return;
+
+    function refreshDisplay() {
+      const wm = (state.config && state.config.windowManager) ? state.config.windowManager : {};
+      const currentHk = (wm[configPropKey] && String(wm[configPropKey]).trim() !== '')
+        ? String(wm[configPropKey]).trim()
+        : defaultAhkHotkey;
+      badgeEl.textContent = formatKeyDisplay(currentHk);
+      badgeEl.title = `Click to change shortcut (Current: ${formatKeyDisplay(currentHk)})`;
+    }
+
+    refreshDisplay();
+    badgeEl._refreshDisplay = refreshDisplay;
+
+    if (badgeEl.dataset.editableBound) return;
+    badgeEl.dataset.editableBound = 'true';
+
+    badgeEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (activeRecordingBadge === badgeEl) {
+        stopActiveBadgeRecording(true);
+        return;
+      }
+      stopActiveBadgeRecording(true);
+
+      const wm = (state.config && state.config.windowManager) ? state.config.windowManager : {};
+      const originalHk = (wm[configPropKey] && String(wm[configPropKey]).trim() !== '')
+        ? String(wm[configPropKey]).trim()
+        : defaultAhkHotkey;
+      const originalDisplay = formatKeyDisplay(originalHk);
+
+      activeRecordingBadge = badgeEl;
+      badgeEl.classList.add('is-recording');
+      badgeEl.textContent = 'Press keys...';
+
+      let pendingMod = null;
+
+      function onKeyDown(evt) {
+        evt.preventDefault();
+        evt.stopPropagation();
+
+        if (evt.key === 'Escape') {
+          cleanup(true);
+          showToast('Shortcut change cancelled');
+          return;
+        }
+
+        const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+        const parts = [];
+        if (evt.ctrlKey) parts.push('Ctrl');
+        if (evt.altKey) parts.push('Alt');
+        if (evt.shiftKey) parts.push('Shift');
+        if (evt.metaKey) parts.push('Win');
+
+        if (isModifier) {
+          pendingMod = (evt.key === 'Control') ? 'Ctrl' : ((evt.key === 'Shift') ? 'Shift' : ((evt.key === 'Alt') ? 'Alt' : 'Win'));
+          badgeEl.textContent = parts.join(' + ') + ' + ...';
+          return;
+        }
+
+        pendingMod = null;
+
+        let key = evt.key;
+        if (evt.code && evt.code.startsWith('Key')) {
+          key = evt.code.slice(3).toUpperCase();
+        } else if (evt.code && evt.code.startsWith('Digit')) {
+          key = evt.code.slice(5);
+        } else if (evt.code && evt.code.startsWith('Numpad')) {
+          key = evt.code;
+        } else if (key === ' ') {
+          key = 'Space';
+        } else if (key === 'ArrowUp') {
+          key = 'Up';
+        } else if (key === 'ArrowDown') {
+          key = 'Down';
+        } else if (key === 'ArrowLeft') {
+          key = 'Left';
+        } else if (key === 'ArrowRight') {
+          key = 'Right';
+        } else if (key === 'PageUp') {
+          key = 'PgUp';
+        } else if (key === 'PageDown') {
+          key = 'PgDn';
+        } else if (evt.code === 'Minus') {
+          key = '-';
+        } else if (evt.code === 'Equal') {
+          key = '=';
+        } else if (evt.code === 'BracketLeft') {
+          key = '[';
+        } else if (evt.code === 'BracketRight') {
+          key = ']';
+        } else if (evt.code === 'Backslash') {
+          key = '\\';
+        } else if (evt.code === 'Semicolon') {
+          key = ';';
+        } else if (evt.code === 'Quote') {
+          key = "'";
+        } else if (evt.code === 'Backquote') {
+          key = '`';
+        } else if (evt.code === 'Comma') {
+          key = ',';
+        } else if (evt.code === 'Period') {
+          key = '.';
+        } else if (evt.code === 'Slash') {
+          key = '/';
+        } else if (key.length === 1) {
+          key = key.toUpperCase();
+        }
+
+        if (!parts.includes(key)) {
+          parts.push(key);
+        }
+
+        const combo = parts.join(' + ');
+        const ahkHk = comboToAhk(combo);
+
+        if (!state.config.windowManager) state.config.windowManager = {};
+        state.config.windowManager[configPropKey] = ahkHk;
+
+        badgeEl.textContent = formatKeyDisplay(ahkHk);
+        cleanup(false);
+
+        saveCurrentProfileState();
+        syncConfig();
+        showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+
+        if (typeof onUpdateCallback === 'function') {
+          onUpdateCallback(ahkHk);
+        }
+      }
+
+      function onKeyUp(evt) {
+        if (pendingMod) {
+          const combo = pendingMod;
+          const ahkHk = comboToAhk(combo);
+          if (!state.config.windowManager) state.config.windowManager = {};
+          state.config.windowManager[configPropKey] = ahkHk;
+          badgeEl.textContent = formatKeyDisplay(ahkHk);
+          cleanup(false);
+          saveCurrentProfileState();
+          syncConfig();
+          showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+          if (typeof onUpdateCallback === 'function') {
+            onUpdateCallback(ahkHk);
+          }
+          pendingMod = null;
+        }
+      }
+
+      function onDocClick(evt) {
+        if (!badgeEl.contains(evt.target)) {
+          cleanup(true);
+        }
+      }
+
+      function cleanup(restore) {
+        badgeEl.classList.remove('is-recording');
+        window.removeEventListener('keydown', onKeyDown, true);
+        window.removeEventListener('keyup', onKeyUp, true);
+        document.removeEventListener('pointerdown', onDocClick, true);
+        if (activeRecordingBadge === badgeEl) {
+          activeRecordingBadge = null;
+          activeRecordingCleanup = null;
+        }
+        if (restore) {
+          badgeEl.textContent = originalDisplay;
+        }
+      }
+
+      activeRecordingCleanup = cleanup;
+      window.addEventListener('keydown', onKeyDown, true);
+      window.addEventListener('keyup', onKeyUp, true);
+      setTimeout(() => {
+        document.addEventListener('pointerdown', onDocClick, true);
+      }, 50);
+    });
+  }
+
   function initWindowManager() {
     if (!state.config.windowManager) {
       state.config.windowManager = {};
@@ -2235,7 +3470,8 @@
       { id: 'wmSwitchCleanText', badgeId: 'wmBadgeCleanText', key: 'textTransformCleanEnabled' },
       { id: 'wmSwitchScreenOcr', badgeId: 'wmBadgeOcr', key: 'screenOcrEnabled' },
       { id: 'wmSwitchColorPicker', badgeId: 'wmBadgeColorPicker', key: 'colorPickerEnabled' },
-      { id: 'wmSwitchVirtualDesktops', badgeId: 'wmBadgeVDesktops', key: 'virtualDesktopsEnabled' }
+      { id: 'wmSwitchVirtualDesktops', badgeId: 'wmBadgeVDesktops', key: 'virtualDesktopsEnabled' },
+      { id: 'wmSwitchSleep', badgeId: 'wmBadgeSleep', key: 'sleepEnabled' }
     ];
 
     switchDefinitions.forEach(({ id, badgeId, key }) => {
@@ -2253,6 +3489,12 @@
       }
       if (badge) {
         badge.classList.toggle('is-disabled', !isEnabled);
+      }
+      if (id === 'wmSwitchTextTransform') {
+        const lowerBadge = document.getElementById('wmBadgeLower');
+        const titleBadge = document.getElementById('wmBadgeTitle');
+        if (lowerBadge) lowerBadge.classList.toggle('is-disabled', !isEnabled);
+        if (titleBadge) titleBadge.classList.toggle('is-disabled', !isEnabled);
       }
       if (iconBadge) {
         iconBadge.classList.toggle('is-disabled', !isEnabled);
@@ -2272,9 +3514,18 @@
           if (badge) {
             badge.classList.toggle('is-disabled', !isChecked);
           }
+          if (id === 'wmSwitchTextTransform') {
+            const lowerBadge = document.getElementById('wmBadgeLower');
+            const titleBadge = document.getElementById('wmBadgeTitle');
+            if (lowerBadge) lowerBadge.classList.toggle('is-disabled', !isChecked);
+            if (titleBadge) titleBadge.classList.toggle('is-disabled', !isChecked);
+          }
           if (iconBadge) {
             iconBadge.classList.toggle('is-disabled', !isChecked);
           }
+          saveCurrentProfileState();
+          updateAllFeatureProfileBadges();
+          updateGlobalIndicators();
           syncConfig();
         });
       }
@@ -2284,8 +3535,12 @@
         card.addEventListener('click', (e) => {
           // If clicked inside the toggle switch itself, let the switch handle it naturally
           if (e.target.closest('.toggle-wrapper')) return;
+          // If clicked inside profile badges, let profile badge switch profile
+          if (e.target.closest('.item-profiles-badges') || e.target.closest('.item-profile-badge')) return;
           // If clicked inside the ghost sub-checkbox or its label, let ghost mode handle it
           if (e.target.closest('.wm-sub-option') || e.target.closest('.uiverse-checkbox-wrap')) return;
+          // If clicked inside any hotkey badge, sub-hotkey tag, chips, sub-controls or sleep controls, do NOT toggle switch
+          if (e.target.closest('.wm-hotkey-badge') || e.target.closest('.wm-sub-hotkey-tag') || e.target.closest('.wm-text-transform-chips') || e.target.closest('.sleep-controls-row') || e.target.closest('.wm-sub-controls-row')) return;
 
           sw.checked = !sw.checked;
           sw.dispatchEvent(new Event('change'));
@@ -2330,6 +3585,206 @@
       }
     }
 
+    // Wire Color Format Dropdown & Launch Picker Button
+    const wmSelectColorFormat = document.getElementById('wmSelectColorFormat');
+    if (wmSelectColorFormat) {
+      const currWm = (state.config && state.config.windowManager) ? state.config.windowManager : {};
+      const currFmt = currWm.colorFormat || 'HEX';
+      wmSelectColorFormat.value = currFmt;
+
+      if (!wmSelectColorFormat.dataset.bound) {
+        wmSelectColorFormat.dataset.bound = 'true';
+        wmSelectColorFormat.addEventListener('change', () => {
+          if (!state.config.windowManager) state.config.windowManager = {};
+          state.config.windowManager.colorFormat = wmSelectColorFormat.value;
+          sendToAhk('setColorFormat', { format: wmSelectColorFormat.value });
+          syncConfig();
+          showToast(`Color format set to ${wmSelectColorFormat.value}`, 'info');
+        });
+      }
+    }
+
+    const btnLaunchColorPicker = document.getElementById('btnLaunchColorPicker');
+    if (btnLaunchColorPicker) {
+      if (!btnLaunchColorPicker.dataset.bound) {
+        btnLaunchColorPicker.dataset.bound = 'true';
+        btnLaunchColorPicker.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sendToAhk('launchColorPicker');
+        });
+      }
+    }
+
+    // Wire Sleep / Hibernate Mode Pill Buttons & Timer
+    const btnSleepModeSleep = document.getElementById('btnSleepModeSleep');
+    const btnSleepModeHibernate = document.getElementById('btnSleepModeHibernate');
+    const wmSleepTimerInput = document.getElementById('wmSleepTimerInput');
+    const wmSleepStatusBadge = document.getElementById('wmSleepStatusBadge');
+    const wmSleepDesc = document.getElementById('wmSleepDesc');
+
+    function formatMinutesDisplay(minutes, isShort = false) {
+      const mins = Math.max(0, parseInt(minutes, 10) || 0);
+      if (mins <= 0) return 'Instant';
+      if (mins < 60) {
+        if (isShort) return `${mins}m`;
+        return `${mins} min${mins === 1 ? '' : 's'}`;
+      }
+      const hrs = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      if (remMins === 0) {
+        if (isShort) return `${hrs}h`;
+        return `${hrs} hour${hrs === 1 ? '' : 's'}`;
+      }
+      if (isShort) return `${hrs}h ${remMins}m`;
+      return `${hrs} hour${hrs === 1 ? '' : 's'} ${remMins} min${remMins === 1 ? '' : 's'}`;
+    }
+
+    function updateSleepCardUI() {
+      const currWm = (state.config && state.config.windowManager) ? state.config.windowManager : {};
+      const isHib = (currWm.sleepMode === 'hibernate' || currWm.sleepModeHibernate === 1 || currWm.sleepModeHibernate === true);
+      const timerVal = Math.max(0, parseInt(currWm.sleepTimer, 10) || 0);
+
+      if (btnSleepModeSleep) btnSleepModeSleep.classList.toggle('active', !isHib);
+      if (btnSleepModeHibernate) btnSleepModeHibernate.classList.toggle('active', isHib);
+      if (wmSleepTimerInput && document.activeElement !== wmSleepTimerInput) {
+        wmSleepTimerInput.value = timerVal;
+      }
+
+      const actionName = isHib ? 'Hibernate' : 'Sleep';
+      if (wmSleepStatusBadge) {
+        wmSleepStatusBadge.textContent = timerVal > 0
+          ? `${actionName} (${formatMinutesDisplay(timerVal, true)})`
+          : `Instant ${actionName}`;
+      }
+      if (wmSleepDesc) {
+        const hkDisplay = formatKeyDisplay(currWm.sleepHotkey || '#s');
+        wmSleepDesc.textContent = timerVal > 0
+          ? `Put PC into ${actionName} after ${formatMinutesDisplay(timerVal, false)} countdown via ${hkDisplay}`
+          : `Instantly put PC into ${actionName} using ${hkDisplay}`;
+      }
+    }
+
+    if (btnSleepModeSleep && !btnSleepModeSleep.dataset.bound) {
+      btnSleepModeSleep.dataset.bound = 'true';
+      btnSleepModeSleep.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!state.config.windowManager) state.config.windowManager = {};
+        state.config.windowManager.sleepMode = 'sleep';
+        state.config.windowManager.sleepModeHibernate = 0;
+        updateSleepCardUI();
+        syncConfig();
+      });
+    }
+
+    if (btnSleepModeHibernate && !btnSleepModeHibernate.dataset.bound) {
+      btnSleepModeHibernate.dataset.bound = 'true';
+      btnSleepModeHibernate.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!state.config.windowManager) state.config.windowManager = {};
+        state.config.windowManager.sleepMode = 'hibernate';
+        state.config.windowManager.sleepModeHibernate = 1;
+        updateSleepCardUI();
+        syncConfig();
+      });
+    }
+
+    if (wmSleepTimerInput && !wmSleepTimerInput.dataset.bound) {
+      wmSleepTimerInput.dataset.bound = 'true';
+      wmSleepTimerInput.addEventListener('input', () => {
+        if (!state.config.windowManager) state.config.windowManager = {};
+        const v = Math.max(0, parseInt(wmSleepTimerInput.value, 10) || 0);
+        state.config.windowManager.sleepTimer = v;
+        const isHib = (state.config.windowManager.sleepMode === 'hibernate' || state.config.windowManager.sleepModeHibernate === 1);
+        const actionName = isHib ? 'Hibernate' : 'Sleep';
+        if (wmSleepStatusBadge) {
+          wmSleepStatusBadge.textContent = v > 0
+            ? `${actionName} (${formatMinutesDisplay(v, true)})`
+            : `Instant ${actionName}`;
+        }
+        if (wmSleepDesc) {
+          const hkDisplay = formatKeyDisplay((state.config.windowManager && state.config.windowManager.sleepHotkey) || '#s');
+          wmSleepDesc.textContent = v > 0
+            ? `Put PC into ${actionName} after ${formatMinutesDisplay(v, false)} countdown via ${hkDisplay}`
+            : `Instantly put PC into ${actionName} using ${hkDisplay}`;
+        }
+      });
+      wmSleepTimerInput.addEventListener('change', () => {
+        if (!state.config.windowManager) state.config.windowManager = {};
+        const v = Math.max(0, parseInt(wmSleepTimerInput.value, 10) || 0);
+        state.config.windowManager.sleepTimer = v;
+        updateSleepCardUI();
+        syncConfig();
+      });
+    }
+
+    updateSleepCardUI();
+
+    // Wire Interactive Shortcut Editing for all Window Manager Hotkey Badges
+    const EDITABLE_WM_HOTKEY_BADGES = [
+      { id: 'wmBadgeAlwaysOnTop', key: 'alwaysOnTopHotkey', def: '^Space' },
+      { id: 'wmBadgeCenterWindow', key: 'centerWindowHotkey', def: '^!c' },
+      { id: 'wmBadgeHideWindow', key: 'hideWindowHotkey', def: '^!h' },
+      { id: 'wmBadgeGhostMode', key: 'clickThroughGhostHotkey', def: '^!g' },
+      { id: 'wmBadgeAppVolumeMute', key: 'appVolumeMuteHotkey', def: '!m' },
+      { id: 'wmBadgeMasterAudioMute', key: 'masterAudioMuteHotkey', def: '^!m' },
+      { id: 'wmBadgeWindowShade', key: 'windowShadeHotkey', def: '^!r' },
+      { id: 'wmBadgeBorderless', key: 'borderlessHotkey', def: '^!Enter' },
+      { id: 'wmBadgeUpper', key: 'textTransformUpperHotkey', def: '^!u' },
+      { id: 'wmBadgeLower', key: 'textTransformLowerHotkey', def: '^!l' },
+      { id: 'wmBadgeTitle', key: 'textTransformTitleHotkey', def: '^!t' },
+      { id: 'wmBadgeCleanText', key: 'textTransformCleanHotkey', def: '^!k' },
+      { id: 'wmBadgeOcr', key: 'screenOcrHotkey', def: '^!o' },
+      { id: 'wmBadgeColorPicker', key: 'colorPickerHotkey', def: '^!p' },
+      {
+        id: 'wmBadgeSleep',
+        key: 'sleepHotkey',
+        def: '#s',
+        onUpdate: () => {
+          updateSleepCardUI();
+        }
+      }
+    ];
+
+    EDITABLE_WM_HOTKEY_BADGES.forEach(({ id, key, def, onUpdate }) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      setupEditableHotkeyBadge(el, key, def, onUpdate);
+    });
+
+    // Reset All System Tools Shortcuts Button
+    const btnResetShortcuts = document.getElementById('btnResetWmShortcuts');
+    if (btnResetShortcuts && !btnResetShortcuts.dataset.bound) {
+      btnResetShortcuts.dataset.bound = 'true';
+      btnResetShortcuts.addEventListener('click', () => {
+        if (typeof stopActiveBadgeRecording === 'function') {
+          stopActiveBadgeRecording(true);
+        }
+
+        const currentProfName = state.config.activeProfile || 'Default';
+        const prof = (state.config.profiles && state.config.profiles[currentProfName]) || state.config;
+        if (!prof.windowManager) prof.windowManager = {};
+        if (!state.config.windowManager) state.config.windowManager = {};
+
+        EDITABLE_WM_HOTKEY_BADGES.forEach(({ id, key, def, onUpdate }) => {
+          prof.windowManager[key] = def;
+          state.config.windowManager[key] = def;
+          const badge = document.getElementById(id);
+          if (badge) {
+            badge.textContent = formatKeyDisplay(def);
+            badge.classList.remove('recording');
+          }
+          if (typeof onUpdate === 'function') {
+            try { onUpdate(); } catch (err) { }
+          }
+        });
+
+        saveCurrentProfileState();
+        syncConfig();
+        updateGlobalIndicators();
+        showToast('All System Tools shortcuts reset to factory defaults!');
+      });
+    }
+
     if (wmAppVolumeSlider) {
       updateSliderProgress(wmAppVolumeSlider);
 
@@ -2357,6 +3812,7 @@
       });
     }
 
+    updateAllFeatureProfileBadges();
     sendToAhk('getActiveAppVolume');
   }
 
@@ -2364,6 +3820,230 @@
     if (!wmOpacitySlider || !wmOpacityValue) return;
     const pct = Math.round((wmOpacitySlider.value / 255) * 100);
     wmOpacityValue.textContent = `${pct}%`;
+  }
+
+  // ============================================================================
+  // Action Definitions & Unified Select Helpers
+  // ============================================================================
+
+  const SYSTEM_ACTION_OPTIONS = [
+    // Productivity & Tabs
+    { val: 'CloseTab', text: 'Close Tab (Ctrl+W)' },
+    { val: 'NewTab', text: 'New Tab (Ctrl+T)' },
+    { val: 'ReopenTab', text: 'Reopen Closed Tab (Ctrl+Shift+T)' },
+    { val: 'NextTab', text: 'Next Tab (Ctrl+Tab)' },
+    { val: 'PrevTab', text: 'Previous Tab (Ctrl+Shift+Tab)' },
+    { val: 'DuplicateTab', text: 'Duplicate Tab' },
+    { val: 'Back', text: 'Browser Back (Alt+Left)' },
+    { val: 'Forward', text: 'Browser Forward (Alt+Right)' },
+    // Window Management
+    { val: 'MinimizeWindow', text: 'Minimize Window' },
+    { val: 'MaximizeWindow', text: 'Maximize Window' },
+    { val: 'CloseWindow', text: 'Close Window (Alt+F4)' },
+    { val: 'SnapLeft', text: 'Snap Left (Win+Left)' },
+    { val: 'SnapRight', text: 'Snap Right (Win+Right)' },
+    { val: 'MinimizeAll', text: 'Minimize All Windows (Win+M)' },
+    { val: 'ShowDesktop', text: 'Show Desktop (Win+D)' },
+    { val: 'TaskView', text: 'Task View (Win+Tab)' },
+    // Audio & Media
+    { val: 'MuteVolume', text: 'Toggle Audio Mute' },
+    { val: 'VolumeUp', text: 'Volume Up (+4%)' },
+    { val: 'VolumeDown', text: 'Volume Down (-4%)' },
+    // Windows System Tools
+    { val: 'ClipboardHistory', text: 'Clipboard History (Win+V)' },
+    { val: 'EmojiPicker', text: 'Emoji & Symbols (Win+.)' },
+    { val: 'PastePlainText', text: 'Paste Plain Text' },
+    { val: 'FileExplorer', text: 'File Explorer (Win+E)' },
+    { val: 'WindowsSettings', text: 'Windows Settings (Win+I)' },
+    { val: 'GameBar', text: 'Xbox Game Bar / Snip' },
+    { val: 'ActionCenter', text: 'Action Center (Win+A)' },
+    { val: 'StartMenu', text: 'Start Menu' },
+    { val: 'LockWorkstation', text: 'Lock Workstation' },
+    // Built-in Tools
+    { val: 'ScreenOcr', text: 'Instant Screen OCR' },
+    { val: 'ColorPicker', text: 'Color Picker' },
+    { val: 'AlwaysOnTop', text: 'Toggle Always-on-Top' },
+    { val: 'GhostMode', text: 'Toggle Ghost Click-Through' },
+    { val: 'CleanText', text: 'Clean Plain Text' },
+    { val: 'NextDesktop', text: 'Next Virtual Desktop' },
+    { val: 'PrevDesktop', text: 'Previous Virtual Desktop' },
+    { val: 'ScrollTop', text: 'Scroll to Top' },
+    { val: 'ScrollBottom', text: 'Scroll to Bottom' },
+    { val: 'Calculator', text: 'Calculator' },
+    { val: 'Screenshot', text: 'Screen Snip' },
+    { val: 'none', text: 'Disabled' }
+  ];
+
+  const ACTION_FRIENDLY_NAMES = {
+    'ScreenOcr': 'OCR',
+    'ColorPicker': 'Color Pick',
+    'NextDesktop': 'Next Desk',
+    'PrevDesktop': 'Prev Desk',
+    'TaskView': 'Task View',
+    'ShowDesktop': 'Desktop',
+    'AlwaysOnTop': 'Always On',
+    'GhostMode': 'Ghost',
+    'MuteVolume': 'Mute Audio',
+    'VolumeUp': 'Vol +',
+    'VolumeDown': 'Vol -',
+    'SnapLeft': 'Snap Left',
+    'SnapRight': 'Snap Right',
+    'MinimizeAll': 'Min All',
+    'CloseTab': 'Close Tab',
+    'NewTab': 'New Tab',
+    'ReopenTab': 'Reopen Tab',
+    'NextTab': 'Next Tab',
+    'PrevTab': 'Prev Tab',
+    'DuplicateTab': 'Dup Tab',
+    'Back': 'Back',
+    'Forward': 'Forward',
+    'MinimizeWindow': 'Min Win',
+    'MaximizeWindow': 'Max Win',
+    'CloseWindow': 'Close Win',
+    'ClipboardHistory': 'Clipboard',
+    'EmojiPicker': 'Emoji',
+    'PastePlainText': 'Paste Text',
+    'FileExplorer': 'Explorer',
+    'WindowsSettings': 'Settings',
+    'GameBar': 'Game Bar',
+    'ActionCenter': 'Action Ctr',
+    'StartMenu': 'Start Menu',
+    'LockWorkstation': 'Lock PC',
+    'ScrollTop': 'Scroll Top',
+    'ScrollBottom': 'Scroll Btm',
+    'Calculator': 'Calc',
+    'CleanText': 'Clean Text',
+    'Screenshot': 'Snip',
+    'none': 'Disabled'
+  };
+
+  function getFullActionOptions() {
+    const list = [...SYSTEM_ACTION_OPTIONS];
+    if (state.config && state.config.appLauncher && Array.isArray(state.config.appLauncher.items)) {
+      state.config.appLauncher.items.forEach(item => {
+        if (item && item.id) {
+          const rawId = String(item.id);
+          const cleanId = rawId.startsWith('al-') ? rawId : `al-${rawId}`;
+          const title = item.name || item.title || item.target || `App #${cleanId}`;
+          list.push({ val: cleanId, text: `Launch: ${title}` });
+        }
+      });
+    }
+    if (state.config && state.config.macroRecorder && Array.isArray(state.config.macroRecorder.items)) {
+      state.config.macroRecorder.items.forEach(macro => {
+        if (macro && macro.id) {
+          const rawId = String(macro.id);
+          const cleanId = rawId.startsWith('macro-') ? rawId : `macro-${rawId}`;
+          const name = macro.name || `Macro #${cleanId}`;
+          list.push({ val: cleanId, text: `Macro: ${name}` });
+        }
+      });
+    }
+    return list;
+  }
+
+  function getActionFriendlyName(actionKey) {
+    if (!actionKey || actionKey === 'none') return 'Disabled';
+    if (ACTION_FRIENDLY_NAMES[actionKey]) return ACTION_FRIENDLY_NAMES[actionKey];
+    if (actionKey.startsWith('al-')) {
+      const cleanKey = actionKey.replace(/^(al-)+/, 'al-');
+      const bareId = actionKey.replace(/^(al-)+/, '');
+      const app = (state.config && state.config.appLauncher && state.config.appLauncher.items)
+        ? state.config.appLauncher.items.find(i => String(i.id) === actionKey || String(i.id) === cleanKey || String(i.id) === bareId || `al-${i.id}` === actionKey)
+        : null;
+      return app ? (app.name || app.title || app.target || 'App') : 'App';
+    }
+    if (actionKey.startsWith('macro-')) {
+      const cleanKey = actionKey.replace(/^(macro-)+/, 'macro-');
+      const bareId = actionKey.replace(/^(macro-)+/, '');
+      const m = (state.config && state.config.macroRecorder && state.config.macroRecorder.items)
+        ? state.config.macroRecorder.items.find(i => String(i.id) === actionKey || String(i.id) === cleanKey || String(i.id) === bareId || `macro-${i.id}` === actionKey)
+        : null;
+      return m ? (m.name || 'Macro') : 'Macro';
+    }
+    return actionKey;
+  }
+
+  function populateActionSelect(sel, currentVal) {
+    if (!sel) return;
+    const options = getFullActionOptions();
+    let cur = currentVal !== undefined ? currentVal : sel.value;
+    if (typeof cur === 'string') {
+      cur = cur.replace(/^(al-)+/, 'al-').replace(/^(macro-)+/, 'macro-');
+    }
+    sel.innerHTML = options.map(opt => `<option value="${escapeHtml(opt.val)}">${escapeHtml(opt.text)}</option>`).join('');
+    if (cur !== undefined && cur !== null) {
+      sel.value = cur;
+    }
+  }
+
+  function refreshAllActionSelects() {
+    const mg = (state.config && state.config.mouseGestures) || {};
+    const rm = (state.config && state.config.radialMenu) || {};
+
+    // 1. Screen Hot Corners
+    const cornerKeys = [
+      { id: 'hcSelectTopLeft', key: 'cornerTopLeft', def: 'TaskView' },
+      { id: 'hcSelectTopRight', key: 'cornerTopRight', def: 'ActionCenter' },
+      { id: 'hcSelectBottomLeft', key: 'cornerBottomLeft', def: 'StartMenu' },
+      { id: 'hcSelectBottomRight', key: 'cornerBottomRight', def: 'ShowDesktop' }
+    ];
+    cornerKeys.forEach(({ id, key, def }) => {
+      const sel = document.getElementById(id);
+      if (sel) {
+        const curVal = sel.value || mg[key] || def;
+        populateActionSelect(sel, curVal);
+      }
+    });
+
+    // 2. Mouse Stroke Gestures
+    const gestureKeys = [
+      { id: 'mgActionLeft', key: 'actionLeft', def: 'Back' },
+      { id: 'mgActionRight', key: 'actionRight', def: 'Forward' },
+      { id: 'mgActionUp', key: 'actionUp', def: 'MaximizeWindow' },
+      { id: 'mgActionDown', key: 'actionDown', def: 'MinimizeWindow' },
+      { id: 'mgActionDownRight', key: 'actionDownRight', def: 'CloseWindow' },
+      { id: 'mgActionUpLeft', key: 'actionUpLeft', def: 'ReopenTab' },
+      { id: 'mgActionUpRight', key: 'actionUpRight', def: 'DuplicateTab' },
+      { id: 'mgActionDownLeft', key: 'actionDownLeft', def: 'MinimizeAll' }
+    ];
+    gestureKeys.forEach(({ id, key, def }) => {
+      const sel = document.getElementById(id);
+      if (sel) {
+        const curVal = sel.value || mg[key] || def;
+        populateActionSelect(sel, curVal);
+      }
+    });
+
+    // 3. Rocker Gestures
+    const selRockerLeft = document.getElementById('mgActionRockerLeft');
+    if (selRockerLeft) {
+      populateActionSelect(selRockerLeft, selRockerLeft.value || mg.actionRockerLeft || 'Back');
+    }
+    const selRockerRight = document.getElementById('mgActionRockerRight');
+    if (selRockerRight) {
+      populateActionSelect(selRockerRight, selRockerRight.value || mg.actionRockerRight || 'Forward');
+    }
+
+    // 4. Radial Menu Center Hub
+    const rmCenter = document.getElementById('rmCenterActionSelect');
+    if (rmCenter) {
+      populateActionSelect(rmCenter, rmCenter.value || rm.centerAction || 'none');
+    }
+
+    // 5. Radial Menu 8 Slices & Labels
+    const slices = Array.isArray(rm.slices) ? rm.slices : [];
+    for (let i = 0; i < 8; i++) {
+      const sel = document.getElementById(`rmAction${i}`);
+      const lbl = document.getElementById(`rmSliceLbl${i}`);
+      const curVal = (sel && sel.value) ? sel.value : (slices[i] || 'none');
+      if (sel) {
+        populateActionSelect(sel, curVal);
+      }
+      if (lbl) {
+        lbl.textContent = getActionFriendlyName(curVal);
+      }
+    }
   }
 
   // ============================================================================
@@ -2389,6 +4069,9 @@
         hcMasterSwitch.addEventListener('change', () => {
           state.config.mouseGestures.cornersEnabled = hcMasterSwitch.checked ? 1 : 0;
           if (col) col.classList.toggle('is-disabled', !hcMasterSwitch.checked);
+          saveCurrentProfileState();
+          updateAllFeatureProfileBadges();
+          updateGlobalIndicators();
           syncConfig();
         });
       }
@@ -2417,6 +4100,29 @@
       }
     }
 
+    // Corner Sensitive Zone Size Slider
+    const hcCornerSizeSlider = document.getElementById('hcCornerSizeSlider');
+    const hcCornerSizeVal = document.getElementById('hcCornerSizeVal');
+    if (hcCornerSizeSlider) {
+      const size = mg.cornerSize || 14;
+      hcCornerSizeSlider.value = size;
+      if (hcCornerSizeVal) hcCornerSizeVal.textContent = `${size} px`;
+      updateSliderProgress(hcCornerSizeSlider);
+
+      if (!hcCornerSizeSlider.dataset.bound) {
+        hcCornerSizeSlider.dataset.bound = 'true';
+        hcCornerSizeSlider.addEventListener('input', () => {
+          if (hcCornerSizeVal) hcCornerSizeVal.textContent = `${hcCornerSizeSlider.value} px`;
+          updateSliderProgress(hcCornerSizeSlider);
+        });
+        hcCornerSizeSlider.addEventListener('change', () => {
+          state.config.mouseGestures.cornerSize = parseInt(hcCornerSizeSlider.value, 10);
+          updateSliderProgress(hcCornerSizeSlider);
+          syncConfig();
+        });
+      }
+    }
+
     // 3. Screen Corner Action Dropdowns
     const cornerSelectMap = [
       { id: 'hcSelectTopLeft', key: 'cornerTopLeft', def: 'TaskView' },
@@ -2428,7 +4134,7 @@
     cornerSelectMap.forEach(({ id, key, def }) => {
       const sel = document.getElementById(id);
       if (!sel) return;
-      sel.value = mg[key] || def;
+      populateActionSelect(sel, mg[key] || def);
 
       if (!sel.dataset.bound) {
         sel.dataset.bound = 'true';
@@ -2452,6 +4158,9 @@
         mgMasterSwitch.addEventListener('change', () => {
           state.config.mouseGestures.gesturesEnabled = mgMasterSwitch.checked ? 1 : 0;
           if (col) col.classList.toggle('is-disabled', !mgMasterSwitch.checked);
+          saveCurrentProfileState();
+          updateAllFeatureProfileBadges();
+          updateGlobalIndicators();
           syncConfig();
         });
       }
@@ -2516,19 +4225,22 @@
       }
     }
 
-    // 8. Gesture Direction Actions
+    // 8. 8-Directional Gesture Actions
     const gestureActionMap = [
       { id: 'mgActionLeft', key: 'actionLeft', def: 'Back' },
       { id: 'mgActionRight', key: 'actionRight', def: 'Forward' },
       { id: 'mgActionUp', key: 'actionUp', def: 'MaximizeWindow' },
       { id: 'mgActionDown', key: 'actionDown', def: 'MinimizeWindow' },
-      { id: 'mgActionDownRight', key: 'actionDownRight', def: 'CloseWindow' }
+      { id: 'mgActionDownRight', key: 'actionDownRight', def: 'CloseWindow' },
+      { id: 'mgActionUpLeft', key: 'actionUpLeft', def: 'ReopenTab' },
+      { id: 'mgActionUpRight', key: 'actionUpRight', def: 'DuplicateTab' },
+      { id: 'mgActionDownLeft', key: 'actionDownLeft', def: 'MinimizeAll' }
     ];
 
     gestureActionMap.forEach(({ id, key, def }) => {
       const sel = document.getElementById(id);
       if (!sel) return;
-      sel.value = mg[key] || def;
+      populateActionSelect(sel, mg[key] || def);
 
       if (!sel.dataset.bound) {
         sel.dataset.bound = 'true';
@@ -2538,6 +4250,73 @@
         });
       }
     });
+
+    // 9. Rocker Gestures (Hold one button, click the other)
+    const mgRockerSwitch = document.getElementById('mgRockerSwitch');
+    if (mgRockerSwitch) {
+      mgRockerSwitch.checked = (mg.rockerEnabled !== false && mg.rockerEnabled !== 0);
+      if (!mgRockerSwitch.dataset.bound) {
+        mgRockerSwitch.dataset.bound = 'true';
+        mgRockerSwitch.addEventListener('change', () => {
+          state.config.mouseGestures.rockerEnabled = mgRockerSwitch.checked ? 1 : 0;
+          saveCurrentProfileState();
+          syncConfig();
+        });
+      }
+    }
+    const selRockerLeft = document.getElementById('mgActionRockerLeft');
+    if (selRockerLeft) {
+      populateActionSelect(selRockerLeft, mg.actionRockerLeft || 'Back');
+      if (!selRockerLeft.dataset.bound) {
+        selRockerLeft.dataset.bound = 'true';
+        selRockerLeft.addEventListener('change', () => {
+          state.config.mouseGestures.actionRockerLeft = selRockerLeft.value;
+          syncConfig();
+        });
+      }
+    }
+    const selRockerRight = document.getElementById('mgActionRockerRight');
+    if (selRockerRight) {
+      populateActionSelect(selRockerRight, mg.actionRockerRight || 'Forward');
+      if (!selRockerRight.dataset.bound) {
+        selRockerRight.dataset.bound = 'true';
+        selRockerRight.addEventListener('change', () => {
+          state.config.mouseGestures.actionRockerRight = selRockerRight.value;
+          syncConfig();
+        });
+      }
+    }
+
+    // 10. Gesture Wheel Action
+    const mgWheelSwitch = document.getElementById('mgWheelSwitch');
+    if (mgWheelSwitch) {
+      const isWheelOn = (mg.wheelGestureEnabled !== false && mg.wheelGestureEnabled !== 0 && mg.wheelGesturesEnabled !== 0);
+      mgWheelSwitch.checked = isWheelOn;
+      if (!mgWheelSwitch.dataset.bound) {
+        mgWheelSwitch.dataset.bound = 'true';
+        mgWheelSwitch.addEventListener('change', () => {
+          const val = mgWheelSwitch.checked ? 1 : 0;
+          state.config.mouseGestures.wheelGestureEnabled = val;
+          state.config.mouseGestures.wheelGesturesEnabled = val;
+          saveCurrentProfileState();
+          syncConfig();
+        });
+      }
+    }
+    const selWheelMode = document.getElementById('mgWheelModeSelect');
+    if (selWheelMode) {
+      selWheelMode.value = mg.wheelMode || mg.wheelGestureMode || 'volume';
+      if (!selWheelMode.dataset.bound) {
+        selWheelMode.dataset.bound = 'true';
+        selWheelMode.addEventListener('change', () => {
+          state.config.mouseGestures.wheelMode = selWheelMode.value;
+          state.config.mouseGestures.wheelGestureMode = selWheelMode.value;
+          syncConfig();
+        });
+      }
+    }
+
+    updateAllFeatureProfileBadges();
   }
 
   // ============================================================================
@@ -2550,6 +4329,8 @@
         enabled: 1,
         triggerButton: 'MButton',
         wheelRadius: 190,
+        sliceCount: 8,
+        centerAction: 'none',
         slices: [
           'ScreenOcr',
           'NextDesktop',
@@ -2564,102 +4345,346 @@
     }
     const rm = state.config.radialMenu;
 
-    // Master switch
+    // Master switches (both preview wheel and controls setup column)
     const rmMasterSwitch = document.getElementById('rmMasterSwitch');
-    if (rmMasterSwitch) {
-      const isRm = (rm.enabled !== false && rm.enabled !== 0);
-      rmMasterSwitch.checked = isRm;
-      const col = rmMasterSwitch.closest('.mg-column');
-      if (col) col.classList.toggle('is-disabled', !isRm);
+    const rmControlsSwitch = document.getElementById('rmControlsSwitch');
+    const previewCol = document.querySelector('.rm-column-preview');
+    const controlsCol = document.querySelector('.rm-column-controls');
+    const rmTriggerSelect = document.getElementById('rmTriggerSelect');
 
+    const isRm = (rm.enabled !== false && rm.enabled !== 0 && rm.triggerButton !== 'none');
+
+    function syncRadialMenuState(enabled) {
+      state.config.radialMenu.enabled = enabled ? 1 : 0;
+      if (rmMasterSwitch) rmMasterSwitch.checked = !!enabled;
+      if (rmControlsSwitch) rmControlsSwitch.checked = !!enabled;
+      if (previewCol) previewCol.classList.toggle('is-disabled', !enabled);
+      if (controlsCol) controlsCol.classList.toggle('is-disabled', !enabled);
+      if (rmTriggerSelect) {
+        if (enabled && rmTriggerSelect.value === 'none') {
+          rmTriggerSelect.value = state.config.radialMenu.triggerButton && state.config.radialMenu.triggerButton !== 'none'
+            ? state.config.radialMenu.triggerButton
+            : 'MButton';
+          state.config.radialMenu.triggerButton = rmTriggerSelect.value;
+        }
+      }
+      saveCurrentProfileState();
+      updateAllFeatureProfileBadges();
+      updateGlobalIndicators();
+      syncConfig();
+    }
+
+    if (rmMasterSwitch) {
+      rmMasterSwitch.checked = isRm;
       if (!rmMasterSwitch.dataset.bound) {
         rmMasterSwitch.dataset.bound = 'true';
         rmMasterSwitch.addEventListener('change', () => {
-          state.config.radialMenu.enabled = rmMasterSwitch.checked ? 1 : 0;
-          if (col) col.classList.toggle('is-disabled', !rmMasterSwitch.checked);
-          syncConfig();
+          syncRadialMenuState(rmMasterSwitch.checked);
         });
       }
     }
 
+    if (rmControlsSwitch) {
+      rmControlsSwitch.checked = isRm;
+      if (!rmControlsSwitch.dataset.bound) {
+        rmControlsSwitch.dataset.bound = 'true';
+        rmControlsSwitch.addEventListener('change', () => {
+          syncRadialMenuState(rmControlsSwitch.checked);
+        });
+      }
+    }
+
+    if (previewCol) previewCol.classList.toggle('is-disabled', !isRm);
+    if (controlsCol) controlsCol.classList.toggle('is-disabled', !isRm);
+
     // Trigger button select
-    const rmTriggerSelect = document.getElementById('rmTriggerSelect');
     if (rmTriggerSelect) {
-      rmTriggerSelect.value = rm.triggerButton || 'MButton';
+      rmTriggerSelect.value = (!isRm && rm.triggerButton === 'none') ? 'none' : (rm.triggerButton || 'MButton');
       if (!rmTriggerSelect.dataset.bound) {
         rmTriggerSelect.dataset.bound = 'true';
         rmTriggerSelect.addEventListener('change', () => {
-          state.config.radialMenu.triggerButton = rmTriggerSelect.value;
+          if (rmTriggerSelect.value === 'none') {
+            syncRadialMenuState(false);
+          } else {
+            state.config.radialMenu.triggerButton = rmTriggerSelect.value;
+            if (!state.config.radialMenu.enabled) {
+              syncRadialMenuState(true);
+            } else {
+              syncConfig();
+            }
+          }
+        });
+      }
+    }
+
+    // Slice Count Segmented Mode Pills (8 Slices vs 4 Slices)
+    const btnRmSlices8 = document.getElementById('btnRmSlices8');
+    const btnRmSlices4 = document.getElementById('btnRmSlices4');
+    const wheelPreviewContainer = document.getElementById('rmWheelPreview');
+    const sliceCount = (rm.sliceCount === 4) ? 4 : 8;
+
+    function renderRadialSpokes(previewSize, is4Slice) {
+      const spokesGroup = document.getElementById('rmSpokesGroup');
+      const wedgesGroup = document.getElementById('rmWedgesGroup');
+      const spokesSvg = document.getElementById('rmSpokesSvg');
+      if (!spokesGroup || !wedgesGroup || !spokesSvg) return;
+
+      spokesSvg.setAttribute('viewBox', `0 0 ${previewSize} ${previewSize}`);
+      spokesGroup.innerHTML = '';
+      wedgesGroup.innerHTML = '';
+
+      const cx = previewSize / 2;
+      const cy = previewSize / 2;
+      const rInner = 43 * (previewSize / 280);
+      const rOuter = previewSize / 2;
+      const wedgeReach = rOuter * 1.5;
+
+      if (is4Slice) {
+        // 4 Slices: N (0), E (2), S (4), W (6)
+        const cardinalSlices = [
+          { slice: 0, centerAng: -90 },
+          { slice: 2, centerAng: 0 },
+          { slice: 4, centerAng: 90 },
+          { slice: 6, centerAng: 180 }
+        ];
+        const halfStep = 45;
+        cardinalSlices.forEach(item => {
+          const startAng = (item.centerAng - halfStep) * (Math.PI / 180);
+          const endAng = (item.centerAng + halfStep) * (Math.PI / 180);
+          const x1 = cx + wedgeReach * Math.cos(startAng);
+          const y1 = cy + wedgeReach * Math.sin(startAng);
+          const x2 = cx + wedgeReach * Math.cos(endAng);
+          const y2 = cy + wedgeReach * Math.sin(endAng);
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${cx} ${cy} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${wedgeReach.toFixed(1)} ${wedgeReach.toFixed(1)} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`);
+          path.setAttribute('class', 'rm-sector-wedge');
+          path.setAttribute('data-slice', item.slice);
+          wedgesGroup.appendChild(path);
+        });
+
+        // 4 Spoke Lines: -135°, -45°, 45°, 135° (diagonals matching GDI+ popup)
+        const spokeAngles = [-135, -45, 45, 135];
+        spokeAngles.forEach(deg => {
+          const rad = deg * (Math.PI / 180);
+          const x1 = cx + rInner * Math.cos(rad);
+          const y1 = cy + rInner * Math.sin(rad);
+          const x2 = cx + wedgeReach * Math.cos(rad);
+          const y2 = cy + wedgeReach * Math.sin(rad);
+
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', x1.toFixed(1));
+          line.setAttribute('y1', y1.toFixed(1));
+          line.setAttribute('x2', x2.toFixed(1));
+          line.setAttribute('y2', y2.toFixed(1));
+          line.setAttribute('class', 'rm-spoke-line');
+          spokesGroup.appendChild(line);
+        });
+      } else {
+        // 8 Slices: N, NE, E, SE, S, SW, W, NW
+        const sliceAngles = [-90, -45, 0, 45, 90, 135, 180, 225];
+        const halfStep = 22.5;
+        sliceAngles.forEach((centerAng, idx) => {
+          const startAng = (centerAng - halfStep) * (Math.PI / 180);
+          const endAng = (centerAng + halfStep) * (Math.PI / 180);
+          const x1 = cx + wedgeReach * Math.cos(startAng);
+          const y1 = cy + wedgeReach * Math.sin(startAng);
+          const x2 = cx + wedgeReach * Math.cos(endAng);
+          const y2 = cy + wedgeReach * Math.sin(endAng);
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${cx} ${cy} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${wedgeReach.toFixed(1)} ${wedgeReach.toFixed(1)} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`);
+          path.setAttribute('class', 'rm-sector-wedge');
+          path.setAttribute('data-slice', idx);
+          wedgesGroup.appendChild(path);
+        });
+
+        // 8 Spoke Lines: -112.5°, -67.5°, -22.5°, 22.5°, 67.5°, 112.5°, 157.5°, 202.5°
+        const spokeAngles = [-112.5, -67.5, -22.5, 22.5, 67.5, 112.5, 157.5, 202.5];
+        spokeAngles.forEach(deg => {
+          const rad = deg * (Math.PI / 180);
+          const x1 = cx + rInner * Math.cos(rad);
+          const y1 = cy + rInner * Math.sin(rad);
+          const x2 = cx + wedgeReach * Math.cos(rad);
+          const y2 = cy + wedgeReach * Math.sin(rad);
+
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', x1.toFixed(1));
+          line.setAttribute('y1', y1.toFixed(1));
+          line.setAttribute('x2', x2.toFixed(1));
+          line.setAttribute('y2', y2.toFixed(1));
+          line.setAttribute('class', 'rm-spoke-line');
+          spokesGroup.appendChild(line);
+        });
+      }
+    }
+
+    function updateHubDefaultText() {
+      const hubText = document.getElementById('rmHubText');
+      if (!hubText) return;
+      const rmConfig = (state.config && state.config.radialMenu) || {};
+      if (rmConfig.centerAction && rmConfig.centerAction !== 'none' && rmConfig.centerAction !== '') {
+        hubText.textContent = getActionFriendlyName(rmConfig.centerAction);
+      } else {
+        hubText.textContent = 'DISMISS';
+      }
+    }
+
+    function applySliceCountMode(count) {
+      state.config.radialMenu.sliceCount = count;
+      if (btnRmSlices8) btnRmSlices8.classList.toggle('active', count === 8);
+      if (btnRmSlices4) btnRmSlices4.classList.toggle('active', count === 4);
+      if (wheelPreviewContainer) {
+        wheelPreviewContainer.classList.toggle('mode-4-slice', count === 4);
+      }
+      // In the slice setup grid, mark diagonal slices (1, 3, 5, 7)
+      [1, 3, 5, 7].forEach(idx => {
+        const sel = document.getElementById(`rmAction${idx}`);
+        if (sel) {
+          const card = sel.closest('.mg-gesture-card');
+          if (card) {
+            card.classList.add('rm-slice-diagonal');
+            card.style.opacity = (count === 4) ? '0.35' : '1';
+            card.style.pointerEvents = (count === 4) ? 'none' : 'auto';
+          }
+        }
+      });
+      const curRad = (state.config.radialMenu && state.config.radialMenu.wheelRadius) || 190;
+      updateRadialPreviewScale(curRad);
+    }
+
+    applySliceCountMode(sliceCount);
+
+    if (btnRmSlices8 && !btnRmSlices8.dataset.bound) {
+      btnRmSlices8.dataset.bound = 'true';
+      btnRmSlices8.addEventListener('click', () => {
+        applySliceCountMode(8);
+        syncConfig();
+      });
+    }
+    if (btnRmSlices4 && !btnRmSlices4.dataset.bound) {
+      btnRmSlices4.dataset.bound = 'true';
+      btnRmSlices4.addEventListener('click', () => {
+        applySliceCountMode(4);
+        syncConfig();
+      });
+    }
+
+    // Center Hub Click Action
+    const rmCenterActionSelect = document.getElementById('rmCenterActionSelect');
+    if (rmCenterActionSelect) {
+      populateActionSelect(rmCenterActionSelect, rm.centerAction || 'none');
+      if (!rmCenterActionSelect.dataset.bound) {
+        rmCenterActionSelect.dataset.bound = 'true';
+        rmCenterActionSelect.addEventListener('change', () => {
+          state.config.radialMenu.centerAction = rmCenterActionSelect.value;
+          updateHubDefaultText();
           syncConfig();
         });
       }
     }
 
-    // Radius slider
+    // Radius slider & dynamic scaling
     const rmRadiusSlider = document.getElementById('rmRadiusSlider');
     const rmRadiusVal = document.getElementById('rmRadiusVal');
+
+    function updateRadialPreviewScale(rad) {
+      const preview = document.getElementById('rmWheelPreview');
+      if (!preview) return;
+      const r = parseFloat(rad) || 190;
+      // Dynamic container size scaling with slider (min 270px, max 350px)
+      const previewSize = Math.max(270, Math.min(350, Math.round(180 + (r - 140) * (170 / 120))));
+      const scale = previewSize / 280;
+
+      preview.style.width = `${previewSize}px`;
+      preview.style.height = `${previewSize}px`;
+      preview.style.setProperty('--rm-scale', scale.toFixed(3));
+      preview.style.setProperty('--rm-size', `${previewSize}px`);
+
+      const cx = previewSize / 2;
+      const cy = previewSize / 2;
+      const rInner = 43 * scale;
+      const rOuter = previewSize / 2;
+      // Match main.ahk: R_nodes = (R_outer + R_inner) * 0.52
+      const dist = (rOuter + rInner) * 0.52;
+
+      const angles = [
+        -90,  // N: 0
+        -45,  // NE: 1
+        0,    // E: 2
+        45,   // SE: 3
+        90,   // S: 4
+        135,  // SW: 5
+        180,  // W: 6
+        -135  // NW: 7
+      ];
+      for (let i = 0; i < 8; i++) {
+        const node = preview.querySelector(`.rm-slice-node[data-slice="${i}"]`);
+        if (node) {
+          const radAng = angles[i] * (Math.PI / 180);
+          const x = cx + dist * Math.cos(radAng);
+          const y = cy + dist * Math.sin(radAng);
+          node.style.left = `${x.toFixed(1)}px`;
+          node.style.top = `${y.toFixed(1)}px`;
+        }
+      }
+
+      const is4Slice = preview.classList.contains('mode-4-slice');
+      renderRadialSpokes(previewSize, is4Slice);
+      updateHubDefaultText();
+    }
+
     if (rmRadiusSlider) {
       const rad = rm.wheelRadius || 190;
       rmRadiusSlider.value = rad;
       if (rmRadiusVal) rmRadiusVal.textContent = `${rad} px`;
       updateSliderProgress(rmRadiusSlider);
+      updateRadialPreviewScale(rad);
 
       if (!rmRadiusSlider.dataset.bound) {
         rmRadiusSlider.dataset.bound = 'true';
         rmRadiusSlider.addEventListener('input', () => {
           if (rmRadiusVal) rmRadiusVal.textContent = `${rmRadiusSlider.value} px`;
           updateSliderProgress(rmRadiusSlider);
+          updateRadialPreviewScale(rmRadiusSlider.value);
         });
         rmRadiusSlider.addEventListener('change', () => {
           state.config.radialMenu.wheelRadius = parseInt(rmRadiusSlider.value, 10);
           updateSliderProgress(rmRadiusSlider);
+          updateRadialPreviewScale(rmRadiusSlider.value);
           syncConfig();
         });
       }
+    } else {
+      updateRadialPreviewScale(rm.wheelRadius || 190);
     }
 
     // Wire 8 slice dropdowns and preview labels
-    const actionLabels = {
-      'ScreenOcr': 'OCR',
-      'ColorPicker': 'Color Pick',
-      'NextDesktop': 'Next Desk',
-      'PrevDesktop': 'Prev Desk',
-      'TaskView': 'Task View',
-      'ShowDesktop': 'Desktop',
-      'AlwaysOnTop': 'Always On',
-      'GhostMode': 'Ghost',
-      'MuteVolume': 'Mute Audio',
-      'Calculator': 'Calc',
-      'CleanText': 'Clean Text',
-      'Screenshot': 'Snip',
-      'none': 'Disabled'
-    };
-
     const slices = Array.isArray(rm.slices) ? rm.slices : [];
     for (let i = 0; i < 8; i++) {
       const sel = document.getElementById(`rmAction${i}`);
       const lbl = document.getElementById(`rmSliceLbl${i}`);
       const action = slices[i] || 'none';
       if (sel) {
-        sel.value = action;
+        populateActionSelect(sel, action);
         if (!sel.dataset.bound) {
           sel.dataset.bound = 'true';
           sel.addEventListener('change', () => {
             if (!Array.isArray(state.config.radialMenu.slices)) state.config.radialMenu.slices = [];
             state.config.radialMenu.slices[i] = sel.value;
-            if (lbl) lbl.textContent = actionLabels[sel.value] || sel.value;
+            if (lbl) lbl.textContent = getActionFriendlyName(sel.value);
             syncConfig();
           });
         }
       }
       if (lbl) {
-        lbl.textContent = actionLabels[action] || action;
+        lbl.textContent = getActionFriendlyName(action);
       }
     }
 
     // Interactive slice hover preview in the mockup wheel
     const previewNodes = document.querySelectorAll('.rm-slice-node');
-    const hubTitle = document.getElementById('rmHubTitle');
+    const hubText = document.getElementById('rmHubText');
     previewNodes.forEach(node => {
       if (!node.dataset.previewBound) {
         node.dataset.previewBound = 'true';
@@ -2667,15 +4692,25 @@
           previewNodes.forEach(n => n.classList.remove('active'));
           node.classList.add('active');
           const idx = parseInt(node.getAttribute('data-slice'), 10);
-          const curAction = (state.config.radialMenu.slices && state.config.radialMenu.slices[idx]) || 'none';
-          if (hubTitle) hubTitle.textContent = actionLabels[curAction] || curAction;
+
+          // Highlight corresponding SVG sector wedge
+          const wedges = document.querySelectorAll('.rm-sector-wedge');
+          wedges.forEach(w => {
+            w.classList.toggle('active', parseInt(w.getAttribute('data-slice'), 10) === idx);
+          });
+
+          const curAction = (state.config.radialMenu && state.config.radialMenu.slices && state.config.radialMenu.slices[idx]) || 'none';
+          if (hubText) hubText.textContent = getActionFriendlyName(curAction);
         });
         node.addEventListener('mouseleave', () => {
           node.classList.remove('active');
-          if (hubTitle) hubTitle.textContent = 'HOVER SLICE';
+          const wedges = document.querySelectorAll('.rm-sector-wedge');
+          wedges.forEach(w => w.classList.remove('active'));
+          updateHubDefaultText();
         });
       }
     });
+    updateAllFeatureProfileBadges();
   }
 
   // ============================================================================
@@ -2811,6 +4846,7 @@
           <span style="font-size: 11px;">Configure a text trigger or key combination above</span>
         </div>
       `;
+      if (typeof refreshAllActionSelects === 'function') refreshAllActionSelects();
       return;
     }
 
@@ -2818,8 +4854,9 @@
       const isHotkey = item.triggerType === 'hotkey';
       const isEnabled = item.enabled !== false && item.enabled !== 0;
       const card = document.createElement('div');
-      card.className = 'shortcut-card';
       card.className = `shortcut-card ${isEnabled ? '' : 'is-disabled'}`;
+      card.dataset.module = 'appLauncher';
+      card.dataset.id = item.id;
 
       const badgeIcon = isHotkey
         ? `<svg class="badge-key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path></svg>`
@@ -2909,6 +4946,7 @@
 
       alLaunchersContainer.appendChild(card);
     });
+    if (typeof refreshAllActionSelects === 'function') refreshAllActionSelects();
   }
 
   function editAl(item) {
@@ -3135,6 +5173,8 @@
       const isEnabled = item.enabled !== false && item.enabled !== 0;
       const card = document.createElement('div');
       card.className = `shortcut-card ${isEnabled ? '' : 'is-disabled'}`;
+      card.dataset.module = 'folderCreator';
+      card.dataset.id = item.id;
 
       const badgeIcon = isHotkey
         ? `<svg class="badge-key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path></svg>`
@@ -3778,6 +5818,7 @@
           <p>Create your first macro above using the live keystroke recorder or mouse click injectors.</p>
         </div>
       `;
+      if (typeof refreshAllActionSelects === 'function') refreshAllActionSelects();
       return;
     }
 
@@ -3786,6 +5827,7 @@
       const card = document.createElement('div');
       card.className = `shortcut-card macro-card ${isEnabled ? '' : 'is-disabled'}`;
       card.dataset.id = item.id;
+      card.dataset.module = 'macroRecorder';
       card.setAttribute('draggable', 'true');
       const stepsCount = (item.steps && Array.isArray(item.steps)) ? item.steps.length : 0;
       const profileBadgesHtml = renderItemProfileBadges('macroRecorder', item.id);
@@ -3959,6 +6001,7 @@
 
       macroListContainer.appendChild(card);
     });
+    if (typeof refreshAllActionSelects === 'function') refreshAllActionSelects();
   }
 
   function submitMacro() {
@@ -4298,7 +6341,7 @@
           'borderlessEnabled', 'windowShadeEnabled', 'appVolumeWheel',
           'appVolumeMuteEnabled', 'masterAudioMuteEnabled', 'transparencyWheel', 'clickThroughGhost',
           'textTransformEnabled', 'textTransformCleanEnabled', 'screenOcrEnabled',
-          'colorPickerEnabled', 'virtualDesktopsEnabled', 'taskbarScrollEnabled'
+          'colorPickerEnabled', 'virtualDesktopsEnabled', 'taskbarScrollEnabled', 'sleepEnabled'
         ];
         for (const k of wmKeys) {
           if (wm[k] === 1 || wm[k] === true) totalItems++;
@@ -4366,7 +6409,10 @@
 
     function createActiveItemCard(item, moduleName, displayTitle, displayMeta, onToggle) {
       const card = document.createElement('div');
-      card.className = 'shortcut-card';
+      card.className = 'shortcut-card active-script-card';
+      card.dataset.module = moduleName;
+      if (item && item.id) card.dataset.id = item.id;
+      if (item && item.featureKey) card.dataset.featureKey = item.featureKey;
       const isEnabled = item.enabled !== false && item.enabled !== 0;
 
       card.innerHTML = `
@@ -4566,14 +6612,15 @@
       { key: 'screenOcrEnabled', title: 'Screen Text OCR Snipper', meta: 'Copy text directly from screen' },
       { key: 'colorPickerEnabled', title: 'Precision Color Eyedropper', meta: 'Pick hex colors from pixels' },
       { key: 'virtualDesktopsEnabled', title: 'Virtual Desktop Taskbar Switch', meta: 'Mouse wheel over taskbar' },
-      { key: 'taskbarScrollEnabled', title: 'Taskbar Volume Control', meta: 'Mouse wheel over taskbar' }
+      { key: 'taskbarScrollEnabled', title: 'Taskbar Volume Control', meta: 'Mouse wheel over taskbar' },
+      { key: 'sleepEnabled', title: 'Quick Sleep / Hibernate', meta: 'Win + S' }
     ];
 
     const activeWmCards = [];
     wmDefinitions.forEach(def => {
       if (wm[def.key] === 1 || wm[def.key] === true) {
         totalActive++;
-        const dummyItem = { enabled: 1 };
+        const dummyItem = { enabled: 1, featureKey: def.key };
         const c = createActiveItemCard(
           dummyItem,
           'windowManager',
@@ -4597,7 +6644,7 @@
     const mgCards = [];
     if (mg.cornersEnabled === 1 || mg.cornersEnabled === true) {
       totalActive++;
-      const dummyItem = { enabled: 1 };
+      const dummyItem = { enabled: 1, featureKey: 'cornersEnabled' };
       mgCards.push(createActiveItemCard(
         dummyItem,
         'mouseGestures',
@@ -4614,7 +6661,7 @@
     }
     if (mg.gesturesEnabled === 1 || mg.gesturesEnabled === true) {
       totalActive++;
-      const dummyItem = { enabled: 1 };
+      const dummyItem = { enabled: 1, featureKey: 'gesturesEnabled' };
       mgCards.push(createActiveItemCard(
         dummyItem,
         'mouseGestures',
@@ -4635,7 +6682,7 @@
     const rm = prof.radialMenu || {};
     if (rm.enabled === 1 || rm.enabled === true) {
       totalActive++;
-      const dummyItem = { enabled: 1 };
+      const dummyItem = { enabled: 1, featureKey: 'enabled' };
       const c = createActiveItemCard(
         dummyItem,
         'radialMenu',
@@ -4776,14 +6823,643 @@
     return '#' + toHex(r) + toHex(g) + toHex(b);
   }
 
-  // Hand-crafted Neumorphic Theme Presets with balanced light/dark shadows, varied radii & high contrast
-  // Hand-crafted Neumorphic Theme Presets: Rich, diverse, colorful clay base palettes (28 modern palettes)
+  // Hand-crafted Neumorphic Theme Presets: Diverse, colorful clay base palettes across all aesthetics
   const THEME_PRESETS = {
-    'ocean-azure': {
-      name: 'Ocean Azure',
-      bgColor: '#1e3a5f',
-      accentColor: '#38bdf8',
+    'custom-default': {
+      name: 'Warm Clay (Default)',
+      bgColor: '#e8dfd5',
+      accentColor: '#d97706',
+      radius: 5,
+      distance: 4,
+      lightIntensity: 39,
+      darkIntensity: 5,
+      blur: 9
+    },
+    'dribbble-soft-gray': {
+      name: 'Dribbble Soft Canvas',
+      bgColor: '#e0e5ec',
+      accentColor: '#3b82f6',
+      radius: 16,
+      distance: 5,
+      lightIntensity: 85,
+      darkIntensity: 18,
+      blur: 10
+    },
+    'porcelain-ceramic': {
+      name: 'Porcelain Ceramic',
+      bgColor: '#f1f5f9',
+      accentColor: '#2563eb',
+      radius: 28,
+      distance: 7,
+      lightIntensity: 85,
+      darkIntensity: 20,
+      blur: 16
+    },
+    'pure-snow': {
+      name: 'Pure Snow Clay',
+      bgColor: '#f8fafc',
+      accentColor: '#0ea5e9',
+      radius: 18,
+      distance: 4,
+      lightIntensity: 90,
+      darkIntensity: 15,
+      blur: 12
+    },
+    'alabaster-clean': {
+      name: 'Alabaster Minimal',
+      bgColor: '#f4f4f5',
+      accentColor: '#18181b',
+      radius: 12,
+      distance: 4,
+      lightIntensity: 80,
+      darkIntensity: 18,
+      blur: 10
+    },
+    'nordic-linen': {
+      name: 'Nordic Linen',
+      bgColor: '#dfd9ce',
+      accentColor: '#92400e',
+      radius: 10,
+      distance: 4,
+      lightIntensity: 65,
+      darkIntensity: 20,
+      blur: 8
+    },
+    'nord-frost': {
+      name: 'Nord Frost',
+      bgColor: '#e5e9f0',
+      accentColor: '#5e81ac',
+      radius: 8,
+      distance: 3,
+      lightIntensity: 32,
+      darkIntensity: 16,
+      blur: 7
+    },
+    'silver-chiffon': {
+      name: 'Silver Chiffon',
+      bgColor: '#e2e8f0',
+      accentColor: '#475569',
       radius: 14,
+      distance: 4,
+      lightIntensity: 75,
+      darkIntensity: 18,
+      blur: 9
+    },
+    'retro-sharp': {
+      name: 'Retro Paper',
+      bgColor: '#f2efe9',
+      accentColor: '#e11d48',
+      radius: 4,
+      distance: 3,
+      lightIntensity: 50,
+      darkIntensity: 16,
+      blur: 0
+    },
+    'solarized-cream': {
+      name: 'Solarized Cream',
+      bgColor: '#fdf6e3',
+      accentColor: '#b58900',
+      radius: 6,
+      distance: 3,
+      lightIntensity: 32,
+      darkIntensity: 14,
+      blur: 6
+    },
+    'butter-cream': {
+      name: 'Butter Cream',
+      bgColor: '#fef3c7',
+      accentColor: '#b45309',
+      radius: 14,
+      distance: 4,
+      lightIntensity: 35,
+      darkIntensity: 15,
+      blur: 8
+    },
+    'cappuccino-foam': {
+      name: 'Cappuccino Foam',
+      bgColor: '#ede0d4',
+      accentColor: '#7f4f24',
+      radius: 16,
+      distance: 4,
+      lightIntensity: 45,
+      darkIntensity: 16,
+      blur: 9
+    },
+    'desert-caramel': {
+      name: 'Desert Caramel',
+      bgColor: '#c68b59',
+      accentColor: '#451a03',
+      radius: 8,
+      distance: 3,
+      lightIntensity: 25,
+      darkIntensity: 22,
+      blur: 7
+    },
+    'roasted-cocoa': {
+      name: 'Roasted Cocoa',
+      bgColor: '#351c14',
+      accentColor: '#fbbf24',
+      radius: 10,
+      distance: 3,
+      lightIntensity: 22,
+      darkIntensity: 60,
+      blur: 5
+    },
+    'espresso-mocha': {
+      name: 'Espresso Mocha',
+      bgColor: '#2b1d14',
+      accentColor: '#f59e0b',
+      radius: 10,
+      distance: 3,
+      lightIntensity: 18,
+      darkIntensity: 36,
+      blur: 7
+    },
+    'brutalist-concrete': {
+      name: 'Brutalist Concrete',
+      bgColor: '#78716c',
+      accentColor: '#f97316',
+      radius: 2,
+      distance: 5,
+      lightIntensity: 55,
+      darkIntensity: 75,
+      blur: 0
+    },
+    'brutalist-amber': {
+      name: 'Brutalist Amber',
+      bgColor: '#f59e0b',
+      accentColor: '#1e1b4b',
+      radius: 2,
+      distance: 6,
+      lightIntensity: 65,
+      darkIntensity: 75,
+      blur: 0
+    },
+    'hard-canary': {
+      name: 'Hard Canary Yellow',
+      bgColor: '#facc15',
+      accentColor: '#09090b',
+      radius: 0,
+      distance: 5,
+      lightIntensity: 70,
+      darkIntensity: 80,
+      blur: 0
+    },
+    'hard-bubblegum': {
+      name: 'Hard Bubblegum Pop',
+      bgColor: '#f472b6',
+      accentColor: '#0f172a',
+      radius: 4,
+      distance: 6,
+      lightIntensity: 65,
+      darkIntensity: 75,
+      blur: 0
+    },
+    'hard-acid-lime': {
+      name: 'Hard Acid Lime',
+      bgColor: '#a3e635',
+      accentColor: '#14532d',
+      radius: 1,
+      distance: 5,
+      lightIntensity: 60,
+      darkIntensity: 75,
+      blur: 0
+    },
+    'hard-bauhaus-red': {
+      name: 'Hard Bauhaus Red',
+      bgColor: '#ef4444',
+      accentColor: '#000000',
+      radius: 0,
+      distance: 7,
+      lightIntensity: 60,
+      darkIntensity: 80,
+      blur: 0
+    },
+    'hard-blueprint': {
+      name: 'Hard Electric Blueprint',
+      bgColor: '#2563eb',
+      accentColor: '#fde047',
+      radius: 0,
+      distance: 7,
+      lightIntensity: 55,
+      darkIntensity: 85,
+      blur: 0
+    },
+    'hard-tangerine': {
+      name: 'Hard Tangerine Pop',
+      bgColor: '#fb923c',
+      accentColor: '#09090b',
+      radius: 3,
+      distance: 6,
+      lightIntensity: 60,
+      darkIntensity: 75,
+      blur: 0
+    },
+    'hard-arcade-cyan': {
+      name: 'Hard Arcade Cyan',
+      bgColor: '#38bdf8',
+      accentColor: '#0f172a',
+      radius: 6,
+      distance: 6,
+      lightIntensity: 65,
+      darkIntensity: 75,
+      blur: 0
+    },
+    'hard-toxic-mint': {
+      name: 'Hard Toxic Mint',
+      bgColor: '#34d399',
+      accentColor: '#064e3b',
+      radius: 2,
+      distance: 5,
+      lightIntensity: 65,
+      darkIntensity: 70,
+      blur: 0
+    },
+    'hard-ultraviolet': {
+      name: 'Hard Ultraviolet Pop',
+      bgColor: '#8b5cf6',
+      accentColor: '#facc15',
+      radius: 4,
+      distance: 6,
+      lightIntensity: 55,
+      darkIntensity: 80,
+      blur: 0
+    },
+    'hard-swiss-white': {
+      name: 'Hard Swiss Stark White',
+      bgColor: '#ffffff',
+      accentColor: '#e11d48',
+      radius: 0,
+      distance: 6,
+      lightIntensity: 80,
+      darkIntensity: 85,
+      blur: 0
+    },
+    'hard-parchment': {
+      name: 'Hard Parchment Blueprint',
+      bgColor: '#f6f1eb',
+      accentColor: '#1d4ed8',
+      radius: 2,
+      distance: 4,
+      lightIntensity: 60,
+      darkIntensity: 65,
+      blur: 0
+    },
+    'hard-hazard': {
+      name: 'Hard Industrial Hazard',
+      bgColor: '#eab308',
+      accentColor: '#000000',
+      radius: 0,
+      distance: 8,
+      lightIntensity: 65,
+      darkIntensity: 85,
+      blur: 0
+    },
+    'hard-gameboy': {
+      name: 'Hard Dot Matrix Handheld',
+      bgColor: '#8bac0f',
+      accentColor: '#0f380f',
+      radius: 4,
+      distance: 4,
+      lightIntensity: 50,
+      darkIntensity: 75,
+      blur: 0
+    },
+    'hard-steel': {
+      name: 'Hard Machined Steel',
+      bgColor: '#475569',
+      accentColor: '#38bdf8',
+      radius: 1,
+      distance: 5,
+      lightIntensity: 50,
+      darkIntensity: 80,
+      blur: 0
+    },
+    'hard-terminal-green': {
+      name: 'Hard CRT Terminal Green',
+      bgColor: '#052e16',
+      accentColor: '#22c55e',
+      radius: 0,
+      distance: 4,
+      lightIntensity: 45,
+      darkIntensity: 90,
+      blur: 0
+    },
+    'hard-cyber-black': {
+      name: 'Hard Cyber Void',
+      bgColor: '#121214',
+      accentColor: '#f43f5e',
+      radius: 0,
+      distance: 6,
+      lightIntensity: 45,
+      darkIntensity: 90,
+      blur: 0
+    },
+    'hard-midnight-navy': {
+      name: 'Hard Midnight Navy',
+      bgColor: '#0f172a',
+      accentColor: '#38bdf8',
+      radius: 2,
+      distance: 6,
+      lightIntensity: 45,
+      darkIntensity: 85,
+      blur: 0
+    },
+    'hard-blood-dark': {
+      name: 'Hard Blood Obsidian',
+      bgColor: '#260707',
+      accentColor: '#ef4444',
+      radius: 0,
+      distance: 6,
+      lightIntensity: 45,
+      darkIntensity: 85,
+      blur: 0
+    },
+    'hard-kawaii-lilac': {
+      name: 'Hard Kawaii Lilac',
+      bgColor: '#ddd6fe',
+      accentColor: '#6d28d9',
+      radius: 8,
+      distance: 6,
+      lightIntensity: 70,
+      darkIntensity: 70,
+      blur: 0
+    },
+    'hard-matcha': {
+      name: 'Hard Matcha Ceramic',
+      bgColor: '#d5dfc3',
+      accentColor: '#14532d',
+      radius: 2,
+      distance: 5,
+      lightIntensity: 65,
+      darkIntensity: 65,
+      blur: 0
+    },
+    'hard-teal-punch': {
+      name: 'Hard Teal Punch',
+      bgColor: '#0f766e',
+      accentColor: '#fef08a',
+      radius: 3,
+      distance: 6,
+      lightIntensity: 55,
+      darkIntensity: 80,
+      blur: 0
+    },
+    'hard-neon-coral': {
+      name: 'Hard Neon Coral',
+      bgColor: '#f43f5e',
+      accentColor: '#ffffff',
+      radius: 4,
+      distance: 7,
+      lightIntensity: 60,
+      darkIntensity: 80,
+      blur: 0
+    },
+    'hard-amber-slate': {
+      name: 'Hard Amber Slate',
+      bgColor: '#1c1917',
+      accentColor: '#f59e0b',
+      radius: 1,
+      distance: 5,
+      lightIntensity: 45,
+      darkIntensity: 85,
+      blur: 0
+    },
+    'hard-industrial-gray': {
+      name: 'Hard Industrial Gray',
+      bgColor: '#d1d5db',
+      accentColor: '#111827',
+      radius: 0,
+      distance: 6,
+      lightIntensity: 75,
+      darkIntensity: 80,
+      blur: 0
+    },
+    'hard-peach-punch': {
+      name: 'Hard Peach Punch',
+      bgColor: '#fed7aa',
+      accentColor: '#c2410c',
+      radius: 6,
+      distance: 5,
+      lightIntensity: 70,
+      darkIntensity: 70,
+      blur: 0
+    },
+    'solar-tangerine': {
+      name: 'Solar Tangerine',
+      bgColor: '#ea580c',
+      accentColor: '#fef08a',
+      radius: 34,
+      distance: 5,
+      lightIntensity: 38,
+      darkIntensity: 42,
+      blur: 12
+    },
+    'peach-fuzz': {
+      name: 'Peach Fuzz',
+      bgColor: '#fed7aa',
+      accentColor: '#c2410c',
+      radius: 16,
+      distance: 3,
+      lightIntensity: 28,
+      darkIntensity: 16,
+      blur: 7
+    },
+    'sunset-terracotta': {
+      name: 'Sunset Terracotta',
+      bgColor: '#8c3a27',
+      accentColor: '#fcd34d',
+      radius: 12,
+      distance: 3,
+      lightIntensity: 22,
+      darkIntensity: 28,
+      blur: 8
+    },
+    'vintage-rose': {
+      name: 'Vintage Rose',
+      bgColor: '#b85d68',
+      accentColor: '#ffe4e6',
+      radius: 14,
+      distance: 3,
+      lightIntensity: 22,
+      darkIntensity: 24,
+      blur: 8
+    },
+    'dusty-blush': {
+      name: 'Dusty Blush',
+      bgColor: '#ebdcd9',
+      accentColor: '#9f1239',
+      radius: 18,
+      distance: 5,
+      lightIntensity: 75,
+      darkIntensity: 20,
+      blur: 10
+    },
+    'sakura-blossom': {
+      name: 'Sakura Blossom',
+      bgColor: '#fce7f3',
+      accentColor: '#be123c',
+      radius: 18,
+      distance: 3,
+      lightIntensity: 30,
+      darkIntensity: 14,
+      blur: 8
+    },
+    'bubblegum-magenta': {
+      name: 'Bubblegum Magenta',
+      bgColor: '#db2777',
+      accentColor: '#fef08a',
+      radius: 30,
+      distance: 7,
+      lightIntensity: 42,
+      darkIntensity: 38,
+      blur: 15
+    },
+    'electric-coral': {
+      name: 'Electric Coral',
+      bgColor: '#f43f5e',
+      accentColor: '#ffffff',
+      radius: 20,
+      distance: 5,
+      lightIntensity: 40,
+      darkIntensity: 35,
+      blur: 10
+    },
+    'marshmallow-indigo': {
+      name: 'Marshmallow Indigo',
+      bgColor: '#4f46e5',
+      accentColor: '#fde047',
+      radius: 42,
+      distance: 8,
+      lightIntensity: 40,
+      darkIntensity: 48,
+      blur: 18
+    },
+    'lilac-cloud': {
+      name: 'Lilac Cloud',
+      bgColor: '#c4b5fd',
+      accentColor: '#4c1d95',
+      radius: 22,
+      distance: 4,
+      lightIntensity: 36,
+      darkIntensity: 22,
+      blur: 11
+    },
+    'lavender-dream': {
+      name: 'Lavender Dream',
+      bgColor: '#e2d9f3',
+      accentColor: '#6b21a8',
+      radius: 14,
+      distance: 3,
+      lightIntensity: 28,
+      darkIntensity: 18,
+      blur: 8
+    },
+    'sage-mint': {
+      name: 'Sage Mint',
+      bgColor: '#c8d6c0',
+      accentColor: '#166534',
+      radius: 18,
+      distance: 3,
+      lightIntensity: 24,
+      darkIntensity: 18,
+      blur: 7
+    },
+    'matcha-cream': {
+      name: 'Matcha Cream',
+      bgColor: '#dbe4d2',
+      accentColor: '#3f5622',
+      radius: 16,
+      distance: 3,
+      lightIntensity: 26,
+      darkIntensity: 18,
+      blur: 8
+    },
+    'eucalyptus-mist': {
+      name: 'Eucalyptus Mist',
+      bgColor: '#d4ded6',
+      accentColor: '#065f46',
+      radius: 16,
+      distance: 4,
+      lightIntensity: 70,
+      darkIntensity: 22,
+      blur: 9
+    },
+    'spearmint-gelato': {
+      name: 'Spearmint Gelato',
+      bgColor: '#6ee7b7',
+      accentColor: '#831843',
+      radius: 38,
+      distance: 6,
+      lightIntensity: 48,
+      darkIntensity: 28,
+      blur: 14
+    },
+    'pistachio-gelato': {
+      name: 'Pistachio Gelato',
+      bgColor: '#dcfce7',
+      accentColor: '#15803d',
+      radius: 20,
+      distance: 4,
+      lightIntensity: 45,
+      darkIntensity: 16,
+      blur: 10
+    },
+    'aqua-marine': {
+      name: 'Aqua Marine',
+      bgColor: '#cffafe',
+      accentColor: '#0369a1',
+      radius: 16,
+      distance: 3,
+      lightIntensity: 30,
+      darkIntensity: 16,
+      blur: 8
+    },
+    'sky-blue-pastel': {
+      name: 'Sky Blue Pastel',
+      bgColor: '#bae6fd',
+      accentColor: '#0369a1',
+      radius: 16,
+      distance: 4,
+      lightIntensity: 45,
+      darkIntensity: 18,
+      blur: 9
+    },
+    'cyber-cyan': {
+      name: 'Cyber Cyan',
+      bgColor: '#0891b2',
+      accentColor: '#fef08a',
+      radius: 18,
+      distance: 4,
+      lightIntensity: 35,
+      darkIntensity: 32,
+      blur: 6
+    },
+    'neon-lime': {
+      name: 'Neon Lime Pop',
+      bgColor: '#84cc16',
+      accentColor: '#1a2e05',
+      radius: 16,
+      distance: 4,
+      lightIntensity: 50,
+      darkIntensity: 30,
+      blur: 8
+    },
+    'sunburst-yellow': {
+      name: 'Sunburst Gold',
+      bgColor: '#eab308',
+      accentColor: '#172554',
+      radius: 14,
+      distance: 4,
+      lightIntensity: 55,
+      darkIntensity: 35,
+      blur: 8
+    },
+    'laguna-teal': {
+      name: 'Laguna Teal',
+      bgColor: '#134e4a',
+      accentColor: '#2dd4bf',
+      radius: 12,
       distance: 3,
       lightIntensity: 20,
       darkIntensity: 30,
@@ -4799,54 +7475,44 @@
       darkIntensity: 30,
       blur: 7
     },
-    'sunset-terracotta': {
-      name: 'Sunset Terracotta',
-      bgColor: '#8c3a27',
-      accentColor: '#fcd34d',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 28,
-      blur: 8
+    'matrix-terminal': {
+      name: 'Matrix CRT',
+      bgColor: '#052e16',
+      accentColor: '#22c55e',
+      radius: 4,
+      distance: 2,
+      lightIntensity: 40,
+      darkIntensity: 70,
+      blur: 2
     },
-    'royal-violet': {
-      name: 'Royal Violet',
-      bgColor: '#442759',
-      accentColor: '#f472b6',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 20,
-      darkIntensity: 32,
-      blur: 9
-    },
-    'laguna-teal': {
-      name: 'Laguna Teal',
-      bgColor: '#134e4a',
-      accentColor: '#2dd4bf',
-      radius: 12,
+    'ocean-azure': {
+      name: 'Ocean Azure',
+      bgColor: '#1e3a5f',
+      accentColor: '#38bdf8',
+      radius: 14,
       distance: 3,
       lightIntensity: 20,
       darkIntensity: 30,
       blur: 8
     },
-    'desert-caramel': {
-      name: 'Desert Caramel',
-      bgColor: '#c68b59',
-      accentColor: '#451a03',
-      radius: 8,
-      distance: 3,
-      lightIntensity: 25,
-      darkIntensity: 22,
-      blur: 7
-    },
-    'vintage-rose': {
-      name: 'Vintage Rose',
-      bgColor: '#b85d68',
-      accentColor: '#ffe4e6',
-      radius: 14,
-      distance: 3,
+    'abyssal-ocean': {
+      name: 'Abyssal Ocean',
+      bgColor: '#0e2a47',
+      accentColor: '#38bdf8',
+      radius: 16,
+      distance: 4,
       lightIntensity: 22,
-      darkIntensity: 24,
+      darkIntensity: 55,
+      blur: 10
+    },
+    'electric-cobalt': {
+      name: 'Electric Cobalt',
+      bgColor: '#1d3557',
+      accentColor: '#34d399',
+      radius: 10,
+      distance: 3,
+      lightIntensity: 20,
+      darkIntensity: 30,
       blur: 8
     },
     'nordic-slate': {
@@ -4859,45 +7525,95 @@
       darkIntensity: 28,
       blur: 8
     },
-    'soft-gray': {
-      name: 'Warm Clay (Default)',
-      bgColor: '#e8dfd5',
-      accentColor: '#d97706',
-      radius: 5,
-      distance: 4,
-      lightIntensity: 39,
-      darkIntensity: 5,
-      blur: 9
-    },
-    'sage-mint': {
-      name: 'Sage Mint',
-      bgColor: '#c8d6c0',
-      accentColor: '#166534',
-      radius: 18,
-      distance: 3,
-      lightIntensity: 24,
-      darkIntensity: 18,
-      blur: 7
-    },
-    'retro-sharp': {
-      name: 'Retro Paper',
-      bgColor: '#f2efe9',
-      accentColor: '#e11d48',
-      radius: 4,
-      distance: 3,
-      lightIntensity: 50,
-      darkIntensity: 16,
-      blur: 0
-    },
-    'midnight-onyx': {
-      name: 'Midnight Onyx',
-      bgColor: '#18181b',
-      accentColor: '#a855f7',
+    'matte-titanium': {
+      name: 'Matte Titanium',
+      bgColor: '#1e293b',
+      accentColor: '#06b6d4',
       radius: 12,
       distance: 3,
-      lightIntensity: 16,
+      lightIntensity: 22,
       darkIntensity: 45,
       blur: 7
+    },
+    'graphite-carbon': {
+      name: 'Graphite Studio',
+      bgColor: '#24272c',
+      accentColor: '#00f2fe',
+      radius: 12,
+      distance: 4,
+      lightIntensity: 18,
+      darkIntensity: 42,
+      blur: 8
+    },
+    'royal-violet': {
+      name: 'Royal Violet',
+      bgColor: '#442759',
+      accentColor: '#f472b6',
+      radius: 16,
+      distance: 4,
+      lightIntensity: 20,
+      darkIntensity: 32,
+      blur: 9
+    },
+    'midnight-violet': {
+      name: 'Midnight Violet',
+      bgColor: '#3b0764',
+      accentColor: '#f43f5e',
+      radius: 24,
+      distance: 6,
+      lightIntensity: 32,
+      darkIntensity: 65,
+      blur: 14
+    },
+    'garnet-obsidian': {
+      name: 'Garnet Obsidian',
+      bgColor: '#450a0a',
+      accentColor: '#fb7185',
+      radius: 8,
+      distance: 4,
+      lightIntensity: 24,
+      darkIntensity: 70,
+      blur: 9
+    },
+    'crimson-vampire': {
+      name: 'Crimson Vampire',
+      bgColor: '#2a0808',
+      accentColor: '#ef4444',
+      radius: 10,
+      distance: 4,
+      lightIntensity: 18,
+      darkIntensity: 60,
+      blur: 8
+    },
+    'obsidian-gold': {
+      name: 'Obsidian Gold',
+      bgColor: '#1e1e24',
+      accentColor: '#f59e0b',
+      radius: 10,
+      distance: 4,
+      lightIntensity: 16,
+      darkIntensity: 48,
+      blur: 8
+    },
+    'synth-slate': {
+      name: 'Synthwave Slate',
+      bgColor: '#2b2d42',
+      accentColor: '#ff007f',
+      radius: 12,
+      distance: 5,
+      lightIntensity: 22,
+      darkIntensity: 38,
+      blur: 9
+    },
+    'synthwave-sunset': {
+      name: 'Synthwave Sunset',
+      bgColor: '#262335',
+      accentColor: '#ff7b00',
+      radius: 14,
+      distance: 4,
+      lightIntensity: 20,
+      darkIntensity: 32,
+      blur: 9
     },
     'tokyo-night': {
       name: 'Tokyo Night',
@@ -4929,116 +7645,6 @@
       darkIntensity: 32,
       blur: 7
     },
-    'cyberpunk-neon': {
-      name: 'Cyberpunk Neon',
-      bgColor: '#12131a',
-      accentColor: '#fcee0a',
-      radius: 6,
-      distance: 3,
-      lightIntensity: 15,
-      darkIntensity: 45,
-      blur: 6
-    },
-    'synthwave-sunset': {
-      name: 'Synthwave Sunset',
-      bgColor: '#262335',
-      accentColor: '#ff7b00',
-      radius: 14,
-      distance: 4,
-      lightIntensity: 20,
-      darkIntensity: 32,
-      blur: 9
-    },
-    'matcha-cream': {
-      name: 'Matcha Cream',
-      bgColor: '#dbe4d2',
-      accentColor: '#3f5622',
-      radius: 16,
-      distance: 3,
-      lightIntensity: 26,
-      darkIntensity: 18,
-      blur: 8
-    },
-    'peach-fuzz': {
-      name: 'Peach Fuzz',
-      bgColor: '#fed7aa',
-      accentColor: '#c2410c',
-      radius: 16,
-      distance: 3,
-      lightIntensity: 28,
-      darkIntensity: 16,
-      blur: 7
-    },
-    'lavender-dream': {
-      name: 'Lavender Dream',
-      bgColor: '#e2d9f3',
-      accentColor: '#6b21a8',
-      radius: 14,
-      distance: 3,
-      lightIntensity: 28,
-      darkIntensity: 18,
-      blur: 8
-    },
-    'electric-cobalt': {
-      name: 'Electric Cobalt',
-      bgColor: '#1d3557',
-      accentColor: '#34d399',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 30,
-      blur: 8
-    },
-    'espresso-mocha': {
-      name: 'Espresso Mocha',
-      bgColor: '#2b1d14',
-      accentColor: '#f59e0b',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 18,
-      darkIntensity: 36,
-      blur: 7
-    },
-    'sakura-blossom': {
-      name: 'Sakura Blossom',
-      bgColor: '#fce7f3',
-      accentColor: '#be123c',
-      radius: 18,
-      distance: 3,
-      lightIntensity: 30,
-      darkIntensity: 14,
-      blur: 8
-    },
-    'nord-frost': {
-      name: 'Nord Frost',
-      bgColor: '#e5e9f0',
-      accentColor: '#5e81ac',
-      radius: 8,
-      distance: 3,
-      lightIntensity: 32,
-      darkIntensity: 16,
-      blur: 7
-    },
-    'solarized-cream': {
-      name: 'Solarized Cream',
-      bgColor: '#fdf6e3',
-      accentColor: '#b58900',
-      radius: 6,
-      distance: 3,
-      lightIntensity: 32,
-      darkIntensity: 14,
-      blur: 6
-    },
-    'matrix-terminal': {
-      name: 'Matrix Terminal',
-      bgColor: '#0f1712',
-      accentColor: '#22c55e',
-      radius: 4,
-      distance: 3,
-      lightIntensity: 14,
-      darkIntensity: 46,
-      blur: 6
-    },
     'monokai-charcoal': {
       name: 'Monokai Charcoal',
       bgColor: '#2d2a2e',
@@ -5049,17 +7655,37 @@
       darkIntensity: 34,
       blur: 7
     },
-    'aqua-marine': {
-      name: 'Aqua Marine',
-      bgColor: '#cffafe',
-      accentColor: '#0369a1',
-      radius: 16,
+    'cyberpunk-neon': {
+      name: 'Cyberpunk Neon',
+      bgColor: '#12131a',
+      accentColor: '#fcee0a',
+      radius: 6,
       distance: 3,
-      lightIntensity: 30,
-      darkIntensity: 16,
-      blur: 8
+      lightIntensity: 15,
+      darkIntensity: 45,
+      blur: 6
     },
-    'custom-default': {
+    'midnight-onyx': {
+      name: 'Midnight Onyx',
+      bgColor: '#18181b',
+      accentColor: '#a855f7',
+      radius: 12,
+      distance: 3,
+      lightIntensity: 16,
+      darkIntensity: 45,
+      blur: 7
+    },
+    'oled-black': {
+      name: 'OLED Void',
+      bgColor: '#09090b',
+      accentColor: '#38bdf8',
+      radius: 8,
+      distance: 3,
+      lightIntensity: 14,
+      darkIntensity: 65,
+      blur: 6
+    },
+    'soft-gray': {
       name: 'Warm Clay (Default)',
       bgColor: '#e8dfd5',
       accentColor: '#d97706',
@@ -5067,226 +7693,6 @@
       distance: 4,
       lightIntensity: 39,
       darkIntensity: 5,
-      blur: 9
-    },
-    'brutalist-amber': {
-      name: 'Brutalist Amber',
-      bgColor: '#f59e0b',
-      accentColor: '#1e1b4b',
-      radius: 2,
-      distance: 6,
-      lightIntensity: 65,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'marshmallow-indigo': {
-      name: 'Marshmallow Indigo',
-      bgColor: '#4f46e5',
-      accentColor: '#fde047',
-      radius: 42,
-      distance: 8,
-      lightIntensity: 40,
-      darkIntensity: 48,
-      blur: 18
-    },
-    'porcelain-ceramic': {
-      name: 'Porcelain Ceramic',
-      bgColor: '#f1f5f9',
-      accentColor: '#2563eb',
-      radius: 28,
-      distance: 7,
-      lightIntensity: 85,
-      darkIntensity: 20,
-      blur: 16
-    },
-    'solar-tangerine': {
-      name: 'Solar Tangerine',
-      bgColor: '#ea580c',
-      accentColor: '#fef08a',
-      radius: 34,
-      distance: 5,
-      lightIntensity: 38,
-      darkIntensity: 42,
-      blur: 12
-    },
-    'matrix-terminal': {
-      name: 'Matrix CRT',
-      bgColor: '#052e16',
-      accentColor: '#22c55e',
-      radius: 4,
-      distance: 2,
-      lightIntensity: 40,
-      darkIntensity: 70,
-      blur: 2
-    },
-    'cyber-cyan': {
-      name: 'Cyber Cyan',
-      bgColor: '#0891b2',
-      accentColor: '#fef08a',
-      radius: 18,
-      distance: 4,
-      lightIntensity: 35,
-      darkIntensity: 32,
-      blur: 6
-    },
-    'brutalist-concrete': {
-      name: 'Brutalist Concrete',
-      bgColor: '#78716c',
-      accentColor: '#f97316',
-      radius: 3,
-      distance: 5,
-      lightIntensity: 50,
-      darkIntensity: 60,
-      blur: 1
-    },
-    'midnight-violet': {
-      name: 'Midnight Violet',
-      bgColor: '#3b0764',
-      accentColor: '#f43f5e',
-      radius: 24,
-      distance: 6,
-      lightIntensity: 32,
-      darkIntensity: 65,
-      blur: 14
-    },
-    'spearmint-gelato': {
-      name: 'Spearmint Gelato',
-      bgColor: '#6ee7b7',
-      accentColor: '#831843',
-      radius: 38,
-      distance: 6,
-      lightIntensity: 48,
-      darkIntensity: 28,
-      blur: 14
-    },
-    'garnet-obsidian': {
-      name: 'Garnet Obsidian',
-      bgColor: '#450a0a',
-      accentColor: '#fb7185',
-      radius: 8,
-      distance: 4,
-      lightIntensity: 24,
-      darkIntensity: 70,
-      blur: 9
-    },
-    'abyssal-ocean': {
-      name: 'Abyssal Ocean',
-      bgColor: '#0e2a47',
-      accentColor: '#38bdf8',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 22,
-      darkIntensity: 55,
-      blur: 10
-    },
-    'roasted-cocoa': {
-      name: 'Roasted Cocoa',
-      bgColor: '#351c14',
-      accentColor: '#fbbf24',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 60,
-      blur: 5
-    },
-    'bubblegum-magenta': {
-      name: 'Bubblegum Magenta',
-      bgColor: '#db2777',
-      accentColor: '#fef08a',
-      radius: 30,
-      distance: 7,
-      lightIntensity: 42,
-      darkIntensity: 38,
-      blur: 15
-    },
-    'lilac-cloud': {
-      name: 'Lilac Cloud',
-      bgColor: '#c4b5fd',
-      accentColor: '#4c1d95',
-      radius: 22,
-      distance: 4,
-      lightIntensity: 36,
-      darkIntensity: 22,
-      blur: 11
-    },
-    'matte-titanium': {
-      name: 'Matte Titanium',
-      bgColor: '#1e293b',
-      accentColor: '#06b6d4',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 45,
-      blur: 7
-    },
-    'dribbble-soft-gray': {
-      name: 'Dribbble Soft Canvas',
-      bgColor: '#e0e5ec',
-      accentColor: '#3b82f6',
-      radius: 16,
-      distance: 5,
-      lightIntensity: 85,
-      darkIntensity: 18,
-      blur: 10
-    },
-    'graphite-carbon': {
-      name: 'Graphite Studio',
-      bgColor: '#24272c',
-      accentColor: '#00f2fe',
-      radius: 12,
-      distance: 4,
-      lightIntensity: 18,
-      darkIntensity: 42,
-      blur: 8
-    },
-    'nordic-linen': {
-      name: 'Nordic Linen',
-      bgColor: '#dfd9ce',
-      accentColor: '#92400e',
-      radius: 10,
-      distance: 4,
-      lightIntensity: 65,
-      darkIntensity: 20,
-      blur: 8
-    },
-    'eucalyptus-mist': {
-      name: 'Eucalyptus Mist',
-      bgColor: '#d4ded6',
-      accentColor: '#065f46',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 70,
-      darkIntensity: 22,
-      blur: 9
-    },
-    'obsidian-gold': {
-      name: 'Obsidian Gold',
-      bgColor: '#1e1e24',
-      accentColor: '#f59e0b',
-      radius: 10,
-      distance: 4,
-      lightIntensity: 16,
-      darkIntensity: 48,
-      blur: 8
-    },
-    'dusty-blush': {
-      name: 'Dusty Blush',
-      bgColor: '#ebdcd9',
-      accentColor: '#9f1239',
-      radius: 18,
-      distance: 5,
-      lightIntensity: 75,
-      darkIntensity: 20,
-      blur: 10
-    },
-    'synth-slate': {
-      name: 'Synthwave Slate',
-      bgColor: '#2b2d42',
-      accentColor: '#ff007f',
-      radius: 12,
-      distance: 5,
-      lightIntensity: 22,
-      darkIntensity: 38,
       blur: 9
     }
   };
@@ -5340,8 +7746,10 @@
   function computePresetShadow(bgColor, lightIntensity = 20, darkIntensity = 20, distance = 3, blur = 8) {
     const d = Math.max(2, Math.round(distance * 0.75));
     const b = blur;
-    const darkAlpha = Math.min(0.55, Math.max(0.12, (darkIntensity / 100.0) * 1.1));
-    const lightAlpha = Math.min(0.65, Math.max(0.10, (lightIntensity / 100.0) * 1.1));
+    const maxDark = (blur === 0) ? 0.85 : 0.55;
+    const maxLight = (blur === 0) ? 0.85 : 0.65;
+    const darkAlpha = Math.min(maxDark, Math.max(0.12, (darkIntensity / 100.0) * 1.1));
+    const lightAlpha = Math.min(maxLight, Math.max(0.10, (lightIntensity / 100.0) * 1.1));
     if (blur === 0) {
       return `${d}px ${d}px 0px rgba(0, 0, 0, ${darkAlpha.toFixed(2)}), -${d}px -${d}px 0px rgba(255, 255, 255, ${lightAlpha.toFixed(2)})`;
     }
@@ -5503,9 +7911,9 @@
       ? parseInt(neo.radius, 10)
       : ((state.config && state.config.theme && typeof state.config.theme.radius !== 'undefined') ? parseInt(state.config.theme.radius, 10) : 5);
 
-    const distance = (neo && typeof neo.distance !== 'undefined')
+    const distance = Math.min(10, Math.max(1, (neo && typeof neo.distance !== 'undefined')
       ? parseInt(neo.distance, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined') ? parseInt(state.config.theme.distance, 10) : 3);
+      : ((state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined') ? parseInt(state.config.theme.distance, 10) : 3)));
 
     const lightIntensity = (neo && typeof neo.lightIntensity !== 'undefined')
       ? parseInt(neo.lightIntensity, 10)
@@ -5659,25 +8067,60 @@
     }
   }
 
-  function getCurrentThemeColors() {
-    const bg = (state.config && state.config.theme && state.config.theme.bgColor)
-      || document.documentElement.style.getPropertyValue('--bg-color')
-      || '#e8dfd5';
-    const acc = (state.config && state.config.theme && state.config.theme.accentColor)
-      || document.documentElement.style.getPropertyValue('--accent-primary')
-      || '#d97706';
-    const radius = (state.config && state.config.theme && typeof state.config.theme.radius !== 'undefined')
-      ? parseInt(state.config.theme.radius, 10) : 5;
-    const distance = (state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined')
-      ? parseInt(state.config.theme.distance, 10) : 3;
-    const lightIntensity = (state.config && state.config.theme && typeof state.config.theme.lightIntensity !== 'undefined')
-      ? parseInt(state.config.theme.lightIntensity, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 22);
-    const darkIntensity = (state.config && state.config.theme && typeof state.config.theme.darkIntensity !== 'undefined')
-      ? parseInt(state.config.theme.darkIntensity, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 6);
-    const blur = (state.config && state.config.theme && typeof state.config.theme.blur !== 'undefined')
-      ? parseInt(state.config.theme.blur, 10) : 10;
+  function getCurrentThemeColors(preferDom = true) {
+    let bg = '';
+    let acc = '';
+
+    if (preferDom) {
+      if (themeBgHex && /^#[0-9A-Fa-f]{6}$/i.test(themeBgHex.value.trim())) {
+        bg = themeBgHex.value.trim();
+      } else if (themeBgColorPicker && /^#[0-9A-Fa-f]{6}$/i.test(themeBgColorPicker.value)) {
+        bg = themeBgColorPicker.value;
+      }
+
+      if (themeAccentHex && /^#[0-9A-Fa-f]{6}$/i.test(themeAccentHex.value.trim())) {
+        acc = themeAccentHex.value.trim();
+      } else if (themeAccentColorPicker && /^#[0-9A-Fa-f]{6}$/i.test(themeAccentColorPicker.value)) {
+        acc = themeAccentColorPicker.value;
+      }
+    }
+
+    if (!bg) {
+      bg = (state.config && state.config.theme && state.config.theme.bgColor)
+        || document.documentElement.style.getPropertyValue('--bg-color')
+        || '#e8dfd5';
+    }
+
+    if (!acc) {
+      acc = (state.config && state.config.theme && state.config.theme.accentColor)
+        || document.documentElement.style.getPropertyValue('--accent-primary')
+        || '#d97706';
+    }
+
+    const radius = (preferDom && themeSliderRadius)
+      ? parseInt(themeSliderRadius.value, 10)
+      : ((state.config && state.config.theme && typeof state.config.theme.radius !== 'undefined') ? parseInt(state.config.theme.radius, 10) : 5);
+
+    const distance = Math.min(10, Math.max(1, (preferDom && themeSliderDistance)
+      ? parseInt(themeSliderDistance.value, 10)
+      : ((state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined') ? parseInt(state.config.theme.distance, 10) : 3)));
+
+    const lightIntensity = (preferDom && themeSliderLightIntensity)
+      ? parseInt(themeSliderLightIntensity.value, 10)
+      : ((state.config && state.config.theme && typeof state.config.theme.lightIntensity !== 'undefined')
+        ? parseInt(state.config.theme.lightIntensity, 10)
+        : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 22));
+
+    const darkIntensity = (preferDom && themeSliderDarkIntensity)
+      ? parseInt(themeSliderDarkIntensity.value, 10)
+      : ((state.config && state.config.theme && typeof state.config.theme.darkIntensity !== 'undefined')
+        ? parseInt(state.config.theme.darkIntensity, 10)
+        : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 6));
+
+    const blur = (preferDom && themeSliderBlur)
+      ? parseInt(themeSliderBlur.value, 10)
+      : ((state.config && state.config.theme && typeof state.config.theme.blur !== 'undefined') ? parseInt(state.config.theme.blur, 10) : 10);
+
     return {
       bg: bg.trim(),
       acc: acc.trim(),
@@ -5718,11 +8161,52 @@
     return [];
   }
 
+  function renderCuratedPresets() {
+    const grid = document.getElementById('bgSwatchesGrid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    const currentColors = getCurrentThemeColors(true);
+
+    Object.entries(THEME_PRESETS).forEach(([key, preset]) => {
+      if (key === 'soft-gray') return;
+
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'theme-swatch-chip theme-card-chip';
+      chip.dataset.preset = key;
+      chip.dataset.color = preset.bgColor;
+      chip.title = `${preset.name} (Background: ${preset.bgColor}, Accent: ${preset.accentColor || currentColors.acc})`;
+      chip.setAttribute('aria-label', preset.name);
+      chip.style.backgroundColor = preset.bgColor;
+      chip.style.borderColor = preset.accentColor || currentColors.acc;
+      chip.style.color = preset.accentColor || currentColors.acc;
+      chip.style.borderRadius = `${Math.min(24, Math.max(0, typeof preset.radius !== 'undefined' ? preset.radius : 10))}px`;
+      chip.style.boxShadow = computePresetShadow(
+        preset.bgColor,
+        preset.lightIntensity,
+        preset.darkIntensity,
+        preset.distance,
+        preset.blur
+      );
+
+      chip.innerHTML = `
+        <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      `;
+
+      grid.appendChild(chip);
+    });
+
+    updateActivePresetChips();
+  }
+
   function updateActivePresetChips() {
-    const currentColors = getCurrentThemeColors();
+    const currentColors = getCurrentThemeColors(true);
     const currentSliders = getNeoSliderValues();
 
-    // Check built-in swatches
+    // Check curated swatches
     document.querySelectorAll('#bgSwatchesGrid .theme-swatch-chip').forEach(chip => {
       const presetKey = chip.dataset.preset;
       const preset = presetKey ? THEME_PRESETS[presetKey] : null;
@@ -5738,9 +8222,9 @@
           parseInt(preset.darkIntensity, 10) === currentSliders.darkIntensity
         );
         chip.style.backgroundColor = preset.bgColor;
-        chip.style.borderColor = preset.accentColor;
-        chip.style.color = preset.accentColor;
-        chip.style.borderRadius = `${Math.min(22, Math.max(4, preset.radius))}px`;
+        chip.style.borderColor = preset.accentColor || currentColors.acc;
+        chip.style.color = preset.accentColor || currentColors.acc;
+        chip.style.borderRadius = `${Math.min(24, Math.max(0, typeof preset.radius !== 'undefined' ? preset.radius : 10))}px`;
         chip.style.boxShadow = computePresetShadow(preset.bgColor, preset.lightIntensity, preset.darkIntensity, preset.distance, preset.blur);
       } else if (chip.dataset.color) {
         isMatch = (chip.dataset.color.toLowerCase() === currentColors.bg.toLowerCase());
@@ -5798,7 +8282,7 @@
       chip.style.backgroundColor = p.bgColor;
       chip.style.borderColor = p.accentColor;
       chip.style.color = p.accentColor;
-      chip.style.borderRadius = `${Math.min(22, Math.max(4, p.radius || 10))}px`;
+      chip.style.borderRadius = `${Math.min(22, Math.max(0, typeof p.radius !== 'undefined' ? p.radius : 10))}px`;
       chip.style.boxShadow = computePresetShadow(
         p.bgColor,
         (typeof p.lightIntensity !== 'undefined') ? p.lightIntensity : 20,
@@ -5968,18 +8452,24 @@
     if (btnScrollProfilesLeft && lgsProfilesTrack) {
       btnScrollProfilesLeft.addEventListener('click', () => {
         lgsProfilesTrack.scrollBy({ left: -220, behavior: 'smooth' });
+        setTimeout(updateProfilesScrollButtons, 220);
       });
     }
     if (btnScrollProfilesRight && lgsProfilesTrack) {
       btnScrollProfilesRight.addEventListener('click', () => {
         lgsProfilesTrack.scrollBy({ left: 220, behavior: 'smooth' });
+        setTimeout(updateProfilesScrollButtons, 220);
       });
     }
     if (lgsProfilesTrack) {
+      lgsProfilesTrack.addEventListener('scroll', () => {
+        updateProfilesScrollButtons();
+      });
       lgsProfilesTrack.addEventListener('wheel', (e) => {
         if (e.deltaY) {
           e.preventDefault();
           lgsProfilesTrack.scrollLeft += e.deltaY;
+          updateProfilesScrollButtons();
         }
       }, { passive: false });
     }
@@ -6009,48 +8499,25 @@
         renderRunningAppsList();
       });
     }
-    const profSwitchOnHover = document.getElementById('profSwitchOnHover');
-    if (profSwitchOnHover) {
-      profSwitchOnHover.addEventListener('change', () => {
-        const isChecked = profSwitchOnHover.checked;
-        if (isChecked) {
-          const f = modalTriggerState.focus || (!modalTriggerState.focus && !modalTriggerState.hover);
-          updateProfileTriggerModeUI(true, f, modalTriggerState.hover);
-        } else {
-          updateProfileTriggerModeUI(false, modalTriggerState.focus, modalTriggerState.hover);
-        }
+    const chipTriggerOff = document.getElementById('chipTriggerOff');
+    if (chipTriggerOff) {
+      chipTriggerOff.addEventListener('click', (e) => {
+        e.stopPropagation();
+        updateProfileTriggerModeUI('off');
       });
     }
     const chipTriggerFocus = document.getElementById('chipTriggerFocus');
     if (chipTriggerFocus) {
       chipTriggerFocus.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!modalTriggerState.enabled) {
-          updateProfileTriggerModeUI(true, true, modalTriggerState.hover);
-          return;
-        }
-        const newFocus = !modalTriggerState.focus;
-        if (!newFocus && !modalTriggerState.hover) {
-          updateProfileTriggerModeUI(false, false, false);
-        } else {
-          updateProfileTriggerModeUI(true, newFocus, modalTriggerState.hover);
-        }
+        updateProfileTriggerModeUI('focus');
       });
     }
     const chipTriggerHover = document.getElementById('chipTriggerHover');
     if (chipTriggerHover) {
       chipTriggerHover.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!modalTriggerState.enabled) {
-          updateProfileTriggerModeUI(true, modalTriggerState.focus, true);
-          return;
-        }
-        const newHover = !modalTriggerState.hover;
-        if (!newHover && !modalTriggerState.focus) {
-          updateProfileTriggerModeUI(false, false, false);
-        } else {
-          updateProfileTriggerModeUI(true, modalTriggerState.focus, newHover);
-        }
+        updateProfileTriggerModeUI('hover');
       });
     }
     if (btnConfirmProfileModal) {
@@ -6069,16 +8536,93 @@
       });
     }
 
-    // Tab Bar
+    // Tab Bar (Smooth Drag & Wheel Horizontal Scroll + Responsive Buttons)
+    let isTabsDragging = false;
+    let tabsStartX = 0;
+    let tabsScrollLeft = 0;
+    let hasTabsDragged = false;
+
+    segmentedBar.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isTabsDragging = true;
+      hasTabsDragged = false;
+      tabsStartX = e.pageX - segmentedBar.offsetLeft;
+      tabsScrollLeft = segmentedBar.scrollLeft;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isTabsDragging) return;
+      const x = e.pageX - segmentedBar.offsetLeft;
+      const walk = (x - tabsStartX);
+      if (Math.abs(walk) > 4) {
+        hasTabsDragged = true;
+        segmentedBar.scrollLeft = tabsScrollLeft - walk;
+        updateTabsScrollButtons();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      isTabsDragging = false;
+    });
+
     segmentedBar.addEventListener('click', (e) => {
+      if (hasTabsDragged) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       const btn = e.target.closest('.segment-btn');
       if (!btn) return;
       switchTab(btn.dataset.tab);
     });
 
+    segmentedBar.addEventListener('scroll', () => {
+      updateTabsScrollButtons();
+    });
+
+    const handleTabsWheel = (e) => {
+      if (e.deltaY) {
+        e.preventDefault();
+        segmentedBar.scrollLeft += e.deltaY;
+        updateTabsScrollButtons();
+      }
+    };
+    segmentedBar.addEventListener('wheel', handleTabsWheel, { passive: false });
+
+    const segmentedWrap = document.querySelector('.segmented-control-wrapper');
+    if (segmentedWrap) {
+      segmentedWrap.addEventListener('wheel', handleTabsWheel, { passive: false });
+    }
+
+    const btnScrollTabsLeft = document.getElementById('btnScrollTabsLeft');
+    const btnScrollTabsRight = document.getElementById('btnScrollTabsRight');
+    if (btnScrollTabsLeft) {
+      btnScrollTabsLeft.addEventListener('click', () => {
+        segmentedBar.scrollBy({ left: -220, behavior: 'smooth' });
+        setTimeout(updateTabsScrollButtons, 220);
+      });
+    }
+    if (btnScrollTabsRight) {
+      btnScrollTabsRight.addEventListener('click', () => {
+        segmentedBar.scrollBy({ left: 220, behavior: 'smooth' });
+        setTimeout(updateTabsScrollButtons, 220);
+      });
+    }
+
+    if (window.ResizeObserver) {
+      const tabsObserver = new ResizeObserver(() => {
+        updateTabsScrollButtons();
+        updateProfilesScrollButtons();
+      });
+      tabsObserver.observe(segmentedBar);
+      tabsObserver.observe(document.body);
+    }
+
     window.addEventListener('resize', () => {
       updateSegmentedGlider(true);
       updateProfileGlider(true);
+      updateProfilesScrollButtons();
+      updateTabsScrollButtons();
     });
 
     // Text Expander Listeners
@@ -6195,6 +8739,17 @@
     }
 
     dragHeader.addEventListener('mousedown', handleDragStart);
+    dragHeader.addEventListener('dblclick', (e) => {
+      if (
+        e.target.closest('#mainEngineSwitch') ||
+        e.target.closest('.vertical-rocker') ||
+        e.target.closest('.lgs-profile-card') ||
+        e.target.closest('.lgs-profiles-bar') ||
+        e.target.closest('button') ||
+        e.target.closest('input')
+      ) return;
+      sendToAhk('maximize');
+    });
     appCard.addEventListener('mousedown', (e) => {
       if (
         e.target === appCard ||
@@ -6217,9 +8772,10 @@
     });
 
     // Window Controls
-    btnMinimize.addEventListener('click', () => sendToAhk('minimize'));
-    btnClose.addEventListener('click', () => sendToAhk('close'));
-    btnRefresh.addEventListener('click', () => sendToAhk('reload'));
+    if (btnMinimize) btnMinimize.addEventListener('click', () => sendToAhk('minimize'));
+    if (btnMaximize) btnMaximize.addEventListener('click', () => sendToAhk('maximize'));
+    if (btnClose) btnClose.addEventListener('click', () => sendToAhk('close'));
+    if (btnRefresh) btnRefresh.addEventListener('click', () => sendToAhk('reload'));
     if (btnExport) {
       btnExport.addEventListener('click', () => sendToAhk('openConfig'));
     }
@@ -6251,7 +8807,7 @@
     if (btnTheme) {
       btnTheme.addEventListener('click', () => {
         if (themeModal) {
-          const current = getCurrentThemeColors();
+          const current = getCurrentThemeColors(false);
           if (themeBgColorPicker) themeBgColorPicker.value = current.bg;
           if (themeBgHex) themeBgHex.value = current.bg.toUpperCase();
           if (themeAccentColorPicker) themeAccentColorPicker.value = current.acc;
@@ -6283,6 +8839,7 @@
             if (badgeBlur) badgeBlur.textContent = `${current.blur}px`;
           }
 
+          renderCuratedPresets();
           updateActivePresetChips();
           renderCustomPresets();
 
@@ -6346,7 +8903,7 @@
         if (!chip) return;
         const presetKey = chip.dataset.preset;
         const preset = presetKey ? THEME_PRESETS[presetKey] : null;
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         if (preset) {
           applyTheme(preset.bgColor, preset.accentColor || current.acc, true, {
             radius: preset.radius,
@@ -6358,32 +8915,38 @@
         } else if (chip.dataset.color) {
           applyTheme(chip.dataset.color, current.acc, true, getNeoSliderValues());
         }
+        updateActivePresetChips();
       });
     }
 
-    // Custom Background Color Picker
+    // Custom Background Color Picker & Hex Input with real-time bidirectional synchronization
     if (themeBgColorPicker) {
       themeBgColorPicker.addEventListener('input', (e) => {
         const color = e.target.value;
-        const current = getCurrentThemeColors();
+        if (themeBgHex) themeBgHex.value = color.toUpperCase();
+        const current = getCurrentThemeColors(true);
         applyTheme(color, current.acc, false, getNeoSliderValues());
       });
       themeBgColorPicker.addEventListener('change', (e) => {
         const color = e.target.value;
-        const current = getCurrentThemeColors();
+        if (themeBgHex) themeBgHex.value = color.toUpperCase();
+        const current = getCurrentThemeColors(true);
         applyTheme(color, current.acc, true, getNeoSliderValues());
       });
     }
 
     if (themeBgHex) {
-      themeBgHex.addEventListener('change', (e) => {
-        let val = e.target.value.trim();
-        if (!val.startsWith('#')) val = '#' + val;
+      const handleBgHex = (save = false) => {
+        let val = themeBgHex.value.trim();
+        if (!val.startsWith('#') && val.length > 0) val = '#' + val;
         if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-          const current = getCurrentThemeColors();
-          applyTheme(val, current.acc, true, getNeoSliderValues());
+          if (themeBgColorPicker) themeBgColorPicker.value = val;
+          const current = getCurrentThemeColors(true);
+          applyTheme(val, current.acc, save, getNeoSliderValues());
         }
-      });
+      };
+      themeBgHex.addEventListener('input', () => handleBgHex(false));
+      themeBgHex.addEventListener('change', () => handleBgHex(true));
     }
 
     // Accent Swatches - Auto-save immediately
@@ -6392,34 +8955,39 @@
         const chip = e.target.closest('.theme-swatch-chip');
         if (!chip) return;
         const color = chip.dataset.color;
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, color, true, getNeoSliderValues());
       });
     }
 
-    // Custom Accent Color Picker
+    // Custom Accent Color Picker & Hex Input with real-time bidirectional synchronization
     if (themeAccentColorPicker) {
       themeAccentColorPicker.addEventListener('input', (e) => {
         const color = e.target.value;
-        const current = getCurrentThemeColors();
+        if (themeAccentHex) themeAccentHex.value = color.toUpperCase();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, color, false, getNeoSliderValues());
       });
       themeAccentColorPicker.addEventListener('change', (e) => {
         const color = e.target.value;
-        const current = getCurrentThemeColors();
+        if (themeAccentHex) themeAccentHex.value = color.toUpperCase();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, color, true, getNeoSliderValues());
       });
     }
 
     if (themeAccentHex) {
-      themeAccentHex.addEventListener('change', (e) => {
-        let val = e.target.value.trim();
-        if (!val.startsWith('#')) val = '#' + val;
+      const handleAccHex = (save = false) => {
+        let val = themeAccentHex.value.trim();
+        if (!val.startsWith('#') && val.length > 0) val = '#' + val;
         if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-          const current = getCurrentThemeColors();
-          applyTheme(current.bg, val, true, getNeoSliderValues());
+          if (themeAccentColorPicker) themeAccentColorPicker.value = val;
+          const current = getCurrentThemeColors(true);
+          applyTheme(current.bg, val, save, getNeoSliderValues());
         }
-      });
+      };
+      themeAccentHex.addEventListener('input', () => handleAccHex(false));
+      themeAccentHex.addEventListener('change', () => handleAccHex(true));
     }
 
     // Neumorphism Sliders Listeners (Live Preview on Input, Save on Change)
@@ -6428,11 +8996,11 @@
         const val = parseInt(themeSliderRadius.value, 10);
         if (badgeRadius) badgeRadius.textContent = `${val}px`;
         updateSliderProgress(themeSliderRadius);
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), radius: val });
       });
       themeSliderRadius.addEventListener('change', () => {
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, true, getNeoSliderValues());
       });
     }
@@ -6442,11 +9010,11 @@
         const val = parseInt(themeSliderDistance.value, 10);
         if (badgeDistance) badgeDistance.textContent = `${val}px`;
         updateSliderProgress(themeSliderDistance);
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), distance: val });
       });
       themeSliderDistance.addEventListener('change', () => {
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, true, getNeoSliderValues());
       });
     }
@@ -6456,11 +9024,11 @@
         const val = parseInt(themeSliderLightIntensity.value, 10);
         if (badgeLightIntensity) badgeLightIntensity.textContent = `${val}%`;
         updateSliderProgress(themeSliderLightIntensity);
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), lightIntensity: val });
       });
       themeSliderLightIntensity.addEventListener('change', () => {
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, true, getNeoSliderValues());
       });
     }
@@ -6470,11 +9038,11 @@
         const val = parseInt(themeSliderDarkIntensity.value, 10);
         if (badgeDarkIntensity) badgeDarkIntensity.textContent = `${val}%`;
         updateSliderProgress(themeSliderDarkIntensity);
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), darkIntensity: val });
       });
       themeSliderDarkIntensity.addEventListener('change', () => {
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, true, getNeoSliderValues());
       });
     }
@@ -6484,11 +9052,11 @@
         const val = parseInt(themeSliderBlur.value, 10);
         if (badgeBlur) badgeBlur.textContent = `${val}px`;
         updateSliderProgress(themeSliderBlur);
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), blur: val });
       });
       themeSliderBlur.addEventListener('change', () => {
-        const current = getCurrentThemeColors();
+        const current = getCurrentThemeColors(true);
         applyTheme(current.bg, current.acc, true, getNeoSliderValues());
       });
     }
@@ -6504,15 +9072,61 @@
           darkIntensity: def.darkIntensity,
           blur: def.blur
         });
+        showToast('Theme reset to default (Warm Clay)', 'info');
       });
     }
 
-    // Save / Apply Theme
+    // Save / Apply Theme (Fully fixes Apply & Save button)
     if (btnSaveTheme) {
       btnSaveTheme.addEventListener('click', () => {
-        const current = getCurrentThemeColors();
-        applyTheme(current.bg, current.acc, true, getNeoSliderValues());
-        if (themeModal) themeModal.classList.add('hidden-field');
+        const current = getCurrentThemeColors(true);
+        const sliders = getNeoSliderValues();
+
+        // 1. Apply theme variables & persist
+        applyTheme(current.bg, current.acc, true, sliders);
+
+        // 2. Explicitly ensure state.config.theme has everything
+        if (!state.config.theme) state.config.theme = {};
+        state.config.theme.bgColor = current.bg;
+        state.config.theme.accentColor = current.acc;
+        state.config.theme.radius = sliders.radius;
+        state.config.theme.distance = sliders.distance;
+        state.config.theme.lightIntensity = sliders.lightIntensity;
+        state.config.theme.darkIntensity = sliders.darkIntensity;
+        state.config.theme.intensity = Math.round((sliders.lightIntensity + sliders.darkIntensity) / 2);
+        state.config.theme.blur = sliders.blur;
+
+        // 3. Persist to localStorage & AutoHotkey
+        try {
+          localStorage.setItem('ahk_theme', JSON.stringify({
+            bgColor: current.bg,
+            accentColor: current.acc,
+            radius: sliders.radius,
+            distance: sliders.distance,
+            lightIntensity: sliders.lightIntensity,
+            darkIntensity: sliders.darkIntensity,
+            intensity: Math.round((sliders.lightIntensity + sliders.darkIntensity) / 2),
+            blur: sliders.blur,
+            customPresets: state.config.theme.customPresets || []
+          }));
+        } catch (e) { }
+
+        syncConfig();
+        sendToAhk('saveState', { config: state.config });
+
+        // 4. Positive visual feedback
+        showToast('Theme applied and saved successfully!', 'success');
+
+        const btnSpan = btnSaveTheme.querySelector('span');
+        const origText = btnSpan ? btnSpan.textContent : 'APPLY';
+        if (btnSpan) btnSpan.textContent = 'SAVED!';
+        btnSaveTheme.classList.add('btn-saved');
+
+        setTimeout(() => {
+          if (btnSpan) btnSpan.textContent = origText;
+          btnSaveTheme.classList.remove('btn-saved');
+          if (themeModal) themeModal.classList.add('hidden-field');
+        }, 350);
       });
     }
 
@@ -6531,6 +9145,39 @@
 
     initMacroRecorder();
     initFolderCreator();
+    initProfileContextMenu();
+    initScriptContextMenu();
+
+    // Global listener to ensure gesture, hot corner, and radial action dropdowns are immediately fresh when focused/clicked
+    document.addEventListener('focusin', (e) => {
+      const sel = e.target;
+      if (sel && sel.tagName === 'SELECT' && (
+        sel.classList.contains('mg-action-select') ||
+        sel.classList.contains('rm-slice-select') ||
+        sel.id.startsWith('hcSelect') ||
+        sel.id === 'rmCenterActionSelect'
+      )) {
+        populateActionSelect(sel, sel.value);
+      }
+    });
+  }
+
+  function updateMaximizeButtonState(isMax) {
+    const btn = document.getElementById('btnMaximize');
+    const svg = document.getElementById('svgMaximizeIcon');
+    if (!btn) return;
+    btn.title = isMax ? 'Restore Window' : 'Maximize Window';
+    document.body.classList.toggle('window-maximized', Boolean(isMax));
+    if (svg) {
+      if (isMax) {
+        svg.innerHTML = `
+          <rect x="7" y="3" width="13" height="13" rx="1.5" ry="1.5"></rect>
+          <path d="M4 7h1v10a1.5 1.5 0 0 0 1.5 1.5H17v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"></path>
+        `;
+      } else {
+        svg.innerHTML = `<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>`;
+      }
+    }
   }
 
   // Handle IPC Messages from AHK
@@ -6538,7 +9185,15 @@
     try {
       const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
 
+      if (msg.type === 'windowStateChanged' || msg.action === 'windowStateChanged') {
+        updateMaximizeButtonState(Boolean(msg.isMaximized));
+        return;
+      }
+
       if (msg.type === 'init' || msg.type === 'updateState') {
+        if (typeof msg.isMaximized === 'boolean') {
+          updateMaximizeButtonState(msg.isMaximized);
+        }
         if (typeof msg.enabled === 'boolean') state.enabled = msg.enabled;
         if (msg.config) {
           state.config = msg.config;
@@ -6663,6 +9318,19 @@
         if (macroState.isRecording) {
           stopMacroRecording();
         }
+      } else if (msg.type === 'colorFormatChanged') {
+        const sel = document.getElementById('wmSelectColorFormat');
+        if (sel) sel.value = msg.format;
+        if (state.config && state.config.windowManager) {
+          state.config.windowManager.colorFormat = msg.format;
+        }
+        showToast(`Color format changed to ${msg.format}`, 'info');
+      } else if (msg.type === 'colorPicked') {
+        showToast(`Color Picked & Copied: ${msg.color}`, 'success');
+      } else if (msg.type === 'moduleEvent') {
+        if (msg.message) {
+          showToast(msg.message, msg.isError ? 'error' : 'info');
+        }
       }
     } catch (err) {
       console.error('Error handling AHK message:', err);
@@ -6725,7 +9393,9 @@
     initAutoClicker();
     renderMacroRecorder();
     updateGlobalIndicators();
+    renderCuratedPresets();
     renderCustomPresets();
+    updateAllFeatureProfileBadges();
   }
 
   // Startup
@@ -6734,6 +9404,8 @@
   requestAnimationFrame(() => {
     updateSegmentedGlider(true);
     updateProfileGlider(true);
+    updateTabsScrollButtons();
+    updateProfilesScrollButtons();
   });
   initAhkBridge();
 

@@ -57,3 +57,6 @@ $RECYCLE.BIN/
 /EBWebView/
 /WebView2_Data/
 /WebView2_Cache/
+
+# Compiler Tools & Staging
+tools/compiler/
