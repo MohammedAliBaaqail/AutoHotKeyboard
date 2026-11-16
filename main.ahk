@@ -2528,6 +2528,10 @@ CheckAutoProfileSwitch() {
     if (!g_Config.Has("profiles") || !IsObject(g_Config["profiles"]))
         return
 
+    ; When profile is locked, freeze on current profile and disallow auto-switching
+    if (g_Config.Has("profileLocked") && (g_Config["profileLocked"] = 1 || g_Config["profileLocked"] = true))
+        return
+
     ; Check if any profile has switchOnHover enabled (including Default)
     hasHoverProfiles := false
     for pName, pData in g_Config["profiles"] {
@@ -2698,6 +2702,23 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
         }
         if (prof.Has("radialMenu"))
             g_Config["radialMenu"] := prof["radialMenu"]
+    }
+
+    ; Enforce any globally forced feature toggles across profiles
+    if (g_Config.Has("forcedFeatures") && IsObject(g_Config["forcedFeatures"])) {
+        for fId, isForced in g_Config["forcedFeatures"] {
+            if (isForced) {
+                parts := StrSplit(fId, ".")
+                if (parts.Length = 2) {
+                    modName := parts[1]
+                    fKey := parts[2]
+                    if (!g_Config.Has(modName) || !IsObject(g_Config[modName]))
+                        g_Config[modName] := Map()
+                    val := (fKey = "enabled" || fKey = "cornersEnabled" || fKey = "gesturesEnabled") ? true : 1
+                    g_Config[modName][fKey] := val
+                }
+            }
+        }
     }
 
     SaveConfigToFile()
@@ -4076,6 +4097,11 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
             case "launchColorPicker":
                 StartColorPicker()
 
+            case "previewCornerZones":
+                size := msg.Has("size") ? Integer(msg["size"]) : 14
+                show := msg.Has("show") ? (msg["show"] = true || msg["show"] = 1) : true
+                HotCornerPreviewHUD.ShowPreview(size, show)
+
             case "setColorFormat":
                 if (msg.Has("format") && msg["format"] != "") {
                     global g_ColorPickerFormat
@@ -4543,31 +4569,70 @@ CheckScreenHotCorners() {
         dwellMs := 20
     }
 
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&mx, &my)
+    baseTol := mg.Has("cornerSize") ? Max(5, Min(40, Integer(mg["cornerSize"]))) : 14
+    baseTol := mg.Has("cornerSize") ? Max(1, Min(40, Integer(mg["cornerSize"]))) : 14
+
+    ; Switch thread to Per-Monitor v2 DPI context to guarantee true 1:1 physical pixel coordinates across mixed 4K/2K displays
+    oldCtx := DllCall("user32\SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
+
+    pt := Buffer(8, 0)
+    DllCall("user32\GetCursorPos", "ptr", pt.Ptr)
+    mx := NumGet(pt, 0, "int")
+    my := NumGet(pt, 4, "int")
+
+    ; Identify the exact monitor directly containing the cursor
+    hMon := DllCall("user32\MonitorFromPoint", "int64", ((my & 0xFFFFFFFF) << 32) | (mx & 0xFFFFFFFF), "uint", 2, "ptr"
+    )
+    if (!hMon) {
+        if (oldCtx) DllCall("user32\SetThreadDpiAwarenessContext", "ptr", oldCtx, "ptr")
+            g_CornerActive := ""
+        g_CornerTriggered := false
+        return
+    }
+
+    mi := Buffer(40, 0)
+    NumPut("uint", 40, mi, 0)
+    DllCall("user32\GetMonitorInfoW", "ptr", hMon, "ptr", mi.Ptr)
+    mL := NumGet(mi, 4, "int")
+    mT := NumGet(mi, 8, "int")
+    mR := NumGet(mi, 12, "int")
+    mB := NumGet(mi, 16, "int")
+
+    ; Respect monitorMode if configured ("primary" only vs all monitors)
+    if (mg.Has("monitorMode") && mg["monitorMode"] = "primary") {
+        isPrimary := (NumGet(mi, 36, "uint") & 1)
+        if (!isPrimary) {
+            if (oldCtx) DllCall("user32\SetThreadDpiAwarenessContext", "ptr", oldCtx, "ptr")
+                g_CornerActive := ""
+            g_CornerTriggered := false
+            return
+        }
+    }
+
+    ; Calculate DPI scale for the specific active monitor so 4K hit zones scale properly
+    dpiX := 96, dpiY := 96
+    try DllCall("shcore\GetDpiForMonitor", "ptr", hMon, "int", 0, "uint*", &dpiX, "uint*", &dpiY)
+    dpiScale := Max(1.0, dpiX / 96.0)
+    effectiveTol := Round(baseTol * dpiScale)
+
+    if (oldCtx)
+        DllCall("user32\SetThreadDpiAwarenessContext", "ptr", oldCtx, "ptr")
+
+    ; Check corner bounds (in Windows RECT, Right & Bottom coordinates are exclusive bounds, so mR - 1 and mB - 1)
+    isLeft := (mx <= mL + effectiveTol)
+    isRight := (mx >= mR - 1 - effectiveTol)
+    isTop := (my <= mT + effectiveTol)
+    isBottom := (my >= mB - 1 - effectiveTol)
 
     cornerName := ""
-    tol := mg.Has("cornerSize") ? Max(5, Min(40, Integer(mg["cornerSize"]))) : 14
-
-    ; Check across each individual active physical monitor
-    monCount := MonitorGetCount()
-    loop monCount {
-        MonitorGet(A_Index, &mL, &mT, &mR, &mB)
-        ; Check if mouse is on this monitor (or within tolerance)
-        if (mx >= mL - tol && mx <= mR + tol && my >= mT - tol && my <= mB + tol) {
-            if (mx <= mL + tol && my <= mT + tol) {
-                cornerName := "cornerTopLeft"
-            } else if (mx >= mR - tol && my <= mT + tol) {
-                cornerName := "cornerTopRight"
-            } else if (mx <= mL + tol && my >= mB - tol) {
-                cornerName := "cornerBottomLeft"
-            } else if (mx >= mR - tol && my >= mB - tol) {
-                cornerName := "cornerBottomRight"
-            }
-            if (cornerName != "") {
-                break
-            }
-        }
+    if (isLeft && isTop) {
+        cornerName := "cornerTopLeft"
+    } else if (isRight && isTop) {
+        cornerName := "cornerTopRight"
+    } else if (isLeft && isBottom) {
+        cornerName := "cornerBottomLeft"
+    } else if (isRight && isBottom) {
+        cornerName := "cornerBottomRight"
     }
 
     if (cornerName != "") {
@@ -4585,6 +4650,168 @@ CheckScreenHotCorners() {
     } else {
         g_CornerActive := ""
         g_CornerTriggered := false
+    }
+}
+
+class HotCornerPreviewHUD {
+    static guiList := []
+    static hideTimer := 0
+
+    static ShowPreview(cornerSizePx, show := true) {
+        global g_Config
+
+        if (this.hideTimer) {
+            SetTimer(this.hideTimer, 0)
+            this.hideTimer := 0
+        }
+
+        if (!show) {
+            this.DestroyHUD()
+            return
+        }
+
+        themeAccent := (g_Config.Has("theme") && g_Config["theme"].Has("accentColor")) ? g_Config["theme"][
+            "accentColor"] : "#d97706"
+        accentArgb := RadialMenuHUD.ParseHexColor(themeAccent, 255)
+
+        cFill := (0x45 << 24) | (accentArgb & 0x00FFFFFF)
+        cBorder := (0xFF << 24) | (accentArgb & 0x00FFFFFF)
+
+        ProfileGdipHelper.Init()
+
+        targetMode := "all"
+        if (g_Config.Has("mouseGestures")) {
+            if (g_Config["mouseGestures"].Has("monitorMode"))
+                targetMode := g_Config["mouseGestures"]["monitorMode"]
+            else if (g_Config["mouseGestures"].Has("targetDisplays"))
+                targetMode := g_Config["mouseGestures"]["targetDisplays"]
+        }
+
+        oldCtx := DllCall("user32\SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
+
+        monCount := MonitorGetCount()
+        primaryMon := MonitorGetPrimary()
+
+        monIndices := []
+        if (targetMode = "primary") {
+            monIndices.Push(primaryMon)
+        } else {
+            loop monCount {
+                monIndices.Push(A_Index)
+            }
+        }
+
+        cornerRects := []
+        loop monIndices.Length {
+            mIdx := monIndices[A_Index]
+            MonitorGet(mIdx, &mL, &mT, &mR, &mB)
+
+            midX := mL + Round((mR - mL) / 2)
+            midY := mT + Round((mB - mT) / 2)
+            pt64 := ((midY & 0xFFFFFFFF) << 32) | (midX & 0xFFFFFFFF)
+            hMon := DllCall("user32\MonitorFromPoint", "int64", pt64, "uint", 2, "ptr")
+
+            dpiX := 96, dpiY := 96
+            if (hMon) {
+                try DllCall("Shcore\GetDpiForMonitor", "ptr", hMon, "int", 0, "uint*", &dpiX, "uint*", &dpiY)
+            }
+            dpiScale := Max(1.0, dpiX / 96.0)
+
+            baseTol := Max(5, Min(40, Integer(cornerSizePx)))
+            baseTol := Max(1, Min(40, Integer(cornerSizePx)))
+            effectiveTol := Round(baseTol * dpiScale)
+            boxPx := effectiveTol + 1
+
+            cornerRects.Push({ x: mL, y: mT, w: boxPx, h: boxPx, dpiScale: dpiScale })
+            cornerRects.Push({ x: mR - boxPx, y: mT, w: boxPx, h: boxPx, dpiScale: dpiScale })
+            cornerRects.Push({ x: mL, y: mB - boxPx, w: boxPx, h: boxPx, dpiScale: dpiScale })
+            cornerRects.Push({ x: mR - boxPx, y: mB - boxPx, w: boxPx, h: boxPx, dpiScale: dpiScale })
+        }
+
+        if (oldCtx)
+            DllCall("user32\SetThreadDpiAwarenessContext", "ptr", oldCtx, "ptr")
+
+        if (this.guiList.Length != cornerRects.Length) {
+            this.DestroyHUD()
+            loop cornerRects.Length {
+                gObj := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +E0x20 +E0x08000000 +E0x00080000")
+                this.guiList.Push(gObj)
+            }
+        }
+
+        hDC := DllCall("GetDC", "ptr", 0, "ptr")
+
+        for idx, c in cornerRects {
+            gObj := this.guiList[idx]
+
+            hMemDC := DllCall("CreateCompatibleDC", "ptr", hDC, "ptr")
+
+            bi := Buffer(40, 0)
+            NumPut("uint", 40, bi, 0)
+            NumPut("int", c.w, bi, 4)
+            NumPut("int", -c.h, bi, 8)
+            NumPut("ushort", 1, bi, 12)
+            NumPut("ushort", 32, bi, 14)
+
+            pBits := 0
+            hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint",
+                0, "ptr")
+            hOldBmp := DllCall("SelectObject", "ptr", hMemDC, "ptr", hBmp, "ptr")
+
+            pGraphics := 0
+            DllCall("gdiplus\GdipCreateFromHDC", "ptr", hMemDC, "ptr*", &pGraphics)
+            DllCall("gdiplus\GdipSetSmoothingMode", "ptr", pGraphics, "int", 4)
+
+            pFillBrush := 0
+            DllCall("gdiplus\GdipCreateSolidFill", "uint", cFill, "ptr*", &pFillBrush)
+
+            penWidth := Max(1.5, 2.0 * c.dpiScale)
+            pBorderPen := 0
+            DllCall("gdiplus\GdipCreatePen1", "uint", cBorder, "float", penWidth, "int", 2, "ptr*", &pBorderPen)
+
+            ; Draw filled corner rectangle with theme border matching physical hit zone
+            DllCall("gdiplus\GdipFillRectangle", "ptr", pGraphics, "ptr", pFillBrush, "float", 0.0, "float", 0.0,
+                "float", Float(c.w), "float", Float(c.h))
+            DllCall("gdiplus\GdipDrawRectangle", "ptr", pGraphics, "ptr", pBorderPen, "float", 0.5, "float", 0.5,
+                "float", Float(c.w - 1), "float", Float(c.h - 1))
+
+            DllCall("gdiplus\GdipDeleteBrush", "ptr", pFillBrush)
+            DllCall("gdiplus\GdipDeletePen", "ptr", pBorderPen)
+            DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
+
+            ptDst := Buffer(8, 0)
+            NumPut("int", c.x, ptDst, 0), NumPut("int", c.y, ptDst, 4)
+            sz := Buffer(8, 0)
+            NumPut("int", c.w, sz, 0), NumPut("int", c.h, sz, 4)
+            ptSrc := Buffer(8, 0)
+            blend := Buffer(4, 0)
+            NumPut("uchar", 0, blend, 0), NumPut("uchar", 0, blend, 1)
+            NumPut("uchar", 255, blend, 2), NumPut("uchar", 1, blend, 3)
+
+            gObj.Show("x" . c.x . " y" . c.y . " w" . c.w . " h" . c.h . " NoActivate")
+            DllCall("UpdateLayeredWindow", "ptr", gObj.Hwnd, "ptr", hDC, "ptr", ptDst, "ptr", sz, "ptr", hMemDC, "ptr",
+                ptSrc, "uint", 0, "ptr", blend, "uint", 2)
+
+            DllCall("SelectObject", "ptr", hMemDC, "ptr", hOldBmp)
+            DllCall("DeleteObject", "ptr", hBmp)
+            DllCall("DeleteDC", "ptr", hMemDC)
+        }
+
+        DllCall("ReleaseDC", "ptr", 0, "ptr", hDC)
+
+        this.hideTimer := () => HotCornerPreviewHUD.DestroyHUD()
+        SetTimer(this.hideTimer, -1800)
+    }
+
+    static DestroyHUD() {
+        if (this.hideTimer) {
+            SetTimer(this.hideTimer, 0)
+            this.hideTimer := 0
+        }
+        for _, g in this.guiList {
+            try g.Destroy()
+        }
+        this.guiList := []
     }
 }
 
@@ -5075,8 +5302,7 @@ class RadialMenuHUD {
 
         sliceCount := (sliceCount = 4) ? 4 : 8
         is4Slice := (sliceCount = 4)
-        dirs := is4Slice ? ["N", "E", "S", "W"] : ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-        ; Ergonomic WASD-cluster key mapping: N=W, NE=E, E=D, SE=C, S=S, SW=Z, W=A, NW=Q
+        ; Ergonomic WASD-cluster key mapping: Up=W, Up-Right=E, Right=D, Down-Right=C, Down=S/X, Down-Left=Z, Left=A, Up-Left=Q
         dirs := is4Slice ? ["W", "D", "S", "A"] : ["W", "E", "D", "C", "S", "Z", "A", "Q"]
         wedgeStep := is4Slice ? 90.0 : 45.0
         halfWedge := wedgeStep / 2.0
@@ -5409,7 +5635,6 @@ class RadialMenuHUD {
                 NumPut("float", cy + (4.0 * dpiScale), rectBuf, 4)
                 NumPut("float", R_inner * 2.0, rectBuf, 8)
                 NumPut("float", 18.0 * dpiScale, rectBuf, 12)
-                hubPrompt := (centerAction != "" && centerAction != "none") ? "CLICK HUB" : "CLICK SLICE"
                 hubPrompt := (centerAction != "" && centerAction != "none") ? "SPACE" : "WASD / CLICK"
                 DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", hubPrompt, "int", -1
                     , "ptr", pFontCenter, "ptr", rectBuf.Ptr, "ptr", pFormat, "ptr", pTextCenterNormalBrush)
@@ -5426,14 +5651,92 @@ class RadialMenuHUD {
         selectedSlice := -1
         clickedSlice := -1
 
-        ; Wait until user releases trigger button if it was a mouse button or key,
-        ; so holding the initial trigger does not accidentally register as a click.
-        while (isMouseBtn && GetKeyState(trigBtn, "P")) {
-            Sleep(15)
+        ; Setup InputHook to intercept and suppress WASD-cluster keys, Space, Enter, Escape
+        ; This ensures instant response without leaking keystrokes to foreground apps
+        ih := InputHook("L0 I1")
+        ih.KeyOpt("{All}", "-N -S")
+        ih.KeyOpt("{w}{a}{s}{d}{q}{e}{z}{c}{x}{Space}{Escape}{Enter}", "+N +S")
+        ih.OnKeyDown := (hook, vk, sc) => (RadialMenuHUD.pressedKey := StrLower(GetKeyName(Format("vk{:x}sc{:x}", vk,
+            sc))))
+        try ih.Start()
+
+        ; Unified interaction loop: handles mouse hover, hold-and-release, click, and WASD keys
+        while (true) {
+            Sleep(10)
+
+            ; 1. Cancellation check
+            if (RadialMenuHUD.pressedKey = "escape" || GetKeyState("Escape", "P") || GetKeyState("RButton", "P")) {
+                clickedSlice := -1
+                break
+            }
+
+            ; 2. WASD-cluster keyboard activation
+            kPress := RadialMenuHUD.pressedKey
+            if (kPress = "") {
+                if (GetKeyState("w", "P"))
+                    kPress := "w"
+                else if (GetKeyState("e", "P"))
+                    kPress := "e"
+                else if (GetKeyState("d", "P"))
+                    kPress := "d"
+                else if (GetKeyState("c", "P"))
+                    kPress := "c"
+                else if (GetKeyState("s", "P") || GetKeyState("x", "P"))
+                    kPress := "s"
+                else if (GetKeyState("z", "P"))
+                    kPress := "z"
+                else if (GetKeyState("a", "P"))
+                    kPress := "a"
+                else if (GetKeyState("q", "P"))
+                    kPress := "q"
+                else if (GetKeyState("Space", "P") || GetKeyState("Enter", "P"))
+                    kPress := "space"
+            }
+
+            if (kPress != "") {
+                if (kPress = "w") {
+                    clickedSlice := 0 ; Up / North
+                } else if (is4Slice) {
+                    if (kPress = "d")
+                        clickedSlice := 1 ; Right / East
+                    else if (kPress = "s" || kPress = "x")
+                        clickedSlice := 2 ; Down / South
+                    else if (kPress = "a")
+                        clickedSlice := 3 ; Left / West
+                    else if (kPress = "space" || kPress = "enter")
+                        clickedSlice := -2 ; Center hub
+                } else {
+                    if (kPress = "e")
+                        clickedSlice := 1 ; Up-Right / North-East
+                    else if (kPress = "d")
+                        clickedSlice := 2 ; Right / East
+                    else if (kPress = "c")
+                        clickedSlice := 3 ; Down-Right / South-East
+                    else if (kPress = "s" || kPress = "x")
+                        clickedSlice := 4 ; Down / South
+                    else if (kPress = "z")
+                        clickedSlice := 5 ; Down-Left / South-West
+                    else if (kPress = "a")
+                        clickedSlice := 6 ; Left / West
+                    else if (kPress = "q")
+                        clickedSlice := 7 ; Up-Left / North-West
+                    else if (kPress = "space" || kPress = "enter")
+                        clickedSlice := -2 ; Center hub
+                }
+
+                if (clickedSlice != -1) {
+                    DrawFrame(clickedSlice)
+                    Sleep(40)
+                    break
+                }
+            }
+
+            ; 3. Mouse pointer tracking and slice highlighting
             MouseGetPos(&curX, &curY)
             dx := curX - originX
             dy := curY - originY
             dist := Sqrt(dx * dx + dy * dy)
+
             newSel := -1
             if (dist < (26.0 * dpiScale)) {
                 newSel := -2 ; Center hub hovered
@@ -5442,218 +5745,125 @@ class RadialMenuHUD {
                 if (angle < 0) angle += 360
                     newSel := Mod(Round(angle / wedgeStep), sliceCount)
             }
+
             if (newSel != selectedSlice) {
                 selectedSlice := newSel
                 DrawFrame(selectedSlice)
             }
-            if (GetKeyState("LButton", "P") || GetKeyState("Escape", "P")) {
-                if (this.pressedKey != "" || GetKeyState("LButton", "P") || GetKeyState("Escape", "P")) {
-                    break
+
+            ; 4. Hold & Release Trigger Gesture (e.g. MButton hold-drag-release)
+            if (isMouseBtn && !GetKeyState(trigBtn, "P") && (A_TickCount - startTick > 150)) {
+                if (selectedSlice >= 0 || selectedSlice == -2) {
+                    clickedSlice := selectedSlice
+                    DrawFrame(clickedSlice)
+                    Sleep(30)
                 }
+                break
             }
 
-            ; CLICK-TO-ACTIVATE ONLY:
-            ; The menu remains open until the user explicitly clicks on one of the slices or center hub,
-            ; or cancels via Escape, Right Click.
-            ; CLICK OR WASD-KEY TO ACTIVATE:
-            ; The menu remains open until the user clicks a slice/hub, presses a WASD key,
-            ; or cancels via Escape / Right Click.
-            while (true) {
-                Sleep(15)
-
-                ; Cancellation via Escape or Right Click
-                if (GetKeyState("Escape", "P") || GetKeyState("RButton", "P")) {
-                    if (this.pressedKey = "escape" || GetKeyState("Escape", "P") || GetKeyState("RButton", "P")) {
-                        clickedSlice := -1
-                        break
-                    }
-
-                    ; WASD-cluster keyboard activation (ergonomic left-hand cluster around WASD)
-                    kPress := this.pressedKey
-                    if (kPress = "" && GetKeyState("w", "P"))
-                        kPress := "w"
-                    else if (kPress = "" && GetKeyState("d", "P"))
-                        kPress := "d"
-                    else if (kPress = "" && (GetKeyState("s", "P") || GetKeyState("x", "P")))
-                        kPress := "s"
-                    else if (kPress = "" && GetKeyState("a", "P"))
-                        kPress := "a"
-                    else if (kPress = "" && GetKeyState("q", "P"))
-                        kPress := "q"
-                    else if (kPress = "" && GetKeyState("e", "P"))
-                        kPress := "e"
-                    else if (kPress = "" && GetKeyState("z", "P"))
-                        kPress := "z"
-                    else if (kPress = "" && GetKeyState("c", "P"))
-                        kPress := "c"
-                    else if (kPress = "" && (GetKeyState("Space", "P") || GetKeyState("f", "P")))
-                        kPress := "space"
-
-                    if (kPress != "") {
-                        if (kPress = "w") {
-                            clickedSlice := 0 ; North / Up
-                        } else if (is4Slice) {
-                            if (kPress = "d")
-                                clickedSlice := 1 ; East / Right
-                            else if (kPress = "s" || kPress = "x")
-                                clickedSlice := 2 ; South / Down
-                            else if (kPress = "a")
-                                clickedSlice := 3 ; West / Left
-                            else if (kPress = "space" || kPress = "f")
-                                clickedSlice := -2 ; Center hub
-                        } else {
-                            if (kPress = "e")
-                                clickedSlice := 1 ; North-East / Up-Right
-                            else if (kPress = "d")
-                                clickedSlice := 2 ; East / Right
-                            else if (kPress = "c")
-                                clickedSlice := 3 ; South-East / Down-Right
-                            else if (kPress = "s" || kPress = "x")
-                                clickedSlice := 4 ; South / Down
-                            else if (kPress = "z")
-                                clickedSlice := 5 ; South-West / Down-Left
-                            else if (kPress = "a")
-                                clickedSlice := 6 ; West / Left
-                            else if (kPress = "q")
-                                clickedSlice := 7 ; North-West / Up-Left
-                            else if (kPress = "space" || kPress = "f")
-                                clickedSlice := -2 ; Center hub
-                        }
-
-                        if (clickedSlice != -1) {
-                            ; Briefly highlight the activated slice for snappy visual confirmation
-                            DrawFrame(clickedSlice)
-                            Sleep(35)
-                            if (kPress = "space")
-                                KeyWait("Space", "T0.2")
-                            else
-                                KeyWait(kPress, "T0.2")
-                            break
-                        }
-                    }
-
-                    MouseGetPos(&curX, &curY)
-                    dx := curX - originX
-                    dy := curY - originY
-                    dist := Sqrt(dx * dx + dy * dy)
-
-                    newSel := -1
-                    if (dist < (26.0 * dpiScale)) {
-                        newSel := -2 ; Center hub hovered
-                    } else if (dist <= (radSize + 40.0 * dpiScale)) {
-                        angle := (ATan2(dx, -dy) * 57.2957795)
-                        if (angle < 0) angle += 360
-                            newSel := Mod(Round(angle / wedgeStep), sliceCount)
-                    }
-
-                    if (newSel != selectedSlice) {
-                        selectedSlice := newSel
-                        DrawFrame(selectedSlice)
-                    }
-
-                    ; Left Click to activate directly
-                    if (GetKeyState("LButton", "P")) {
-                        ; Wait for mouse button release to prevent click pass-through
-                        while (GetKeyState("LButton", "P")) {
-                            Sleep(10)
-                        }
-                        if (dist < (26.0 * dpiScale)) {
-                            clickedSlice := -2
-                        } else if (dist <= (radSize + 40.0 * dpiScale) && selectedSlice >= 0) {
-                            clickedSlice := selectedSlice
-                        } else {
-                            ; Clicked outside -> dismiss cleanly
-                            clickedSlice := -1
-                        }
-                        break
-                    }
+            ; 5. Left Click Direct Activation
+            if (GetKeyState("LButton", "P")) {
+                while (GetKeyState("LButton", "P")) {
+                    Sleep(10)
                 }
-
-                this.guiObj.Destroy()
-                this.guiObj := 0
-                this.isShowing := false
-                this.pressedKey := ""
-
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pWheelBackdropBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pHoverWedgeBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeNormalBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeHoverBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pCenterHubBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTargetIconDotBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagNormalBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblNormalBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagHoverBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblHoverBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterNormalBrush)
-                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterHoverBrush)
-                DllCall("gdiplus\GdipDeletePen", "ptr", pWheelShadowPen)
-                DllCall("gdiplus\GdipDeletePen", "ptr", pWheelBorderPen)
-                DllCall("gdiplus\GdipDeletePen", "ptr", pSpokePen)
-                DllCall("gdiplus\GdipDeletePen", "ptr", pNodeNormalPen)
-                DllCall("gdiplus\GdipDeletePen", "ptr", pNodeHoverPen)
-                DllCall("gdiplus\GdipDeletePen", "ptr", pCenterHubPen)
-                DllCall("gdiplus\GdipDeletePen", "ptr", pTargetIconPen)
-                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontDir)
-                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontLabel)
-                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenter)
-                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenterAction)
-                DllCall("gdiplus\GdipDeleteFontFamily", "ptr", pFamily)
-                DllCall("gdiplus\GdipDeleteStringFormat", "ptr", pFormat)
-                DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
-                DllCall("SelectObject", "ptr", hMemDC, "ptr", hOldBmp)
-                DllCall("DeleteObject", "ptr", hBmp)
-                DllCall("DeleteDC", "ptr", hMemDC)
-                DllCall("ReleaseDC", "ptr", 0, "ptr", hDC)
-
-                if (clickedSlice == -2) {
-                    if (centerAction != "" && centerAction != "none") {
-                        ExecuteSystemAction(centerAction, "Radial Menu (Center Hub)")
-                    }
-                } else if (clickedSlice >= 0 && clickedSlice < cardinalMap.Length) {
-                    sourceIdx := cardinalMap[clickedSlice + 1]
-                    if (sourceIdx <= slices.Length) {
-                        actionName := slices[sourceIdx]
-                        if (actionName != "" && actionName != "none") {
-                            ExecuteSystemAction(actionName, "Radial Menu (" . dirs[clickedSlice + 1] . ")")
-                        }
-                    }
+                if (dist < (26.0 * dpiScale)) {
+                    clickedSlice := -2
+                } else if (dist <= (radSize + 40.0 * dpiScale) && selectedSlice >= 0) {
+                    clickedSlice := selectedSlice
+                } else {
+                    clickedSlice := -1
                 }
-            }
-
-            static AddRoundRectToPath(pPath, x, y, w, h, r) {
-                d := r * 2.0
-                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y, "float", d, "float", d, "float",
-                    180.0, "float", 90.0)
-                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y, "float", d, "float", d,
-                    "float", 270.0, "float", 90.0)
-                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y + h - d, "float", d,
-                    "float", d, "float", 0.0, "float", 90.0)
-                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y + h - d, "float", d, "float", d,
-                    "float", 90.0, "float", 90.0)
-                DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
+                break
             }
         }
 
-        ATan2(x, y) {
-            return DllCall("msvcrt\atan2", "Double", x, "Double", y, "Cdecl Double")
-        }
+        try ih.Stop()
 
-        ; ----------------------------------------------------------------------
-        ; Radial Menu (Pie Wheel) WASD Cluster Keyboard Interception Hotkeys
-        ; Active ONLY while the Radial Menu on-screen overlay is showing.
-        ; Intercepts and suppresses keystrokes to prevent pass-through to background apps.
-        ; ----------------------------------------------------------------------
-        #HotIf RadialMenuHUD.isShowing
-        *w:: RadialMenuHUD.OnHotKey("w")
-        *a:: RadialMenuHUD.OnHotKey("a")
-        *s:: RadialMenuHUD.OnHotKey("s")
-        *d:: RadialMenuHUD.OnHotKey("d")
-        *q:: RadialMenuHUD.OnHotKey("q")
-        *e:: RadialMenuHUD.OnHotKey("e")
-        *z:: RadialMenuHUD.OnHotKey("z")
-        *c:: RadialMenuHUD.OnHotKey("c")
-        *x:: RadialMenuHUD.OnHotKey("x")
-        *f:: RadialMenuHUD.OnHotKey("f")
-        *Space:: RadialMenuHUD.OnHotKey("space")
-        *Escape:: RadialMenuHUD.OnHotKey("escape")
-        #HotIf
+        this.guiObj.Destroy()
+        this.guiObj := 0
+        this.isShowing := false
+        RadialMenuHUD.pressedKey := ""
+
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pWheelBackdropBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pHoverWedgeBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeNormalBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeHoverBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pCenterHubBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTargetIconDotBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagNormalBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblNormalBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagHoverBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblHoverBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterNormalBrush)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterHoverBrush)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pWheelShadowPen)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pWheelBorderPen)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pSpokePen)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pNodeNormalPen)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pNodeHoverPen)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pCenterHubPen)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pTargetIconPen)
+        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontDir)
+        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontLabel)
+        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenter)
+        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenterAction)
+        DllCall("gdiplus\GdipDeleteFontFamily", "ptr", pFamily)
+        DllCall("gdiplus\GdipDeleteStringFormat", "ptr", pFormat)
+        DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
+        DllCall("SelectObject", "ptr", hMemDC, "ptr", hOldBmp)
+        DllCall("DeleteObject", "ptr", hBmp)
+        DllCall("DeleteDC", "ptr", hMemDC)
+        DllCall("ReleaseDC", "ptr", 0, "ptr", hDC)
+
+        if (clickedSlice == -2) {
+            if (centerAction != "" && centerAction != "none") {
+                ExecuteSystemAction(centerAction, "Radial Menu (Center Hub)")
+            }
+        } else if (clickedSlice >= 0 && clickedSlice < cardinalMap.Length) {
+            sourceIdx := cardinalMap[clickedSlice + 1]
+            if (sourceIdx <= slices.Length) {
+                actionName := slices[sourceIdx]
+                if (actionName != "" && actionName != "none") {
+                    ExecuteSystemAction(actionName, "Radial Menu (" . dirs[clickedSlice + 1] . ")")
+                }
+            }
+        }
+    }
+
+    static AddRoundRectToPath(pPath, x, y, w, h, r) {
+        d := r * 2.0
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y, "float", d, "float", d, "float", 180.0,
+            "float", 90.0)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y, "float", d, "float", d, "float",
+            270.0, "float", 90.0)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y + h - d, "float", d, "float", d,
+            "float", 0.0, "float", 90.0)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y + h - d, "float", d, "float", d, "float",
+            90.0, "float", 90.0)
+        DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
+    }
+}
+
+ATan2(x, y) {
+    return DllCall("msvcrt\atan2", "Double", x, "Double", y, "Cdecl Double")
+}
+
+; ----------------------------------------------------------------------
+; Radial Menu (Pie Wheel) WASD Cluster Keyboard Interception Hotkeys
+; Active ONLY while the Radial Menu on-screen overlay is showing.
+; Intercepts and suppresses keystrokes to prevent pass-through to background apps.
+; ----------------------------------------------------------------------
+#HotIf RadialMenuHUD.isShowing
+*w:: RadialMenuHUD.OnHotKey("w")
+*a:: RadialMenuHUD.OnHotKey("a")
+*s:: RadialMenuHUD.OnHotKey("s")
+*d:: RadialMenuHUD.OnHotKey("d")
+*q:: RadialMenuHUD.OnHotKey("q")
+*e:: RadialMenuHUD.OnHotKey("e")
+*z:: RadialMenuHUD.OnHotKey("z")
+*c:: RadialMenuHUD.OnHotKey("c")
+*x:: RadialMenuHUD.OnHotKey("x")
+*f:: RadialMenuHUD.OnHotKey("f")
+*Space:: RadialMenuHUD.OnHotKey("space")
+*Escape:: RadialMenuHUD.OnHotKey("escape")
+#HotIf

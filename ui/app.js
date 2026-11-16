@@ -739,8 +739,12 @@
       if (!container) {
         container = document.createElement('div');
         container.className = 'item-profiles-badges';
+        container.setAttribute('data-module', module);
         container.setAttribute('data-feature-key', key);
         parent.insertBefore(container, toggleWrapper);
+      } else {
+        container.setAttribute('data-module', module);
+        container.setAttribute('data-feature-key', key);
       }
 
       const activeProfiles = [];
@@ -773,6 +777,7 @@
 
       const totalProfCount = Object.keys(profiles).length;
       const isForcedFeature = Boolean((state.config.forcedFeatures && state.config.forcedFeatures[`${module}.${key}`]) ||
+        (profiles[currentProf] && profiles[currentProf][module] && profiles[currentProf][module].forcedAllProfiles && profiles[currentProf][module].forcedAllProfiles[key]) ||
         (totalProfCount > 1 && activeProfiles.length === totalProfCount));
 
       if (isForcedFeature) {
@@ -809,14 +814,39 @@
         const isCur = (pName === currentProf);
         const iconHtml = getProfileIconHtml(pName, prof);
         const tooltip = isCur
-          ? `Active in Profile: ${pName} (Current Profile)`
-          : `Active in Profile: ${pName} (Click to switch)`;
-        return `<div class="item-profile-badge ${isCur ? 'is-current' : ''}" title="${escapeHtml(tooltip)}" data-switch-profile="${escapeHtml(pName)}">${iconHtml}</div>`;
+          ? `Active in Profile: ${pName} (Current Profile) • Right-click to force on all profiles`
+          : `Active in Profile: ${pName} (Click to switch) • Right-click to force on all profiles`;
+        return `<div class="item-profile-badge ${isCur ? 'is-current' : ''}" title="${escapeHtml(tooltip)}" data-switch-profile="${escapeHtml(pName)}" data-module="${escapeHtml(module)}" data-feature-key="${escapeHtml(key)}">${iconHtml}</div>`;
       }).join('');
 
       container.innerHTML = badgesHtml;
       container.style.display = 'grid';
     });
+  }
+
+  function updateProfileLockButton() {
+    const btnLock = document.getElementById('btnLockProfile');
+    if (!btnLock) return;
+    const isLocked = !!(state.config && (state.config.profileLocked === 1 || state.config.profileLocked === true));
+    btnLock.classList.toggle('is-locked', isLocked);
+    const curProfile = (state.config && state.config.activeProfile) || 'Default';
+    if (isLocked) {
+      btnLock.title = `Profile "${curProfile}" is Locked (Auto-switching paused. Click to unlock)`;
+      btnLock.innerHTML = `
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      `;
+    } else {
+      btnLock.title = `Lock Profile "${curProfile}" (Prevent automatic switching)`;
+      btnLock.innerHTML = `
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+        </svg>
+      `;
+    }
   }
 
   function renderProfilesRibbon() {
@@ -850,6 +880,8 @@
       btnDelete.classList.toggle('is-disabled', !canDelete);
       btnDelete.title = canDelete ? `Delete Profile "${currentProfName}"` : 'Cannot delete Default profile';
     }
+
+    updateProfileLockButton();
 
     function createProfileCard(pName, isDef) {
       const prof = profiles[pName] || {};
@@ -1727,6 +1759,10 @@
     if (!switchEl && cardEl) {
       switchEl = cardEl.querySelector('.toggle-checkbox');
     }
+    if (!switchEl && featureKey) {
+      const def = FEATURE_SWITCH_DEFINITIONS.find(d => d.module === moduleName && d.key === featureKey);
+      if (def) switchEl = document.getElementById(def.id);
+    }
 
     if (itemId) {
       const items = (prof[moduleName] && prof[moduleName].items) || [];
@@ -1763,7 +1799,9 @@
     } else if (featureKey) {
       const mod = prof[moduleName] || {};
       let isEnabled = false;
-      if (featureKey === 'enabled' || featureKey === 'cornersEnabled' || featureKey === 'gesturesEnabled') {
+      if (switchEl) {
+        isEnabled = Boolean(switchEl.checked);
+      } else if (featureKey === 'enabled' || featureKey === 'cornersEnabled' || featureKey === 'gesturesEnabled') {
         isEnabled = (mod[featureKey] !== false && mod[featureKey] !== 0);
       } else {
         isEnabled = (mod[featureKey] === 1 || mod[featureKey] === true);
@@ -1797,13 +1835,22 @@
   function getScriptInfo(target) {
     if (!target) return null;
 
-    // Check if directly clicking a badge with module info
+    // 1. Check if directly clicking a badge or badges container
     const badge = target.closest('.item-profile-badge, .item-profiles-badges');
-    if (badge && badge.dataset.module && (badge.dataset.id || badge.dataset.featureKey)) {
-      return resolveScriptInfo(badge.dataset.module, badge.dataset.id, badge.dataset.featureKey, badge);
+    if (badge) {
+      const mod = badge.dataset.module;
+      const itemId = badge.dataset.id;
+      const fKey = badge.dataset.featureKey;
+      if (mod && (itemId || fKey)) {
+        return resolveScriptInfo(mod, itemId, fKey, badge);
+      }
+      if (fKey) {
+        const def = FEATURE_SWITCH_DEFINITIONS.find(d => d.key === fKey);
+        if (def) return resolveScriptInfo(def.module, null, def.key, badge);
+      }
     }
 
-    // Check if inside a card with data-module
+    // 2. Check if inside a card with data-module
     const card = target.closest('.shortcut-card, .key-remap-card, .app-card, .folder-card, .macro-card, .wm-card, .active-script-card');
     if (card) {
       const mod = card.dataset.module;
@@ -1823,7 +1870,21 @@
       }
     }
 
-    // Check if directly on or inside a toggle-wrapper
+    // 3. Check if inside a column header, column, or feature subcard
+    // E.g. Screen Hot Corners, Mouse Stroke Gestures, Radial Menu, Rocker Gestures
+    const featureContainer = target.closest('.mg-column-header, .mg-column, .rm-column-preview, .mg-config-subcard, .mg-title-group, .mg-header-meta');
+    if (featureContainer) {
+      const sw = featureContainer.querySelector('.toggle-checkbox') ||
+        (featureContainer.closest('.mg-column, .mg-column-header') ? featureContainer.closest('.mg-column, .mg-column-header').querySelector('.toggle-checkbox') : null);
+      if (sw && sw.id) {
+        const def = FEATURE_SWITCH_DEFINITIONS.find(d => d.id === sw.id);
+        if (def) {
+          return resolveScriptInfo(def.module, null, def.key, featureContainer, sw);
+        }
+      }
+    }
+
+    // 4. Check if directly on or inside a toggle-wrapper
     const toggleWrap = target.closest('.toggle-wrapper');
     if (toggleWrap) {
       const sw = toggleWrap.querySelector('.toggle-checkbox');
@@ -1837,6 +1898,13 @@
       if (parentCard) {
         return resolveScriptInfo(parentCard.dataset.module, parentCard.dataset.id, parentCard.dataset.featureKey, parentCard, sw);
       }
+    }
+
+    // 5. Fallback for entire Radial Menu panel
+    const rmPanel = target.closest('#panel-radialMenu');
+    if (rmPanel) {
+      const sw = document.getElementById('rmMasterSwitch');
+      if (sw) return resolveScriptInfo('radialMenu', null, 'enabled', rmPanel, sw);
     }
 
     return null;
@@ -4054,6 +4122,12 @@
       }
     });
 
+    const btnHcMonAll = document.getElementById('btnHcMonAll');
+    const btnHcMonPrimary = document.getElementById('btnHcMonPrimary');
+    const monMode = mg.monitorMode || 'all';
+    if (btnHcMonAll) btnHcMonAll.classList.toggle('active', monMode === 'all');
+    if (btnHcMonPrimary) btnHcMonPrimary.classList.toggle('active', monMode === 'primary');
+
     // 2. Mouse Stroke Gestures
     const gestureKeys = [
       { id: 'mgActionLeft', key: 'actionLeft', def: 'Back' },
@@ -4158,9 +4232,10 @@
       }
     }
 
-    // Corner Sensitive Zone Size Slider
+    // Corner Sensitive Zone Size Slider & Real Physical Monitor Previews
     const hcCornerSizeSlider = document.getElementById('hcCornerSizeSlider');
     const hcCornerSizeVal = document.getElementById('hcCornerSizeVal');
+
     if (hcCornerSizeSlider) {
       const size = mg.cornerSize || 14;
       hcCornerSizeSlider.value = size;
@@ -4169,16 +4244,71 @@
 
       if (!hcCornerSizeSlider.dataset.bound) {
         hcCornerSizeSlider.dataset.bound = 'true';
+        let previewFadeTimer = null;
+
         hcCornerSizeSlider.addEventListener('input', () => {
-          if (hcCornerSizeVal) hcCornerSizeVal.textContent = `${hcCornerSizeSlider.value} px`;
+          const val = parseInt(hcCornerSizeSlider.value, 10);
+          if (hcCornerSizeVal) hcCornerSizeVal.textContent = `${val} px`;
           updateSliderProgress(hcCornerSizeSlider);
+
+          // Real-time physical monitor overlay preview in the current theme color matching exact hit bounds
+          sendToAhk('previewCornerZones', { size: val, show: true });
+
+          clearTimeout(previewFadeTimer);
+          previewFadeTimer = setTimeout(() => {
+            sendToAhk('previewCornerZones', { show: false });
+          }, 1800);
         });
-        hcCornerSizeSlider.addEventListener('change', () => {
-          state.config.mouseGestures.cornerSize = parseInt(hcCornerSizeSlider.value, 10);
+
+        const finishCornerDrag = () => {
+          const val = parseInt(hcCornerSizeSlider.value, 10);
+          state.config.mouseGestures.cornerSize = val;
           updateSliderProgress(hcCornerSizeSlider);
+          clearTimeout(previewFadeTimer);
+          previewFadeTimer = setTimeout(() => {
+            sendToAhk('previewCornerZones', { show: false });
+          }, 1800);
           syncConfig();
-        });
+        };
+
+        hcCornerSizeSlider.addEventListener('change', finishCornerDrag);
+        hcCornerSizeSlider.addEventListener('pointerup', finishCornerDrag);
+        hcCornerSizeSlider.addEventListener('mouseup', finishCornerDrag);
+        hcCornerSizeSlider.addEventListener('touchend', finishCornerDrag);
       }
+    }
+
+    // Monitor Mode Pills (All Displays vs Primary Display Only)
+    const btnHcMonAll = document.getElementById('btnHcMonAll');
+    const btnHcMonPrimary = document.getElementById('btnHcMonPrimary');
+    const monMode = mg.monitorMode || 'all';
+
+    function setHcMonitorMode(mode) {
+      state.config.mouseGestures.monitorMode = mode;
+      if (btnHcMonAll) btnHcMonAll.classList.toggle('active', mode === 'all');
+      if (btnHcMonPrimary) btnHcMonPrimary.classList.toggle('active', mode === 'primary');
+    }
+
+    setHcMonitorMode(monMode);
+
+    if (btnHcMonAll && !btnHcMonAll.dataset.bound) {
+      btnHcMonAll.dataset.bound = 'true';
+      btnHcMonAll.addEventListener('click', () => {
+        setHcMonitorMode('all');
+        syncConfig();
+        const curSize = parseInt(hcCornerSizeSlider ? hcCornerSizeSlider.value : 14, 10);
+        sendToAhk('previewCornerZones', { size: curSize, show: true });
+      });
+    }
+
+    if (btnHcMonPrimary && !btnHcMonPrimary.dataset.bound) {
+      btnHcMonPrimary.dataset.bound = 'true';
+      btnHcMonPrimary.addEventListener('click', () => {
+        setHcMonitorMode('primary');
+        syncConfig();
+        const curSize = parseInt(hcCornerSizeSlider ? hcCornerSizeSlider.value : 14, 10);
+        sendToAhk('previewCornerZones', { size: curSize, show: true });
+      });
     }
 
     // 3. Screen Corner Action Dropdowns
@@ -8415,6 +8545,18 @@
     if (btnEditProfile) {
       btnEditProfile.addEventListener('click', () => {
         openProfileModal('edit');
+      });
+    }
+    const btnLockProfile = document.getElementById('btnLockProfile');
+    if (btnLockProfile && !btnLockProfile.dataset.bound) {
+      btnLockProfile.dataset.bound = 'true';
+      btnLockProfile.addEventListener('click', () => {
+        const isCurrentlyLocked = !!(state.config && (state.config.profileLocked === 1 || state.config.profileLocked === true));
+        state.config.profileLocked = isCurrentlyLocked ? 0 : 1;
+        updateProfileLockButton();
+        const curProfile = (state.config && state.config.activeProfile) || 'Default';
+        showToast(state.config.profileLocked ? `Profile "${curProfile}" Locked (Auto-switch suspended)` : `Profile "${curProfile}" Unlocked (Auto-switch active)`);
+        syncConfig();
       });
     }
     if (btnRenameProfile) {

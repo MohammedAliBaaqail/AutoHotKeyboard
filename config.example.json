@@ -1,6 +1,7 @@
 {
   "version": "2.0",
   "activeProfile": "Default",
+  "profileLocked": 0,
   "activeTab": "textExpander",
   "profiles": {
     "Default": {
