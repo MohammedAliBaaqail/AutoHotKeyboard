@@ -1509,305 +1509,343 @@
                 <!-- 8 Radial Slices around the perimeter -->
                 <div class="rm-slice-node rm-pos-n" data-slice="0" title="Slice 1: North">
                   <span class="rm-slice-tag">N</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl0">OCR</span>
-                </div>
-                <div class="rm-slice-node rm-pos-ne" data-slice="1" title="Slice 2: North-East">
-                  <span class="rm-slice-tag">NE</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl1">Next Desk</span>
-                </div>
-                <div class="rm-slice-node rm-pos-e" data-slice="2" title="Slice 3: East">
-                  <span class="rm-slice-tag">E</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl2">Color Pick</span>
-                </div>
-                <div class="rm-slice-node rm-pos-se" data-slice="3" title="Slice 4: South-East">
-                  <span class="rm-slice-tag">SE</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl3">Always On</span>
-                </div>
-                <div class="rm-slice-node rm-pos-s" data-slice="4" title="Slice 5: South">
-                  <span class="rm-slice-tag">S</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl4">Mute Audio</span>
-                </div>
-                <div class="rm-slice-node rm-pos-sw" data-slice="5" title="Slice 6: South-West">
-                  <span class="rm-slice-tag">SW</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl5">Clean Text</span>
-                </div>
-                <div class="rm-slice-node rm-pos-w" data-slice="6" title="Slice 7: West">
-                  <span class="rm-slice-tag">W</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl6">Prev Desk</span>
-                </div>
-                <div class="rm-slice-node rm-pos-nw" data-slice="7" title="Slice 8: North-West">
-                  <span class="rm-slice-tag">NW</span>
-                  <span class="rm-slice-lbl" id="rmSliceLbl7">Task View</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Column: Controls & 8 Slice Configurations -->
-          <div class="mg-column mg-column-gestures rm-column-controls">
-            <div class="mg-column-header">
-              <div class="mg-header-meta">
-                <div class="mg-icon-circle">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path
-                      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
-                    </path>
-                  </svg>
-                </div>
-                <div class="mg-title-group">
-                  <h3 class="mg-col-title">Trigger & Slice Setup</h3>
-                  <span class="mg-col-subtitle">Customize wheel size and assigned slice actions</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="mg-column-scroll">
-              <!-- Activation Config Subcard -->
-              <div class="mg-config-subcard">
-                <div class="mg-field-row">
-                  <span class="mg-field-lbl">Activation Trigger:</span>
-                  <select class="hc-select mg-trigger-select" id="rmTriggerSelect">
-                    <option value="none">Disabled (Off)</option>
-                    <option value="MButton">Middle Mouse Button (Hold & Release)</option>
-                    <option value="XButton1">Mouse Side Button 4 (Back)</option>
-                    <option value="XButton2">Mouse Side Button 5 (Forward)</option>
-                    <option value="CapsLock">Caps Lock Key</option>
-                    <option value="^SPACE">Ctrl + Space</option>
-                    <option value="#z">Win + Z</option>
-                  </select>
-                </div>
-
-                <!-- Wheel Radius Slider -->
-                <div class="mg-slider-card inline">
-                  <div class="mg-slider-header">
-                    <span class="mg-slider-label">Wheel Diameter:</span>
-                    <span class="mg-slider-val" id="rmRadiusVal">190 px</span>
+                  <!-- 8 Radial Slices around the perimeter (WASD-cluster keys) -->
+                  <div class="rm-slice-node rm-pos-n" data-slice="0" title="Slice 1: [W] (North / Up)">
+                    <span class="rm-slice-tag">W</span>
+                    <span class="rm-slice-lbl" id="rmSliceLbl0">OCR</span>
                   </div>
-                  <div class="mg-slider-row">
-                    <span class="slider-min-lbl">Compact (140px)</span>
-                    <div class="neumorphic-slider-container" style="flex: 1;">
-                      <input type="range" class="neumorphic-slider mg-slider" id="rmRadiusSlider" min="140" max="260"
-                        step="10" value="190">
+                  <div class="rm-slice-node rm-pos-ne" data-slice="1" title="Slice 2: North-East">
+                    <span class="rm-slice-tag">NE</span>
+                    <div class="rm-slice-node rm-pos-ne" data-slice="1" title="Slice 2: [E] (North-East / Up-Right)">
+                      <span class="rm-slice-tag">E</span>
+                      <span class="rm-slice-lbl" id="rmSliceLbl1">Next Desk</span>
                     </div>
-                    <span class="slider-max-lbl">Spacious (260px)</span>
-                  </div>
-                </div>
+                    <div class="rm-slice-node rm-pos-e" data-slice="2" title="Slice 3: East">
+                      <span class="rm-slice-tag">E</span>
+                      <div class="rm-slice-node rm-pos-e" data-slice="2" title="Slice 3: [D] (East / Right)">
+                        <span class="rm-slice-tag">D</span>
+                        <span class="rm-slice-lbl" id="rmSliceLbl2">Color Pick</span>
+                      </div>
+                      <div class="rm-slice-node rm-pos-se" data-slice="3" title="Slice 4: South-East">
+                        <span class="rm-slice-tag">SE</span>
+                        <div class="rm-slice-node rm-pos-se" data-slice="3"
+                          title="Slice 4: [C] (South-East / Down-Right)">
+                          <span class="rm-slice-tag">C</span>
+                          <span class="rm-slice-lbl" id="rmSliceLbl3">Always On</span>
+                        </div>
+                        <div class="rm-slice-node rm-pos-s" data-slice="4" title="Slice 5: South">
+                          <div class="rm-slice-node rm-pos-s" data-slice="4" title="Slice 5: [S] (South / Down)">
+                            <span class="rm-slice-tag">S</span>
+                            <span class="rm-slice-lbl" id="rmSliceLbl4">Mute Audio</span>
+                          </div>
+                          <div class="rm-slice-node rm-pos-sw" data-slice="5" title="Slice 6: South-West">
+                            <span class="rm-slice-tag">SW</span>
+                            <div class="rm-slice-node rm-pos-sw" data-slice="5"
+                              title="Slice 6: [Z] (South-West / Down-Left)">
+                              <span class="rm-slice-tag">Z</span>
+                              <span class="rm-slice-lbl" id="rmSliceLbl5">Clean Text</span>
+                            </div>
+                            <div class="rm-slice-node rm-pos-w" data-slice="6" title="Slice 7: West">
+                              <span class="rm-slice-tag">W</span>
+                              <div class="rm-slice-node rm-pos-w" data-slice="6" title="Slice 7: [A] (West / Left)">
+                                <span class="rm-slice-tag">A</span>
+                                <span class="rm-slice-lbl" id="rmSliceLbl6">Prev Desk</span>
+                              </div>
+                              <div class="rm-slice-node rm-pos-nw" data-slice="7" title="Slice 8: North-West">
+                                <span class="rm-slice-tag">NW</span>
+                                <div class="rm-slice-node rm-pos-nw" data-slice="7"
+                                  title="Slice 8: [Q] (North-West / Up-Left)">
+                                  <span class="rm-slice-tag">Q</span>
+                                  <span class="rm-slice-lbl" id="rmSliceLbl7">Task View</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
 
-                <!-- Slice Mode (8 Slices vs 4 Slices) -->
-                <div class="mg-field-row" style="margin-top: 6px;">
-                  <span class="mg-field-lbl">Slice Layout Mode:</span>
-                  <div class="trigger-mode-pills" id="rmSliceModePills" role="toolbar" aria-label="Radial Menu Slices">
-                    <button type="button" class="trigger-pill active" id="btnRmSlices8" data-slices="8">8
-                      Slices</button>
-                    <button type="button" class="trigger-pill" id="btnRmSlices4" data-slices="4">4 Slices</button>
-                  </div>
-                </div>
+                          <!-- Right Column: Controls & 8 Slice Configurations -->
+                          <div class="mg-column mg-column-gestures rm-column-controls">
+                            <div class="mg-column-header">
+                              <div class="mg-header-meta">
+                                <div class="mg-icon-circle">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path
+                                      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                                    </path>
+                                  </svg>
+                                </div>
+                                <div class="mg-title-group">
+                                  <h3 class="mg-col-title">Trigger & Slice Setup</h3>
+                                  <span class="mg-col-subtitle">Customize wheel size and assigned slice actions</span>
+                                </div>
+                              </div>
+                            </div>
 
-                <!-- Center Hub Click Action -->
-                <div class="mg-field-row" style="margin-top: 4px;">
-                  <span class="mg-field-lbl">Center Hub Click:</span>
-                  <select class="hc-select mg-action-select" id="rmCenterActionSelect">
-                    <option value="none">Dismiss / Cancel Menu</option>
-                    <option value="TaskView">Task View (Win+Tab)</option>
-                    <option value="ShowDesktop">Show Desktop (Win+D)</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                  </select>
-                </div>
-              </div>
+                            <div class="mg-column-scroll">
+                              <!-- Activation Config Subcard -->
+                              <div class="mg-config-subcard">
+                                <div class="mg-field-row">
+                                  <span class="mg-field-lbl">Activation Trigger:</span>
+                                  <select class="hc-select mg-trigger-select" id="rmTriggerSelect">
+                                    <option value="none">Disabled (Off)</option>
+                                    <option value="MButton">Middle Mouse Button (Hold & Release)</option>
+                                    <option value="XButton1">Mouse Side Button 4 (Back)</option>
+                                    <option value="XButton2">Mouse Side Button 5 (Forward)</option>
+                                    <option value="CapsLock">Caps Lock Key</option>
+                                    <option value="^SPACE">Ctrl + Space</option>
+                                    <option value="#z">Win + Z</option>
+                                  </select>
+                                </div>
 
-              <!-- 8 Slices Configurations Grid -->
-              <div class="mg-gestures-grid">
-                <!-- Slice 0: North -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">↑</span>
-                    <div class="mg-gesture-name">Slice 1 (North)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction0" data-slice="0">
-                    <option value="ScreenOcr">Instant Screen OCR (Text Grabber)</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="TaskView">Task View (Win+Tab)</option>
-                    <option value="ShowDesktop">Show Desktop (Win+D)</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
+                                <!-- Wheel Radius Slider -->
+                                <div class="mg-slider-card inline">
+                                  <div class="mg-slider-header">
+                                    <span class="mg-slider-label">Wheel Diameter:</span>
+                                    <span class="mg-slider-val" id="rmRadiusVal">190 px</span>
+                                  </div>
+                                  <div class="mg-slider-row">
+                                    <span class="slider-min-lbl">Compact (140px)</span>
+                                    <div class="neumorphic-slider-container" style="flex: 1;">
+                                      <input type="range" class="neumorphic-slider mg-slider" id="rmRadiusSlider"
+                                        min="140" max="260" step="10" value="190">
+                                    </div>
+                                    <span class="slider-max-lbl">Spacious (260px)</span>
+                                  </div>
+                                </div>
 
-                <!-- Slice 1: North-East -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">↗</span>
-                    <div class="mg-gesture-name">Slice 2 (North-East)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction1" data-slice="1">
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="TaskView">Task View</option>
-                    <option value="ShowDesktop">Show Desktop</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
+                                <!-- Slice Mode (8 Slices vs 4 Slices) -->
+                                <div class="mg-field-row" style="margin-top: 6px;">
+                                  <span class="mg-field-lbl">Slice Layout Mode:</span>
+                                  <div class="trigger-mode-pills" id="rmSliceModePills" role="toolbar"
+                                    aria-label="Radial Menu Slices">
+                                    <button type="button" class="trigger-pill active" id="btnRmSlices8"
+                                      data-slices="8">8
+                                      Slices</button>
+                                    <button type="button" class="trigger-pill" id="btnRmSlices4" data-slices="4">4
+                                      Slices</button>
+                                  </div>
+                                </div>
 
-                <!-- Slice 2: East -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">→</span>
-                    <div class="mg-gesture-name">Slice 3 (East)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction2" data-slice="2">
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="TaskView">Task View</option>
-                    <option value="ShowDesktop">Show Desktop</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
+                                <!-- Center Hub Click Action -->
+                                <div class="mg-field-row" style="margin-top: 4px;">
+                                  <span class="mg-field-lbl">Center Hub Click:</span>
+                                  <select class="hc-select mg-action-select" id="rmCenterActionSelect">
+                                    <option value="none">Dismiss / Cancel Menu</option>
+                                    <option value="TaskView">Task View (Win+Tab)</option>
+                                    <option value="ShowDesktop">Show Desktop (Win+D)</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                  </select>
+                                </div>
+                              </div>
 
-                <!-- Slice 3: South-East -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">↘</span>
-                    <div class="mg-gesture-name">Slice 4 (South-East)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction3" data-slice="3">
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="TaskView">Task View</option>
-                    <option value="ShowDesktop">Show Desktop</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
+                              <!-- 8 Slices Configurations Grid -->
+                              <div class="mg-gestures-grid">
+                                <!-- Slice 0: North -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">↑</span>
+                                    <div class="mg-gesture-name">Slice 1 (North)</div>
+                                    <div class="mg-gesture-name">Slice 1: [W] (North)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction0"
+                                    data-slice="0">
+                                    <option value="ScreenOcr">Instant Screen OCR (Text Grabber)</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="TaskView">Task View (Win+Tab)</option>
+                                    <option value="ShowDesktop">Show Desktop (Win+D)</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
 
-                <!-- Slice 4: South -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">↓</span>
-                    <div class="mg-gesture-name">Slice 5 (South)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction4" data-slice="4">
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="TaskView">Task View</option>
-                    <option value="ShowDesktop">Show Desktop</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
+                                <!-- Slice 1: North-East -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">↗</span>
+                                    <div class="mg-gesture-name">Slice 2 (North-East)</div>
+                                    <div class="mg-gesture-name">Slice 2: [E] (North-East)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction1"
+                                    data-slice="1">
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="TaskView">Task View</option>
+                                    <option value="ShowDesktop">Show Desktop</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
 
-                <!-- Slice 5: South-West -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">↙</span>
-                    <div class="mg-gesture-name">Slice 6 (South-West)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction5" data-slice="5">
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="TaskView">Task View</option>
-                    <option value="ShowDesktop">Show Desktop</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
+                                <!-- Slice 2: East -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">→</span>
+                                    <div class="mg-gesture-name">Slice 3 (East)</div>
+                                    <div class="mg-gesture-name">Slice 3: [D] (East)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction2"
+                                    data-slice="2">
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="TaskView">Task View</option>
+                                    <option value="ShowDesktop">Show Desktop</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
 
-                <!-- Slice 6: West -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">←</span>
-                    <div class="mg-gesture-name">Slice 7 (West)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction6" data-slice="6">
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="TaskView">Task View</option>
-                    <option value="ShowDesktop">Show Desktop</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
+                                <!-- Slice 3: South-East -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">↘</span>
+                                    <div class="mg-gesture-name">Slice 4 (South-East)</div>
+                                    <div class="mg-gesture-name">Slice 4: [C] (South-East)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction3"
+                                    data-slice="3">
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="TaskView">Task View</option>
+                                    <option value="ShowDesktop">Show Desktop</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
 
-                <!-- Slice 7: North-West -->
-                <div class="mg-gesture-card">
-                  <div class="mg-gesture-dir">
-                    <span class="mg-arrow-icon">↖</span>
-                    <div class="mg-gesture-name">Slice 8 (North-West)</div>
-                  </div>
-                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction7" data-slice="7">
-                    <option value="TaskView">Task View (Win+Tab)</option>
-                    <option value="ShowDesktop">Show Desktop (Win+D)</option>
-                    <option value="ScreenOcr">Instant Screen OCR</option>
-                    <option value="ColorPicker">Precision Color Picker</option>
-                    <option value="NextDesktop">Next Virtual Desktop</option>
-                    <option value="PrevDesktop">Previous Virtual Desktop</option>
-                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
-                    <option value="GhostMode">Toggle Ghost Click-Through</option>
-                    <option value="MuteVolume">Toggle Audio Mute</option>
-                    <option value="Calculator">Launch Calculator</option>
-                    <option value="CleanText">Clean Plain Text</option>
-                    <option value="Screenshot">Screen Snip</option>
-                    <option value="none">Disabled</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+                                <!-- Slice 4: South -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">↓</span>
+                                    <div class="mg-gesture-name">Slice 5 (South)</div>
+                                    <div class="mg-gesture-name">Slice 5: [S] (South)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction4"
+                                    data-slice="4">
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="TaskView">Task View</option>
+                                    <option value="ShowDesktop">Show Desktop</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
+
+                                <!-- Slice 5: South-West -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">↙</span>
+                                    <div class="mg-gesture-name">Slice 6 (South-West)</div>
+                                    <div class="mg-gesture-name">Slice 6: [Z] (South-West)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction5"
+                                    data-slice="5">
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="TaskView">Task View</option>
+                                    <option value="ShowDesktop">Show Desktop</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
+
+                                <!-- Slice 6: West -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">←</span>
+                                    <div class="mg-gesture-name">Slice 7 (West)</div>
+                                    <div class="mg-gesture-name">Slice 7: [A] (West)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction6"
+                                    data-slice="6">
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="TaskView">Task View</option>
+                                    <option value="ShowDesktop">Show Desktop</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
+
+                                <!-- Slice 7: North-West -->
+                                <div class="mg-gesture-card">
+                                  <div class="mg-gesture-dir">
+                                    <span class="mg-arrow-icon">↖</span>
+                                    <div class="mg-gesture-name">Slice 8 (North-West)</div>
+                                    <div class="mg-gesture-name">Slice 8: [Q] (North-West)</div>
+                                  </div>
+                                  <select class="hc-select mg-action-select rm-slice-select" id="rmAction7"
+                                    data-slice="7">
+                                    <option value="TaskView">Task View (Win+Tab)</option>
+                                    <option value="ShowDesktop">Show Desktop (Win+D)</option>
+                                    <option value="ScreenOcr">Instant Screen OCR</option>
+                                    <option value="ColorPicker">Precision Color Picker</option>
+                                    <option value="NextDesktop">Next Virtual Desktop</option>
+                                    <option value="PrevDesktop">Previous Virtual Desktop</option>
+                                    <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+                                    <option value="GhostMode">Toggle Ghost Click-Through</option>
+                                    <option value="MuteVolume">Toggle Audio Mute</option>
+                                    <option value="Calculator">Launch Calculator</option>
+                                    <option value="CleanText">Clean Plain Text</option>
+                                    <option value="Screenshot">Screen Snip</option>
+                                    <option value="none">Disabled</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
       </section>
 
       <!-- ====================================================================
@@ -2775,7 +2813,8 @@
               <div class="profile-option-header">
                 <div class="profile-option-text">
                   <span class="option-title" id="profHoverTitle">Auto-Switch Profile</span>
-                  <span class="option-desc" id="profTriggerDesc">Active. Switches to this profile whenever its target window gains focus.</span>
+                  <span class="option-desc" id="profTriggerDesc">Active. Switches to this profile whenever its target
+                    window gains focus.</span>
                 </div>
                 <div class="toggle-wrapper" title="Enable / Disable Auto-Switch for this profile">
                   <input class="toggle-checkbox" type="checkbox" id="profSwitchAutoSwitch" checked>
@@ -2785,8 +2824,10 @@
                 </div>
               </div>
               <div class="trigger-mode-pills" id="profAutoSwitchPills" role="toolbar" aria-label="Auto Switch Trigger">
-                <button type="button" class="trigger-pill active" id="chipTriggerFocus" data-trigger="focus">Window Focus</button>
-                <button type="button" class="trigger-pill" id="chipTriggerHover" data-trigger="hover">Mouse Hover</button>
+                <button type="button" class="trigger-pill active" id="chipTriggerFocus" data-trigger="focus">Window
+                  Focus</button>
+                <button type="button" class="trigger-pill" id="chipTriggerHover" data-trigger="hover">Mouse
+                  Hover</button>
               </div>
             </div>
 
@@ -2795,7 +2836,8 @@
               <div class="profile-option-header">
                 <div class="profile-option-text">
                   <span class="option-title">Show App Icon on Switch</span>
-                  <span class="option-desc">Display a sleek floating on-screen HUD badge showing the target app icon whenever switched.</span>
+                  <span class="option-desc">Display a sleek floating on-screen HUD badge showing the target app icon
+                    whenever switched.</span>
                 </div>
                 <div class="toggle-wrapper" title="Show app icon popup on profile switch">
                   <input class="toggle-checkbox" type="checkbox" id="profSwitchOsdIcon" checked>

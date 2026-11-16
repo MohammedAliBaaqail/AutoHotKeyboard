@@ -567,6 +567,20 @@ body {
   min-width: 0;
   scroll-behavior: smooth;
   position: relative;
+  cursor: grab;
+}
+
+.lgs-profiles-track.is-dragging,
+.lgs-profiles-track.is-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+  scroll-behavior: auto !important;
+}
+
+.lgs-carousel-wrap.is-dragging,
+.lgs-carousel-wrap.is-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
 }
 
 .lgs-profiles-track::-webkit-scrollbar,
@@ -4976,7 +4990,9 @@ body.window-maximized .resize-handle {
   height: 100%;
   flex: 1 1 0;
   min-height: 0;
-  overflow: hidden;
+  padding: 10px 4px 12px 4px;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 #panel-mouseGestures.active,
@@ -4985,7 +5001,9 @@ body.window-maximized .resize-handle {
   height: 100%;
   flex: 1 1 0;
   min-height: 0;
-  overflow: hidden;
+  padding: 10px 4px 12px 4px;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .modules-container:has(#panel-mouseGestures.active),
@@ -5001,6 +5019,7 @@ body.window-maximized .resize-handle {
         height: 100%;
         min-height: 0;
         flex: 1 1 0;
+        box-sizing: border-box;
       }
 
       @media (max-width: 900px) {

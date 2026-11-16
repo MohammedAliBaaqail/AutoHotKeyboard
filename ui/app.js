@@ -369,7 +369,11 @@
   let ahkMsgQueue = [];
   function sendToAhk(action, data = {}) {
     if (window.chrome && window.chrome.webview) {
-      window.chrome.webview.postMessage(JSON.stringify({ action, ...data }));
+      try {
+        window.chrome.webview.postMessage(JSON.stringify({ action, ...data }));
+      } catch (e) {
+        console.warn('sendToAhk postMessage caught:', e);
+      }
     } else {
       ahkMsgQueue.push({ action, data });
     }
@@ -876,7 +880,12 @@
       card.appendChild(iconBox);
       card.appendChild(infoCol);
 
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (e) => {
+        if (hasProfilesDragged) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         if (state.config.activeProfile !== pName) {
           switchProfile(pName);
         } else {
@@ -884,7 +893,12 @@
         }
       });
 
-      card.addEventListener('dblclick', () => {
+      card.addEventListener('dblclick', (e) => {
+        if (hasProfilesDragged) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         openProfileModal('edit');
       });
 
@@ -1221,6 +1235,7 @@
   // ==========================================================================
   let activeContextProfile = null;
   let profileScriptsClipboard = null;
+  let hasProfilesDragged = false;
   try {
     const saved = localStorage.getItem('ahk_profile_clipboard');
     if (saved) profileScriptsClipboard = JSON.parse(saved);
@@ -8415,6 +8430,8 @@
     const btnScrollProfilesLeft = document.getElementById('btnScrollProfilesLeft');
     const btnScrollProfilesRight = document.getElementById('btnScrollProfilesRight');
     const lgsProfilesTrack = document.getElementById('lgsProfilesTrack');
+    const lgsCarouselWrap = document.querySelector('.lgs-carousel-wrap');
+
     if (btnScrollProfilesLeft && lgsProfilesTrack) {
       btnScrollProfilesLeft.addEventListener('click', () => {
         lgsProfilesTrack.scrollBy({ left: -220, behavior: 'smooth' });
@@ -8431,13 +8448,85 @@
       lgsProfilesTrack.addEventListener('scroll', () => {
         updateProfilesScrollButtons();
       });
-      lgsProfilesTrack.addEventListener('wheel', (e) => {
+
+      const handleProfilesWheel = (e) => {
         if (e.deltaY) {
           e.preventDefault();
           lgsProfilesTrack.scrollLeft += e.deltaY;
           updateProfilesScrollButtons();
         }
-      }, { passive: false });
+      };
+      lgsProfilesTrack.addEventListener('wheel', handleProfilesWheel, { passive: false });
+      if (lgsCarouselWrap) {
+        lgsCarouselWrap.addEventListener('wheel', handleProfilesWheel, { passive: false });
+      }
+
+      // Profiles Ribbon (Left-Mouse Hold & Drag Horizontal Scrolling)
+      let isProfilesDragging = false;
+      let profilesStartX = 0;
+      let profilesScrollLeft = 0;
+
+      const onProfilesMouseDown = (e) => {
+        if (e.button !== 0) return; // Left mouse button only
+        if (e.target.closest('.lgs-scroll-btn')) return; // Allow clicking scroll buttons
+
+        // Only initiate drag if profiles track has scrollable overflow
+        if (lgsProfilesTrack.scrollWidth <= lgsProfilesTrack.clientWidth + 2) return;
+
+        isProfilesDragging = true;
+        hasProfilesDragged = false;
+        profilesStartX = e.pageX;
+        profilesScrollLeft = lgsProfilesTrack.scrollLeft;
+      };
+
+      if (lgsCarouselWrap) {
+        lgsCarouselWrap.addEventListener('mousedown', onProfilesMouseDown);
+      } else {
+        lgsProfilesTrack.addEventListener('mousedown', onProfilesMouseDown);
+      }
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isProfilesDragging) return;
+        const walk = e.pageX - profilesStartX;
+        if (Math.abs(walk) > 4) {
+          if (!hasProfilesDragged) {
+            hasProfilesDragged = true;
+            lgsProfilesTrack.classList.add('is-dragging');
+            if (lgsCarouselWrap) lgsCarouselWrap.classList.add('is-dragging');
+          }
+          lgsProfilesTrack.scrollLeft = profilesScrollLeft - walk;
+          updateProfilesScrollButtons();
+        }
+      });
+
+      const endProfilesDrag = () => {
+        if (isProfilesDragging) {
+          isProfilesDragging = false;
+          lgsProfilesTrack.classList.remove('is-dragging');
+          if (lgsCarouselWrap) lgsCarouselWrap.classList.remove('is-dragging');
+          if (hasProfilesDragged) {
+            setTimeout(() => {
+              hasProfilesDragged = false;
+            }, 80);
+          }
+        }
+      };
+
+      window.addEventListener('mouseup', endProfilesDrag);
+      window.addEventListener('blur', endProfilesDrag);
+
+      // Capture-phase click interceptor on carousel wrapper to guarantee no card switch upon releasing drag
+      const interceptProfilesClick = (e) => {
+        if (hasProfilesDragged) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+        }
+      };
+      if (lgsCarouselWrap) {
+        lgsCarouselWrap.addEventListener('click', interceptProfilesClick, true);
+      }
+      lgsProfilesTrack.addEventListener('click', interceptProfilesClick, true);
     }
     const profileSearchInput = document.getElementById('profileSearchInput');
     if (profileSearchInput) {

@@ -40,16 +40,16 @@ if (!(Test-Path $baseAhk)) {
 
 # 2. Compile Standalone Application Executable
 Write-Host "`n[1/2] Compiling AutoHotKeyboard.exe..." -ForegroundColor Yellow
-$compileArgs = @(
-    "/in", "`"$mainScript`"",
-    "/out", "`"$outputExe`"",
-    "/icon", "`"$appIcon`"",
-    "/base", "`"$baseAhk`""
-)
+Stop-Process -Name "AutoHotKeyboard" -Force -ErrorAction SilentlyContinue
 
-$proc = Start-Process -FilePath $ahk2exe -ArgumentList $compileArgs -Wait -PassThru -NoNewWindow
-if ($proc.ExitCode -ne 0 -or !(Test-Path $outputExe)) {
-    throw "Failed to compile AutoHotKeyboard.exe (ExitCode: $($proc.ExitCode))"
+Push-Location $rootDir
+try {
+    & $ahk2exe /in "main.ahk" /out "AutoHotKeyboard.exe" /icon "app-icon.ico" /base $baseAhk
+} finally {
+    Pop-Location
+}
+if (!(Test-Path $outputExe)) {
+    throw "Failed to compile AutoHotKeyboard.exe"
 }
 $exeItem = Get-Item $outputExe
 Write-Host " [SUCCESS] Built: $($exeItem.Name) ($([math]::Round($exeItem.Length / 1MB, 2)) MB)" -ForegroundColor Green
@@ -57,8 +57,24 @@ Write-Host " [SUCCESS] Built: $($exeItem.Name) ($([math]::Round($exeItem.Length 
 # 3. Compile Windows Setup Installer
 if ($iscc) {
     Write-Host "`n[2/2] Compiling Windows Setup Installer with Inno Setup..." -ForegroundColor Yellow
-    $isccProc = Start-Process -FilePath $iscc -ArgumentList "`"$issScript`"" -Wait -PassThru -NoNewWindow
-    if ($isccProc.ExitCode -ne 0 -or !(Test-Path $setupExe)) {
+    Start-Sleep -Milliseconds 800
+    
+    $maxAttempts = 3
+    $attempt = 1
+    $success = $false
+    while ($attempt -le $maxAttempts -and !$success) {
+        $isccProc = Start-Process -FilePath $iscc -ArgumentList "`"$issScript`"" -Wait -PassThru -NoNewWindow
+        if ($isccProc.ExitCode -eq 0 -and (Test-Path $setupExe)) {
+            $success = $true
+        } else {
+            if ($attempt -lt $maxAttempts) {
+                Write-Host " Setup compilation encountered lock, retrying in 1.5s (Attempt $attempt of $maxAttempts)..." -ForegroundColor DarkYellow
+                Start-Sleep -Milliseconds 1500
+            }
+            $attempt++
+        }
+    }
+    if (!$success) {
         throw "Failed to compile AutoHotKeyboard_Setup.exe (ExitCode: $($isccProc.ExitCode))"
     }
     $setupItem = Get-Item $setupExe

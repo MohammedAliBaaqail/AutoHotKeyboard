@@ -111,11 +111,32 @@ global g_MacroDefDelay := 50
 global g_MacroActiveTimers := Map()
 global g_MacroActiveKeys := Map()
 global g_MacroIsExecuting := false
+global g_IsExiting := false
 
 LogMessage(msg) {
     OutputDebug("[AutoHotKeyboard] " . msg)
-    try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") . " [AutoHotKeyboard] " . msg . "`n", A_ScriptDir . "\debug.log", "UTF-8")
+    try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") . " [AutoHotKeyboard] " . msg . "`n", A_ScriptDir . "\debug.log",
+    "UTF-8")
 }
+
+GlobalErrorHandler(thrown, mode) {
+    global g_IsExiting
+    errDetail := FormatTime(, "yyyy-MM-dd HH:mm:ss") . " [ERROR] " . thrown.Message
+    if (thrown.HasProp("Extra") && thrown.Extra != "")
+        errDetail .= " (Specifically: " . thrown.Extra . ")"
+    if (thrown.HasProp("File") && thrown.File != "")
+        errDetail .= "`n  File: " . thrown.File
+    if (thrown.HasProp("Line") && thrown.Line != "")
+        errDetail .= " (Line: " . thrown.Line . ")"
+    if (thrown.HasProp("What") && thrown.What != "")
+        errDetail .= "`n  In: " . thrown.What
+    if (thrown.HasProp("Stack") && thrown.Stack != "")
+        errDetail .= "`n  Stack:`n" . thrown.Stack
+    LogMessage(errDetail)
+    if (mode = "Exit" || g_IsExiting)
+        return 1
+}
+OnError(GlobalErrorHandler)
 
 ; Initialize Application
 try {
@@ -123,7 +144,7 @@ try {
     CreateMainWindow()
     SetupTrayMenu()
 } catch as err {
-    FileAppend("Error: " . err.Message . "`n" . err.Stack . "`n", A_ScriptDir . "\ahk_error.log", "UTF-8")
+    LogMessage("Startup Error: " . err.Message . "`n" . err.Stack)
     MsgBox("Startup Error: " . err.Message, "Error", 16)
 }
 OnExit(OnAppExit)
@@ -136,17 +157,17 @@ SaveWindowState() {
         minMax := WinGetMinMax("ahk_id " . g_MainGui.Hwnd)
         isMax := (minMax = 1)
         isMin := (minMax = -1)
-        
+
         if (!g_Config.Has("window") || !IsObject(g_Config["window"])) {
             g_Config["window"] := Map()
         }
         g_Config["window"]["isMaximized"] := isMax ? 1 : 0
-        
+
         g_MainGui.GetPos(&curX, &curY)
         g_MainGui.GetClientPos(&dummyX, &dummyY, &curW, &curH)
         targetMon := GetMonitorFromRect(curX, curY, curW, curH)
         g_Config["window"]["monitor"] := targetMon
-        
+
         ; Only save restored dimensions when the window is neither maximized nor minimized
         if (!isMax && !isMin) {
             if (curW >= 720 && curH >= 520) {
@@ -170,14 +191,17 @@ SaveWindowState() {
 }
 
 OnAppExit(exitReason, exitCode) {
-    global g_Wvc, g_MainGui, g_Config
-    SetTimer(CheckActiveAppFocus, 0)
-    SetTimer(CheckAutoProfileSwitch, 0)
-    ProfileOsdHUD.Hide()
-    SaveWindowState()
-    SaveConfigToFile()
-    StopAutoClicker()
-    UnregisterAllHooks()
+    global g_Wvc, g_MainGui, g_Config, g_IsExiting
+    g_IsExiting := true
+    try SetTimer(CheckActiveAppFocus, 0)
+    try SetTimer(CheckAutoProfileSwitch, 0)
+    try SetTimer(SaveWindowSizeDebounced, 0)
+    try ProfileOsdHUD.Hide()
+    try SaveWindowState()
+    try SaveConfigToFile()
+    try StopAutoClicker()
+    try UnregisterAllHooks()
+    try CloseColorPickerLoupe()
     if (g_Wvc) {
         try g_Wvc.Close()
         g_Wvc := 0
@@ -190,13 +214,13 @@ OnAppExit(exitReason, exitCode) {
 
 InitConfig() {
     global g_Config, g_IsEngineActive, CONFIG_FILE
-    
+
     if (FileExist(CONFIG_FILE)) {
         try {
             content := FileRead(CONFIG_FILE, "UTF-8")
             if (Trim(content) != "") {
                 g_Config := JSON.parse(content, false, true)
-                
+
                 ; Migration check for legacy config formats
                 if (!g_Config.Has("textExpander") && g_Config.Has("shortcuts")) {
                     g_Config["textExpander"] := Map(
@@ -204,7 +228,7 @@ InitConfig() {
                         "items", g_Config["shortcuts"]
                     )
                 }
-                
+
                 ; Fill any missing module defaults
                 defaults := GetDefaultConfig()
                 for modName, modVal in defaults {
@@ -214,7 +238,7 @@ InitConfig() {
                 }
                 ; Always default to Text Expander tab on startup
                 g_Config["activeTab"] := "textExpander"
-                
+
                 ; Ensure theme has all Neumorphism parameters
                 if (g_Config.Has("theme") && IsObject(g_Config["theme"])) {
                     themeMap := g_Config["theme"]
@@ -240,11 +264,12 @@ InitConfig() {
                         themeMap["customPresets"] := []
                     }
                 }
-                
+
                 ; Ensure window custom size is tracked and valid
                 if (!g_Config.Has("window") || !IsObject(g_Config["window"])) {
                     GetDefaultWindowSize(&defW, &defH, &defX, &defY)
-                    g_Config["window"] := Map("widthPercent", DEFAULT_WINDOW_WIDTH_PCT, "heightPercent", DEFAULT_WINDOW_HEIGHT_PCT, "width", defW, "height", defH)
+                    g_Config["window"] := Map("widthPercent", DEFAULT_WINDOW_WIDTH_PCT, "heightPercent",
+                        DEFAULT_WINDOW_HEIGHT_PCT, "width", defW, "height", defH)
                 }
             } else {
                 g_Config := GetDefaultConfig()
@@ -259,7 +284,7 @@ InitConfig() {
         g_Config := GetDefaultConfig()
         SaveConfigToFile()
     }
-    
+
     ; Master engine toggle state
     if g_Config.Has("enabled") {
         g_IsEngineActive := (g_Config["enabled"] = true || g_Config["enabled"] = 1)
@@ -267,7 +292,7 @@ InitConfig() {
         g_IsEngineActive := true
         g_Config["enabled"] := true
     }
-    
+
     ApplyAllModules()
     ProfileAppScanner.EnsureAllProfileIcons()
     ProfileAppScanner.CleanAllCachedIcons()
@@ -281,7 +306,8 @@ GetDefaultConfig() {
             "enabled", true,
             "items", [
                 Map("id", "te-1", "input", "@@1", "output", "myemail@gmail.com", "multiline", false),
-                Map("id", "te-2", "input", "@@sig", "output", "Best regards,`nYour Name`nSenior Engineer", "multiline", true)
+                Map("id", "te-2", "input", "@@sig", "output", "Best regards,`nYour Name`nSenior Engineer", "multiline",
+                    true)
             ]
         ),
         "keyRemapper", Map(
@@ -328,9 +354,12 @@ GetDefaultConfig() {
         "appLauncher", Map(
             "enabled", true,
             "items", [
-                Map("id", "al-1", "trigger", "@calc", "triggerType", "string", "target", "calc.exe", "name", "Calculator"),
-                Map("id", "al-2", "trigger", "@yt", "triggerType", "string", "target", "https://www.youtube.com", "name", "YouTube"),
-                Map("id", "al-3", "trigger", "@gh", "triggerType", "string", "target", "https://github.com", "name", "GitHub")
+                Map("id", "al-1", "trigger", "@calc", "triggerType", "string", "target", "calc.exe", "name",
+                    "Calculator"),
+                Map("id", "al-2", "trigger", "@yt", "triggerType", "string", "target", "https://www.youtube.com",
+                    "name", "YouTube"),
+                Map("id", "al-3", "trigger", "@gh", "triggerType", "string", "target", "https://github.com", "name",
+                    "GitHub")
             ]
         ),
         "folderCreator", Map(
@@ -427,17 +456,17 @@ SaveConfigToFile() {
 
 ApplyAllModules() {
     global g_IsEngineActive
-    
+
     ; Unregister all existing hooks and stop auto clicker and macros
     StopAutoClicker()
     StopAllMacros()
     UnregisterAllHooks()
-    
+
     if (!g_IsEngineActive) {
         LogMessage("Master engine suspended (OFF)")
         return
     }
-    
+
     ApplyTextExpander()
     ApplyKeyRemapper()
     ApplyWindowManager()
@@ -467,7 +496,7 @@ IsMouseOverTaskbar(*) {
         return false
     try {
         CoordMode("Mouse", "Screen")
-        MouseGetPos(,, &mHwnd)
+        MouseGetPos(, , &mHwnd)
         if (!mHwnd)
             return false
         rootHwnd := DllCall("GetAncestor", "ptr", mHwnd, "uint", 2, "ptr") ; GA_ROOT = 2
@@ -481,14 +510,14 @@ IsMouseOverTaskbar(*) {
 
 UnregisterAllHooks() {
     global g_ActiveHotstrings, g_ActiveHotkeys
-    
+
     try SetTimer(CheckScreenHotCorners, 0)
-    
+
     for trig in g_ActiveHotstrings {
         try Hotstring(":*:" . trig, "Off")
     }
     g_ActiveHotstrings := []
-    
+
     HotIf(IsNotAppWindowActive)
     for hk in g_ActiveHotkeys {
         try Hotkey(hk, "Off")
@@ -512,21 +541,22 @@ UnregisterAllHooks() {
 
 ApplyTextExpander() {
     global g_Config, g_ActiveHotstrings
-    
+
     if (!g_Config.Has("textExpander") || !g_Config["textExpander"].Has("items")) {
         return
     }
-    
+
     modConfig := g_Config["textExpander"]
     if (modConfig.Has("enabled") && !modConfig["enabled"]) {
         return
     }
-    
+
     for item in modConfig["items"] {
         if (IsObject(item) && item.Has("input") && item.Has("output")) {
             trig := Trim(item["input"])
             outText := item["output"]
-            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] = "1")
+            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] =
+            "1")
             if (trig != "" && outText != "" && isEnabled) {
                 try {
                     handler := CreateExpanderHandler(trig, outText)
@@ -549,10 +579,10 @@ OnExpanderTriggered(trigger, replacement) {
     if (!g_IsEngineActive) {
         return
     }
-    
+
     ; SendText sends exact unicode characters, including newlines, tabs, and special chars verbatim
     SendText(replacement)
-    
+
     if (g_Wv) {
         try {
             msg := JSON.stringify(Map(
@@ -571,22 +601,23 @@ OnExpanderTriggered(trigger, replacement) {
 
 ApplyKeyRemapper() {
     global g_Config, g_ActiveHotkeys
-    
+
     if (!g_Config.Has("keyRemapper") || !g_Config["keyRemapper"].Has("items")) {
         return
     }
-    
+
     modConfig := g_Config["keyRemapper"]
     if (modConfig.Has("enabled") && !modConfig["enabled"]) {
         return
     }
-    
+
     HotIf(IsNotAppWindowActive)
     for item in modConfig["items"] {
         if (IsObject(item) && item.Has("source") && item.Has("target")) {
             src := Trim(item["source"])
             tgt := Trim(item["target"])
-            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] = "1")
+            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] =
+            "1")
             if (src != "" && tgt != "" && isEnabled) {
                 try {
                     RegisterSingleRemap(src, tgt)
@@ -603,7 +634,7 @@ FormatSendString(rawKey) {
     ahkKey := NormalizeHotkeyToAhk(rawKey)
     if (ahkKey = "")
         ahkKey := rawKey
-        
+
     ; Separate leading modifiers (^, !, +, #) from base key
     if RegExMatch(ahkKey, "^([\^!+#]*)(.+)$", &m) {
         mods := m[1]
@@ -618,7 +649,7 @@ FormatSendString(rawKey) {
 
 RegisterSingleRemap(source, target) {
     global g_ActiveHotkeys
-    
+
     cleanSource := Trim(source)
     cleanTarget := Trim(target)
     if (cleanSource = "" || cleanTarget = "")
@@ -638,7 +669,7 @@ RegisterSingleRemap(source, target) {
         g_ActiveHotkeys.Push(safeSource)
         return
     }
-    
+
     ; Modifier key remap (e.g. CapsLock -> Control, or any key to Ctrl/Shift/Alt)
     if (cleanTarget = "Control" || cleanTarget = "Ctrl" || cleanTarget = "Shift" || cleanTarget = "Alt") {
         modKey := (cleanTarget = "Control" || cleanTarget = "Ctrl") ? "Ctrl" : cleanTarget
@@ -649,7 +680,7 @@ RegisterSingleRemap(source, target) {
         g_ActiveHotkeys.Push("*" . ahkSource . " up")
         return
     }
-    
+
     ; General key / compound shortcut remap with hook ($)
     if (InStr(cleanTarget, "+") || InStr(cleanTarget, " ") || RegExMatch(cleanTarget, "^[\^!+#]")) {
         sendPattern := FormatSendString(cleanTarget)
@@ -666,18 +697,19 @@ RegisterSingleRemap(source, target) {
 
 ApplyWindowManager() {
     global g_Config, g_ActiveHotkeys
-    
+
     if (!g_Config.Has("windowManager")) {
         return
     }
-    
+
     wm := g_Config["windowManager"]
     if (wm.Has("enabled") && !wm["enabled"]) {
         return
     }
-    
+
     ; Always-on-Top Hotkey
-    if ((!wm.Has("alwaysOnTopEnabled") || wm["alwaysOnTopEnabled"]) && wm.Has("alwaysOnTopHotkey") && Trim(wm["alwaysOnTopHotkey"]) != "") {
+    if ((!wm.Has("alwaysOnTopEnabled") || wm["alwaysOnTopEnabled"]) && wm.Has("alwaysOnTopHotkey") && Trim(wm[
+        "alwaysOnTopHotkey"]) != "") {
         try {
             rawHk := Trim(wm["alwaysOnTopHotkey"])
             hk := NormalizeHotkeyToAhk(rawHk)
@@ -687,9 +719,10 @@ ApplyWindowManager() {
             g_ActiveHotkeys.Push(hk)
         }
     }
-    
+
     ; Center Window Hotkey
-    if ((!wm.Has("centerWindowEnabled") || wm["centerWindowEnabled"]) && wm.Has("centerWindowHotkey") && Trim(wm["centerWindowHotkey"]) != "") {
+    if ((!wm.Has("centerWindowEnabled") || wm["centerWindowEnabled"]) && wm.Has("centerWindowHotkey") && Trim(wm[
+        "centerWindowHotkey"]) != "") {
         try {
             rawHk := Trim(wm["centerWindowHotkey"])
             hk := NormalizeHotkeyToAhk(rawHk)
@@ -699,9 +732,10 @@ ApplyWindowManager() {
             g_ActiveHotkeys.Push(hk)
         }
     }
-    
+
     ; Boss Key / Hide Active Window Hotkey
-    if ((!wm.Has("hideWindowEnabled") || wm["hideWindowEnabled"]) && wm.Has("hideWindowHotkey") && Trim(wm["hideWindowHotkey"]) != "") {
+    if ((!wm.Has("hideWindowEnabled") || wm["hideWindowEnabled"]) && wm.Has("hideWindowHotkey") && Trim(wm[
+        "hideWindowHotkey"]) != "") {
         try {
             rawHk := Trim(wm["hideWindowHotkey"])
             hk := NormalizeHotkeyToAhk(rawHk)
@@ -711,7 +745,7 @@ ApplyWindowManager() {
             g_ActiveHotkeys.Push(hk)
         }
     }
-    
+
     ; Mouse Wheel Transparency (#WheelUp / #WheelDown)
     if (wm.Has("transparencyWheel") && wm["transparencyWheel"]) {
         try {
@@ -721,7 +755,7 @@ ApplyWindowManager() {
             g_ActiveHotkeys.Push("#WheelDown")
         }
     }
-    
+
     ; Focused Application Volume Control (!WheelUp / !WheelDown, ^!PgUp / ^!PgDn)
     if (wm.Has("appVolumeWheel") && wm["appVolumeWheel"]) {
         try {
@@ -737,7 +771,8 @@ ApplyWindowManager() {
     }
 
     ; Mute Active Application Hotkey
-    if ((!wm.Has("appVolumeMuteEnabled") || wm["appVolumeMuteEnabled"]) && wm.Has("appVolumeMuteHotkey") && Trim(wm["appVolumeMuteHotkey"]) != "") {
+    if ((!wm.Has("appVolumeMuteEnabled") || wm["appVolumeMuteEnabled"]) && wm.Has("appVolumeMuteHotkey") && Trim(wm[
+        "appVolumeMuteHotkey"]) != "") {
         try {
             rawHk := Trim(wm["appVolumeMuteHotkey"])
             hk := NormalizeHotkeyToAhk(rawHk)
@@ -749,7 +784,8 @@ ApplyWindowManager() {
     }
 
     ; Mute Master Audio Hotkey
-    if ((!wm.Has("masterAudioMuteEnabled") || wm["masterAudioMuteEnabled"]) && wm.Has("masterAudioMuteHotkey") && Trim(wm["masterAudioMuteHotkey"]) != "") {
+    if ((!wm.Has("masterAudioMuteEnabled") || wm["masterAudioMuteEnabled"]) && wm.Has("masterAudioMuteHotkey") && Trim(
+        wm["masterAudioMuteHotkey"]) != "") {
         try {
             rawHk := Trim(wm["masterAudioMuteHotkey"])
             hk := NormalizeHotkeyToAhk(rawHk)
@@ -773,7 +809,8 @@ ApplyWindowManager() {
     }
 
     ; Window Shade / Roll Up Hotkey
-    if ((!wm.Has("windowShadeEnabled") || wm["windowShadeEnabled"]) && wm.Has("windowShadeHotkey") && Trim(wm["windowShadeHotkey"]) != "") {
+    if ((!wm.Has("windowShadeEnabled") || wm["windowShadeEnabled"]) && wm.Has("windowShadeHotkey") && Trim(wm[
+        "windowShadeHotkey"]) != "") {
         try {
             rawHk := Trim(wm["windowShadeHotkey"])
             hk := NormalizeHotkeyToAhk(rawHk)
@@ -785,7 +822,8 @@ ApplyWindowManager() {
     }
 
     ; Force Borderless Fullscreen Hotkey
-    if ((!wm.Has("borderlessEnabled") || wm["borderlessEnabled"]) && wm.Has("borderlessHotkey") && Trim(wm["borderlessHotkey"]) != "") {
+    if ((!wm.Has("borderlessEnabled") || wm["borderlessEnabled"]) && wm.Has("borderlessHotkey") && Trim(wm[
+        "borderlessHotkey"]) != "") {
         try {
             rawHk := Trim(wm["borderlessHotkey"])
             hk := NormalizeHotkeyToAhk(rawHk)
@@ -798,9 +836,12 @@ ApplyWindowManager() {
 
     ; Text Transformer (Case Converters: UPPER, lower, Title Case)
     if (!wm.Has("textTransformEnabled") || wm["textTransformEnabled"]) {
-        rawUpper := (wm.Has("textTransformUpperHotkey") && Trim(wm["textTransformUpperHotkey"]) != "") ? Trim(wm["textTransformUpperHotkey"]) : "^!u"
-        rawLower := (wm.Has("textTransformLowerHotkey") && Trim(wm["textTransformLowerHotkey"]) != "") ? Trim(wm["textTransformLowerHotkey"]) : "^!l"
-        rawTitle := (wm.Has("textTransformTitleHotkey") && Trim(wm["textTransformTitleHotkey"]) != "") ? Trim(wm["textTransformTitleHotkey"]) : "^!t"
+        rawUpper := (wm.Has("textTransformUpperHotkey") && Trim(wm["textTransformUpperHotkey"]) != "") ? Trim(wm[
+            "textTransformUpperHotkey"]) : "^!u"
+        rawLower := (wm.Has("textTransformLowerHotkey") && Trim(wm["textTransformLowerHotkey"]) != "") ? Trim(wm[
+            "textTransformLowerHotkey"]) : "^!l"
+        rawTitle := (wm.Has("textTransformTitleHotkey") && Trim(wm["textTransformTitleHotkey"]) != "") ? Trim(wm[
+            "textTransformTitleHotkey"]) : "^!t"
         upperHk := NormalizeHotkeyToAhk(rawUpper)
         if (upperHk = "") {
             upperHk := rawUpper
@@ -829,7 +870,8 @@ ApplyWindowManager() {
 
     ; Clean Plain Text & Strip Formatting Hotkey
     if (!wm.Has("textTransformCleanEnabled") || wm["textTransformCleanEnabled"]) {
-        rawClean := (wm.Has("textTransformCleanHotkey") && Trim(wm["textTransformCleanHotkey"]) != "") ? Trim(wm["textTransformCleanHotkey"]) : "^!k"
+        rawClean := (wm.Has("textTransformCleanHotkey") && Trim(wm["textTransformCleanHotkey"]) != "") ? Trim(wm[
+            "textTransformCleanHotkey"]) : "^!k"
         cleanHk := NormalizeHotkeyToAhk(rawClean)
         if (cleanHk = "") {
             cleanHk := rawClean
@@ -842,7 +884,8 @@ ApplyWindowManager() {
 
     ; Instant Screen OCR (Text Grabber) Hotkey
     if (!wm.Has("screenOcrEnabled") || wm["screenOcrEnabled"]) {
-        rawOcr := (wm.Has("screenOcrHotkey") && Trim(wm["screenOcrHotkey"]) != "") ? Trim(wm["screenOcrHotkey"]) : "^!o"
+        rawOcr := (wm.Has("screenOcrHotkey") && Trim(wm["screenOcrHotkey"]) != "") ? Trim(wm["screenOcrHotkey"]) :
+            "^!o"
         ocrHk := NormalizeHotkeyToAhk(rawOcr)
         if (ocrHk = "") {
             ocrHk := rawOcr
@@ -855,7 +898,8 @@ ApplyWindowManager() {
 
     ; Precision Screen Color Picker Hotkey
     if (!wm.Has("colorPickerEnabled") || wm["colorPickerEnabled"]) {
-        rawCp := (wm.Has("colorPickerHotkey") && Trim(wm["colorPickerHotkey"]) != "") ? Trim(wm["colorPickerHotkey"]) : "^!p"
+        rawCp := (wm.Has("colorPickerHotkey") && Trim(wm["colorPickerHotkey"]) != "") ? Trim(wm["colorPickerHotkey"]) :
+            "^!p"
         cpHk := NormalizeHotkeyToAhk(rawCp)
         if (cpHk = "") {
             cpHk := rawCp
@@ -874,8 +918,9 @@ ApplyWindowManager() {
             g_ActiveHotkeys.Push("^!Left")
             g_ActiveHotkeys.Push("^!Right")
         }
-        
-        taskbarScrollOn := (!wm.Has("taskbarScrollEnabled") || wm["taskbarScrollEnabled"] = 1 || wm["taskbarScrollEnabled"] = true)
+
+        taskbarScrollOn := (!wm.Has("taskbarScrollEnabled") || wm["taskbarScrollEnabled"] = 1 || wm[
+            "taskbarScrollEnabled"] = true)
         if (taskbarScrollOn) {
             try {
                 HotIf(IsMouseOverTaskbar)
@@ -923,13 +968,13 @@ TransformSelectedText(transType) {
         A_Clipboard := clipSaved
         return
     }
-    
+
     txt := A_Clipboard
     if (txt = "") {
         A_Clipboard := clipSaved
         return
     }
-    
+
     transformed := ""
     eventMsg := ""
     switch transType {
@@ -948,12 +993,12 @@ TransformSelectedText(transType) {
             transformed := cleaned
             eventMsg := "Text: Clean Plain Text"
     }
-    
+
     A_Clipboard := transformed
     Sleep(25)
     Send("^v")
     Sleep(120)
-    
+
     SoundBeep(900, 40)
     if (g_Wv && eventMsg != "") {
         try {
@@ -980,7 +1025,7 @@ FormatColorValue(cVal, fmt := "HEX") {
     r := (cVal >> 16) & 0xFF
     g := (cVal >> 8) & 0xFF
     b := cVal & 0xFF
-    
+
     switch fmt {
         case "HEX_BARE":
             return Format("{:02X}{:02X}{:02X}", r, g, b)
@@ -1032,7 +1077,8 @@ FormatColorValue(cVal, fmt := "HEX") {
                 m := (1.0 - gf - k) / (1.0 - k)
                 y := (1.0 - bf - k) / (1.0 - k)
             }
-            return Format("cmyk({:d}%, {:d}%, {:d}%, {:d}%)", Round(c * 100), Round(m * 100), Round(y * 100), Round(k * 100))
+            return Format("cmyk({:d}%, {:d}%, {:d}%, {:d}%)", Round(c * 100), Round(m * 100), Round(y * 100), Round(k *
+                100))
         default: ; HEX
             return Format("#{:02X}{:02X}{:02X}", r, g, b)
     }
@@ -1041,27 +1087,28 @@ FormatColorValue(cVal, fmt := "HEX") {
 StartColorPicker() {
     global g_ColorPickerActive, g_ColorPickerLoupeGui, g_CpHMemDC, g_CpHMemBmp, g_CpHOldBmp
     global g_ColorPickerFormat, g_CpLens, g_CpTxtVal, g_CpTxtSub, g_CpSwatch, g_Config
-    
+
     if (g_ColorPickerActive) {
         CloseColorPickerLoupe()
         return
     }
-    
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("colorFormat") && g_Config["windowManager"]["colorFormat"] != "") {
+
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("colorFormat") && g_Config["windowManager"][
+        "colorFormat"] != "") {
         g_ColorPickerFormat := g_Config["windowManager"]["colorFormat"]
     } else {
         g_ColorPickerFormat := "HEX"
     }
-    
+
     CoordMode("Mouse", "Screen")
     CoordMode("Pixel", "Screen")
     MouseGetPos(&mx, &my)
-    
+
     ; Determine initial monitor work area & cursor-following placement
     loupeW := 190, loupeH := 248, offset := 20
     monCount := MonitorGetCount()
     monLeft := 0, monTop := 0, monRight := A_ScreenWidth, monBottom := A_ScreenHeight
-    Loop monCount {
+    loop monCount {
         MonitorGetWorkArea(A_Index, &mLeft, &mTop, &mRight, &mBottom)
         if (mx >= mLeft && mx <= mRight && my >= mTop && my <= mBottom) {
             monLeft := mLeft, monTop := mTop, monRight := mRight, monBottom := mBottom
@@ -1082,39 +1129,41 @@ StartColorPicker() {
     if (wy < monTop) {
         wy := monTop
     }
-    
+
     g_ColorPickerActive := true
     g_ColorPickerLoupeGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale")
     g_ColorPickerLoupeGui.BackColor := "181920"
-    
+
     g_ColorPickerLoupeGui.SetFont("s11 cWhite Bold", "Segoe UI")
     g_CpTxtVal := g_ColorPickerLoupeGui.Add("Text", "x10 y8 w170 h24 Center", "#FFFFFF")
-    
+
     g_ColorPickerLoupeGui.SetFont("s8 cA0AEC0 Norm", "Segoe UI")
     g_CpTxtSub := g_ColorPickerLoupeGui.Add("Text", "x10 y32 w170 h16 Center", "RGB: 255, 255, 255")
-    
+
     g_CpSwatch := g_ColorPickerLoupeGui.Add("Progress", "x14 y50 w162 h7 -Smooth Background181920 cFFFFFF", 100)
     g_CpLens := g_ColorPickerLoupeGui.Add("Text", "x15 y61 w160 h150 +0x12")
-    
+
     g_ColorPickerLoupeGui.SetFont("s8 c718096 Norm", "Segoe UI")
-    g_ColorPickerLoupeGui.Add("Text", "x10 y215 w170 h28 Center", "[Click] Pick  •  [Space] Format`n[Esc / Right Click] Cancel")
-    
+    g_ColorPickerLoupeGui.Add("Text", "x10 y215 w170 h28 Center",
+        "[Click] Pick  •  [Space] Format`n[Esc / Right Click] Cancel")
+
     g_ColorPickerLoupeGui.Show("x" . wx . " y" . wy . " w" . loupeW . " h" . loupeH . " NoActivate")
-    
+
     try {
-        hRgn := DllCall("CreateRoundRectRgn", "int", 0, "int", 0, "int", loupeW, "int", loupeH, "int", 16, "int", 16, "ptr")
+        hRgn := DllCall("CreateRoundRectRgn", "int", 0, "int", 0, "int", loupeW, "int", loupeH, "int", 16, "int", 16,
+            "ptr")
         DllCall("SetWindowRgn", "ptr", g_ColorPickerLoupeGui.Hwnd, "ptr", hRgn, "int", 1)
     }
-    
+
     hdcScreen := DllCall("GetDC", "ptr", 0, "ptr")
     g_CpHMemDC := DllCall("CreateCompatibleDC", "ptr", hdcScreen, "ptr")
     g_CpHMemBmp := DllCall("CreateCompatibleBitmap", "ptr", hdcScreen, "int", 160, "int", 150, "ptr")
     g_CpHOldBmp := DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", g_CpHMemBmp, "ptr")
     DllCall("ReleaseDC", "ptr", 0, "ptr", hdcScreen)
-    
+
     UpdateColorPickerLoupe()
     SetTimer(UpdateColorPickerLoupe, 16)
-    
+
     Hotkey("*LButton", ColorPickerPickColor, "On")
     Hotkey("*RButton", ColorPickerCancel, "On")
     Hotkey("*Escape", ColorPickerCancel, "On")
@@ -1124,51 +1173,52 @@ StartColorPicker() {
 UpdateColorPickerLoupe() {
     global g_ColorPickerActive, g_ColorPickerLoupeGui, g_CpHMemDC, g_ColorPickerFormat
     global g_CpLens, g_CpTxtVal, g_CpTxtSub, g_CpSwatch
-    
+
     if (!g_ColorPickerActive || !g_ColorPickerLoupeGui)
         return
-        
+
     CoordMode("Mouse", "Screen")
     CoordMode("Pixel", "Screen")
     MouseGetPos(&mx, &my)
-    
+
     srcX := mx - 7
     srcY := my - 7
-    
+
     hdcScreen := DllCall("GetDC", "ptr", 0, "ptr")
     DllCall("SetStretchBltMode", "ptr", g_CpHMemDC, "int", 3)
-    DllCall("StretchBlt", "ptr", g_CpHMemDC, "int", 5, "int", 0, "int", 150, "int", 150, "ptr", hdcScreen, "int", srcX, "int", srcY, "int", 15, "int", 15, "uint", 0x00CC0020)
-    
+    DllCall("StretchBlt", "ptr", g_CpHMemDC, "int", 5, "int", 0, "int", 150, "int", 150, "ptr", hdcScreen, "int", srcX,
+        "int", srcY, "int", 15, "int", 15, "uint", 0x00CC0020)
+
     ; Grid lines between 15x15 pixels
     gridPen := DllCall("CreatePen", "int", 0, "int", 1, "uint", 0x22222A, "ptr")
     oldPen := DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", gridPen, "ptr")
-    Loop 14 {
+    loop 14 {
         px := 5 + A_Index * 10
         DllCall("MoveToEx", "ptr", g_CpHMemDC, "int", px, "int", 0, "ptr", 0)
         DllCall("LineTo", "ptr", g_CpHMemDC, "int", px, "int", 150)
-        
+
         py := A_Index * 10
         DllCall("MoveToEx", "ptr", g_CpHMemDC, "int", 5, "int", py, "ptr", 0)
         DllCall("LineTo", "ptr", g_CpHMemDC, "int", 155, "int", py)
     }
-    
+
     ; Center Reticle (Dual-layer: outer black, inner white)
     blackPen := DllCall("CreatePen", "int", 0, "int", 1, "uint", 0x000000, "ptr")
     nullBrush := DllCall("GetStockObject", "int", 5, "ptr")
     oldBrush := DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", nullBrush, "ptr")
-    
+
     DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", blackPen, "ptr")
     DllCall("Rectangle", "ptr", g_CpHMemDC, "int", 74, "int", 69, "int", 86, "int", 81)
-    
+
     whitePen := DllCall("CreatePen", "int", 0, "int", 1, "uint", 0xFFFFFF, "ptr")
     DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", whitePen, "ptr")
     DllCall("Rectangle", "ptr", g_CpHMemDC, "int", 75, "int", 70, "int", 85, "int", 80)
-    
+
     ; Outer lens frame border
     lensBorderPen := DllCall("CreatePen", "int", 0, "int", 1, "uint", 0x3E4252, "ptr")
     DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", lensBorderPen, "ptr")
     DllCall("Rectangle", "ptr", g_CpHMemDC, "int", 4, "int", 0, "int", 156, "int", 150)
-    
+
     ; Cleanup temporary GDI drawing objects
     DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", oldPen)
     DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", oldBrush)
@@ -1176,13 +1226,14 @@ UpdateColorPickerLoupe() {
     DllCall("DeleteObject", "ptr", blackPen)
     DllCall("DeleteObject", "ptr", whitePen)
     DllCall("DeleteObject", "ptr", lensBorderPen)
-    
+
     ; BitBlt composite buffer to static control DC
     hdcLens := DllCall("GetDC", "ptr", g_CpLens.Hwnd, "ptr")
-    DllCall("BitBlt", "ptr", hdcLens, "int", 0, "int", 0, "int", 160, "int", 150, "ptr", g_CpHMemDC, "int", 0, "int", 0, "uint", 0x00CC0020)
+    DllCall("BitBlt", "ptr", hdcLens, "int", 0, "int", 0, "int", 160, "int", 150, "ptr", g_CpHMemDC, "int", 0, "int", 0,
+        "uint", 0x00CC0020)
     DllCall("ReleaseDC", "ptr", g_CpLens.Hwnd, "ptr", hdcLens)
     DllCall("ReleaseDC", "ptr", 0, "ptr", hdcScreen)
-    
+
     ; Live color inspection
     cVal := PixelGetColor(mx, my, "RGB")
     formatted := FormatColorValue(cVal, g_ColorPickerFormat)
@@ -1191,19 +1242,19 @@ UpdateColorPickerLoupe() {
     g_CpSwatch.Opt("c" . hexClean)
     r := (cVal >> 16) & 0xFF, g := (cVal >> 8) & 0xFF, b := cVal & 0xFF
     g_CpTxtSub.Text := (g_ColorPickerFormat = "HEX") ? ("RGB: " . r . ", " . g . ", " . b) : ("HEX: #" . hexClean)
-    
+
     ; Loupe window repositioning - follow mouse smoothly & stay fully on-screen
     loupeW := 190, loupeH := 248, offset := 20
     monCount := MonitorGetCount()
     monLeft := 0, monTop := 0, monRight := A_ScreenWidth, monBottom := A_ScreenHeight
-    Loop monCount {
+    loop monCount {
         MonitorGetWorkArea(A_Index, &mLeft, &mTop, &mRight, &mBottom)
         if (mx >= mLeft && mx <= mRight && my >= mTop && my <= mBottom) {
             monLeft := mLeft, monTop := mTop, monRight := mRight, monBottom := mBottom
             break
         }
     }
-    
+
     wx := mx + offset
     wy := my + offset
     if (wx + loupeW > monRight) {
@@ -1224,8 +1275,9 @@ UpdateColorPickerLoupe() {
     if (wy + loupeH > monBottom) {
         wy := monBottom - loupeH
     }
-    
-    DllCall("SetWindowPos", "ptr", g_ColorPickerLoupeGui.Hwnd, "ptr", -1, "int", wx, "int", wy, "int", 0, "int", 0, "uint", 0x0011)
+
+    DllCall("SetWindowPos", "ptr", g_ColorPickerLoupeGui.Hwnd, "ptr", -1, "int", wx, "int", wy, "int", 0, "int", 0,
+        "uint", 0x0011)
 }
 
 ColorPickerPickColor(*) {
@@ -1245,7 +1297,7 @@ ColorPickerPickColor(*) {
             "message", "Color Copied: " . formatted
         ))
         g_Wv.PostWebMessageAsString(msg)
-        
+
         pickMsg := JSON.stringify(Map(
             "type", "colorPicked",
             "color", formatted,
@@ -1264,7 +1316,7 @@ ColorPickerCycleFormat(*) {
     global g_ColorPickerFormat, g_Config, g_Wv
     static formats := ["HEX", "HEX_BARE", "RGB", "RGBA", "HSL", "HSV", "CMYK"]
     idx := 1
-    Loop formats.Length {
+    loop formats.Length {
         if (formats[A_Index] = g_ColorPickerFormat) {
             idx := A_Index
             break
@@ -1272,13 +1324,13 @@ ColorPickerCycleFormat(*) {
     }
     idx := Mod(idx, formats.Length) + 1
     g_ColorPickerFormat := formats[idx]
-    
+
     if (!g_Config.Has("windowManager")) {
         g_Config["windowManager"] := Map()
     }
     g_Config["windowManager"]["colorFormat"] := g_ColorPickerFormat
     SaveConfigToFile()
-    
+
     if (g_Wv) {
         msg := JSON.stringify(Map(
             "type", "colorFormatChanged",
@@ -1286,20 +1338,20 @@ ColorPickerCycleFormat(*) {
         ))
         g_Wv.PostWebMessageAsString(msg)
     }
-    
+
     UpdateColorPickerLoupe()
 }
 
 CloseColorPickerLoupe() {
     global g_ColorPickerActive, g_ColorPickerLoupeGui, g_CpHMemDC, g_CpHMemBmp, g_CpHOldBmp
-    
+
     SetTimer(UpdateColorPickerLoupe, 0)
-    
+
     try Hotkey("*LButton", "Off")
     try Hotkey("*RButton", "Off")
     try Hotkey("*Escape", "Off")
     try Hotkey("*Space", "Off")
-    
+
     if (g_CpHMemDC) {
         DllCall("SelectObject", "ptr", g_CpHMemDC, "ptr", g_CpHOldBmp)
         DllCall("DeleteDC", "ptr", g_CpHMemDC)
@@ -1307,7 +1359,7 @@ CloseColorPickerLoupe() {
         g_CpHMemDC := 0
         g_CpHMemBmp := 0
     }
-    
+
     if (g_ColorPickerLoupeGui) {
         try g_ColorPickerLoupeGui.Destroy()
         g_ColorPickerLoupeGui := 0
@@ -1318,24 +1370,24 @@ CloseColorPickerLoupe() {
 StartScreenOCR() {
     global g_Wv
     CoordMode("Mouse", "Screen")
-    
+
     vx := SysGet(76), vy := SysGet(77), vw := SysGet(78), vh := SysGet(79)
     snipGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +LastFound +E0x00080000")
     snipGui.BackColor := "000000"
     WinSetTransparent(40, snipGui)
     snipGui.Show("x" . vx . " y" . vy . " w" . vw . " h" . vh)
-    
+
     KeyWait("LButton", "D T4")
     if (A_PriorKey = "Escape" || !GetKeyState("LButton", "P")) {
         snipGui.Destroy()
         return
     }
-    
+
     MouseGetPos(&x1, &y1)
     boxGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale")
     boxGui.BackColor := "d97706"
     WinSetTransparent(80, boxGui)
-    
+
     while GetKeyState("LButton", "P") {
         Sleep(15)
         MouseGetPos(&cx, &cy)
@@ -1345,18 +1397,18 @@ StartScreenOCR() {
             boxGui.Show("x" . bx . " y" . by . " w" . bw . " h" . bh . " NoActivate")
         }
     }
-    
+
     MouseGetPos(&x2, &y2)
     snipGui.Destroy()
     boxGui.Destroy()
-    
+
     snipX := Min(x1, x2), snipY := Min(y1, y2)
     snipW := Abs(x2 - x1), snipH := Abs(y2 - y1)
-    
+
     if (snipW < 8 || snipH < 8) {
         return
     }
-    
+
     try {
         result := OCR.FromRect(snipX, snipY, snipW, snipH)
         if (result && Trim(result.Text) != "") {
@@ -1424,8 +1476,8 @@ TriggerSleepOrHibernate() {
         return
     }
 
-    isHibernate := (wm.Has("sleepMode") && wm["sleepMode"] = "hibernate") 
-                || (wm.Has("sleepModeHibernate") && (wm["sleepModeHibernate"] = 1 || wm["sleepModeHibernate"] = true))
+    isHibernate := (wm.Has("sleepMode") && wm["sleepMode"] = "hibernate")
+    || (wm.Has("sleepModeHibernate") && (wm["sleepModeHibernate"] = 1 || wm["sleepModeHibernate"] = true))
     g_SleepTimerMode := isHibernate ? "Hibernate" : "Sleep"
 
     delaySec := 0
@@ -1471,7 +1523,8 @@ StartSleepCountdown(seconds, isHibernate) {
     g_SleepTimerMode := isHibernate ? "Hibernate" : "Sleep"
 
     SoundBeep(850, 80)
-    NotifySleepMessage("System: " . g_SleepTimerMode . " in " . FormatDurationSeconds(seconds) . " (Press Win+S or Esc to cancel)")
+    NotifySleepMessage("System: " . g_SleepTimerMode . " in " . FormatDurationSeconds(seconds) .
+    " (Press Win+S or Esc to cancel)")
     NotifySleepTimerState(true, seconds, g_SleepTimerMode)
 
     SetTimer(SleepCountdownTick, 1000)
@@ -1510,7 +1563,8 @@ SleepCountdownTick() {
 
     if (shouldNotify) {
         SoundBeep(950, 40)
-        NotifySleepMessage("System: " . g_SleepTimerMode . " in " . FormatDurationSeconds(g_SleepTimerSecondsLeft) . "... (Win+S or Esc to cancel)")
+        NotifySleepMessage("System: " . g_SleepTimerMode . " in " . FormatDurationSeconds(g_SleepTimerSecondsLeft) .
+        "... (Win+S or Esc to cancel)")
     }
 }
 
@@ -1538,7 +1592,7 @@ ExecuteSleepNow(isHibernate) {
     if (isHibernate) {
         res := DllCall("PowrProf\SetSuspendState", "int", 1, "int", 0, "int", 0)
         if (!res) {
-            Run("shutdown /h",, "Hide")
+            Run("shutdown /h", , "Hide")
         }
     } else {
         DllCall("PowrProf\SetSuspendState", "int", 0, "int", 0, "int", 0)
@@ -1576,7 +1630,8 @@ NotifySleepMessage(msgText) {
 
 ToggleAlwaysOnTop() {
     global g_MainGui, g_Wv, g_Config
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("alwaysOnTopEnabled") && !g_Config["windowManager"]["alwaysOnTopEnabled"]) {
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("alwaysOnTopEnabled") && !g_Config[
+        "windowManager"]["alwaysOnTopEnabled"]) {
         return
     }
     try {
@@ -1591,7 +1646,7 @@ ToggleAlwaysOnTop() {
         isTop := WinGetExStyle("ahk_id " . hwnd) & 0x8
         WinSetAlwaysOnTop(-1, "ahk_id " . hwnd)
         SoundBeep(isTop ? 600 : 900, 60)
-        
+
         if (g_Wv) {
             msg := JSON.stringify(Map(
                 "type", "moduleEvent",
@@ -1605,7 +1660,8 @@ ToggleAlwaysOnTop() {
 
 CenterActiveWindow() {
     global g_MainGui, g_Wv, g_Config
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("centerWindowEnabled") && !g_Config["windowManager"]["centerWindowEnabled"]) {
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("centerWindowEnabled") && !g_Config[
+        "windowManager"]["centerWindowEnabled"]) {
         return
     }
     try {
@@ -1618,12 +1674,12 @@ CenterActiveWindow() {
         if (!hwnd)
             return
         MonitorGetWorkArea(, &l, &t, &r, &b)
-        WinGetPos(,, &w, &h, "ahk_id " . hwnd)
+        WinGetPos(, , &w, &h, "ahk_id " . hwnd)
         newX := l + (r - l - w) // 2
         newY := t + (b - t - h) // 2
-        WinMove(newX, newY,,, "ahk_id " . hwnd)
+        WinMove(newX, newY, , , "ahk_id " . hwnd)
         SoundBeep(850, 50)
-        
+
         if (g_Wv) {
             msg := JSON.stringify(Map(
                 "type", "moduleEvent",
@@ -1637,7 +1693,8 @@ CenterActiveWindow() {
 
 HideActiveWindow() {
     global g_MainGui, g_Config
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("hideWindowEnabled") && !g_Config["windowManager"]["hideWindowEnabled"]) {
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("hideWindowEnabled") && !g_Config[
+        "windowManager"]["hideWindowEnabled"]) {
         return
     }
     try {
@@ -1656,7 +1713,8 @@ HideActiveWindow() {
 
 AdjustActiveWindowTransparency(delta) {
     global g_MainGui, g_Wv, g_Config
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("transparencyWheel") && !g_Config["windowManager"]["transparencyWheel"]) {
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("transparencyWheel") && !g_Config[
+        "windowManager"]["transparencyWheel"]) {
         return
     }
     try {
@@ -1674,19 +1732,21 @@ AdjustActiveWindowTransparency(delta) {
         }
         newAlpha := Min(255, Max(40, curAlpha + delta))
         WinSetTransparent(newAlpha, "ahk_id " . hwnd)
-        
+
         ; If Click-Through Ghost Mode is active in config
-        if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("clickThroughGhost") && g_Config["windowManager"]["clickThroughGhost"]) {
+        if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("clickThroughGhost") && g_Config[
+            "windowManager"]["clickThroughGhost"]) {
             if (newAlpha < 255) {
                 WinSetExStyle("+0x20", "ahk_id " . hwnd)
             } else {
                 WinSetExStyle("-0x20", "ahk_id " . hwnd)
             }
         }
-        
+
         if (g_Wv) {
             pct := Round((newAlpha / 255) * 100)
-            ghostNote := (newAlpha < 255 && g_Config["windowManager"].Has("clickThroughGhost") && g_Config["windowManager"]["clickThroughGhost"]) ? " [Ghost Click-Through]" : ""
+            ghostNote := (newAlpha < 255 && g_Config["windowManager"].Has("clickThroughGhost") && g_Config[
+                "windowManager"]["clickThroughGhost"]) ? " [Ghost Click-Through]" : ""
             msg := JSON.stringify(Map(
                 "type", "moduleEvent",
                 "module", "windowManager",
@@ -1733,7 +1793,8 @@ ToggleGhostMode() {
 
 ToggleWindowShade() {
     global g_MainGui, g_ShadedWindows, g_Config, g_Wv
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("windowShadeEnabled") && !g_Config["windowManager"]["windowShadeEnabled"])
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("windowShadeEnabled") && !g_Config[
+        "windowManager"]["windowShadeEnabled"])
         return
     try {
         hwnd := WinExist("A")
@@ -1744,7 +1805,7 @@ ToggleWindowShade() {
         }
         if (!hwnd || (g_MainGui && hwnd = g_MainGui.Hwnd))
             return
-        
+
         if (g_ShadedWindows.Has(hwnd)) {
             info := g_ShadedWindows[hwnd]
             g_ShadedWindows.Delete(hwnd)
@@ -1758,7 +1819,7 @@ ToggleWindowShade() {
             }
             WinGetPos(&x, &y, &w, &h, "ahk_id " . hwnd)
             g_ShadedWindows[hwnd] := Map("x", x, "y", y, "w", w, "h", h)
-            
+
             captionH := DllCall("GetSystemMetrics", "int", 4, "int")
             frameH := DllCall("GetSystemMetrics", "int", 33, "int")
             titleBarHeight := Max(32, captionH + (frameH * 2) + 4)
@@ -1775,7 +1836,8 @@ ToggleWindowShade() {
 
 ToggleBorderlessFullscreen() {
     global g_MainGui, g_BorderlessWindows, g_Config, g_Wv
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("borderlessEnabled") && !g_Config["windowManager"]["borderlessEnabled"])
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("borderlessEnabled") && !g_Config[
+        "windowManager"]["borderlessEnabled"])
         return
     try {
         hwnd := WinExist("A")
@@ -1786,7 +1848,7 @@ ToggleBorderlessFullscreen() {
         }
         if (!hwnd || (g_MainGui && hwnd = g_MainGui.Hwnd))
             return
-        
+
         if (g_BorderlessWindows.Has(hwnd)) {
             info := g_BorderlessWindows[hwnd]
             g_BorderlessWindows.Delete(hwnd)
@@ -1803,7 +1865,7 @@ ToggleBorderlessFullscreen() {
             WinGetPos(&x, &y, &w, &h, "ahk_id " . hwnd)
             curStyle := WinGetStyle("ahk_id " . hwnd)
             g_BorderlessWindows[hwnd] := Map("x", x, "y", y, "w", w, "h", h, "style", curStyle)
-            
+
             hMon := DllCall("MonitorFromWindow", "ptr", hwnd, "uint", 2, "ptr")
             monInfo := Buffer(40, 0)
             NumPut("uint", 40, monInfo, 0)
@@ -1814,7 +1876,7 @@ ToggleBorderlessFullscreen() {
             monBottom := NumGet(monInfo, 16, "int")
             monW := monRight - monLeft
             monH := monBottom - monTop
-            
+
             WinSetStyle("-0x00C40000", "ahk_id " . hwnd)
             WinMove(monLeft, monTop, monW, monH, "ahk_id " . hwnd)
             DllCall("SetWindowPos", "ptr", hwnd, "ptr", 0, "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x0027)
@@ -1843,7 +1905,8 @@ GetActiveExternalWindow() {
 
 AdjustActiveAppVolume(delta) {
     global g_MainGui, g_Wv, g_Config
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("appVolumeWheel") && !g_Config["windowManager"]["appVolumeWheel"]) {
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("appVolumeWheel") && !g_Config["windowManager"][
+        "appVolumeWheel"]) {
         return
     }
     try {
@@ -1860,13 +1923,13 @@ AdjustActiveAppVolume(delta) {
         if (procName = "") {
             procName := "Application"
         }
-        
+
         if (AudioSession.SetVolume(pid, delta, true, &newVol, &isMuted)) {
             pct := Round(newVol * 100)
             icon := isMuted ? "🔇" : (pct = 0 ? "🔈" : (pct < 50 ? "🔉" : "🔊"))
             ToolTip(icon . " " . procName . " Volume: " . pct . "%")
             SetTimer(() => ToolTip(), -1400)
-            
+
             if (g_Wv) {
                 msg := JSON.stringify(Map(
                     "type", "activeAppVolumeChanged",
@@ -1886,7 +1949,8 @@ AdjustActiveAppVolume(delta) {
 
 ToggleActiveAppMute() {
     global g_MainGui, g_Wv, g_Config
-    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("appVolumeMuteEnabled") && !g_Config["windowManager"]["appVolumeMuteEnabled"]) {
+    if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("appVolumeMuteEnabled") && !g_Config[
+        "windowManager"]["appVolumeMuteEnabled"]) {
         return
     }
     try {
@@ -1903,7 +1967,7 @@ ToggleActiveAppMute() {
         if (procName = "") {
             procName := "Application"
         }
-        
+
         if (AudioSession.ToggleMute(pid, &isMuted)) {
             curVol := AudioSession.GetVolume(pid)
             pct := curVol >= 0 ? Round(curVol * 100) : 0
@@ -1911,7 +1975,7 @@ ToggleActiveAppMute() {
             icon := isMuted ? "🔇" : "🔊"
             ToolTip(icon . " " . procName . ": " . statusText . " (" . pct . "%)")
             SetTimer(() => ToolTip(), -1400)
-            
+
             if (g_Wv) {
                 msg := JSON.stringify(Map(
                     "type", "activeAppVolumeChanged",
@@ -1988,14 +2052,16 @@ class ProfileAppScanner {
             hIcon := 0
             hIcons := Buffer(A_PtrSize, 0)
             hIconIds := Buffer(4, 0)
-            if (DllCall("user32\PrivateExtractIconsW", "Str", fullPath, "Int", 0, "Int", 48, "Int", 48, "Ptr", hIcons.Ptr, "Ptr", hIconIds.Ptr, "UInt", 1, "UInt", 0) > 0) {
+            if (DllCall("user32\PrivateExtractIconsW", "Str", fullPath, "Int", 0, "Int", 48, "Int", 48, "Ptr", hIcons.Ptr,
+                "Ptr", hIconIds.Ptr, "UInt", 1, "UInt", 0) > 0) {
                 hIcon := NumGet(hIcons, 0, "Ptr")
             }
             if (!hIcon) {
                 pathBuf := Buffer(520, 0)
                 StrPut(fullPath, pathBuf, "UTF-16")
                 index := 0
-                hIcon := DllCall("shell32\ExtractAssociatedIcon", "Ptr", 0, "Ptr", pathBuf.Ptr, "Short*", &index, "Ptr")
+                hIcon := DllCall("shell32\ExtractAssociatedIcon", "Ptr", 0, "Ptr", pathBuf.Ptr, "Short*", &index, "Ptr"
+                )
             }
             if (hIcon) {
                 pBitmap := 0
@@ -2004,8 +2070,10 @@ class ProfileAppScanner {
                 if (pBitmap) {
                     this.CleanWhiteCorners(pBitmap)
                     clsidPng := Buffer(16)
-                    DllCall("ole32\CLSIDFromString", "Str", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "Ptr", clsidPng.Ptr)
-                    DllCall("gdiplus\GdipSaveImageToFile", "Ptr", pBitmap, "Str", outPng, "Ptr", clsidPng.Ptr, "Ptr", 0)
+                    DllCall("ole32\CLSIDFromString", "Str", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "Ptr", clsidPng.Ptr
+                    )
+                    DllCall("gdiplus\GdipSaveImageToFile", "Ptr", pBitmap, "Str", outPng, "Ptr", clsidPng.Ptr, "Ptr", 0
+                    )
                     DllCall("gdiplus\GdipDisposeImage", "Ptr", pBitmap)
                 }
             }
@@ -2099,10 +2167,12 @@ class ProfileAppScanner {
             hIcon := 0
             res := 0
             ; Use SendMessageTimeout with 40ms to prevent hanging on unresponsive or suspended windows
-            if (DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 1, "Ptr", 0, "UInt", 0x0002, "UInt", 40, "Ptr*", &res)) {
+            if (DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 1, "Ptr", 0, "UInt", 0x0002,
+                "UInt", 40, "Ptr*", &res)) {
                 hIcon := res
             }
-            if (!hIcon && DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 0, "Ptr", 0, "UInt", 0x0002, "UInt", 40, "Ptr*", &res)) {
+            if (!hIcon && DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 0, "Ptr", 0, "UInt",
+                0x0002, "UInt", 40, "Ptr*", &res)) {
                 hIcon := res
             }
             if (!hIcon)
@@ -2116,8 +2186,10 @@ class ProfileAppScanner {
                     if (pBitmap) {
                         this.CleanWhiteCorners(pBitmap)
                         clsidPng := Buffer(16)
-                        DllCall("ole32\CLSIDFromString", "Str", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "Ptr", clsidPng.Ptr)
-                        DllCall("gdiplus\GdipSaveImageToFile", "Ptr", pBitmap, "Str", outPng, "Ptr", clsidPng.Ptr, "Ptr", 0)
+                        DllCall("ole32\CLSIDFromString", "Str", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "Ptr",
+                            clsidPng.Ptr)
+                        DllCall("gdiplus\GdipSaveImageToFile", "Ptr", pBitmap, "Str", outPng, "Ptr", clsidPng.Ptr,
+                            "Ptr", 0)
                         DllCall("gdiplus\GdipDisposeImage", "Ptr", pBitmap)
                     }
                 }
@@ -2345,7 +2417,8 @@ class ProfileOsdHUD {
         NumPut("uint", 0, bi, 16)
 
         pBits := 0
-        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0, "ptr")
+        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0,
+            "ptr")
         hOldBmp := DllCall("SelectObject", "ptr", hMemDC, "ptr", hBmp, "ptr")
 
         pGraphics := 0
@@ -2360,10 +2433,14 @@ class ProfileOsdHUD {
 
         pPath := 0
         DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &pPath)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset, "float", d, "float", d, "float", 180, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset, "float", d, "float", d, "float", 270, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset + rh - d, "float", d, "float", d, "float", 0, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset + rh - d, "float", d, "float", d, "float", 90, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset, "float", d, "float", d, "float",
+            180, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset, "float", d, "float", d,
+            "float", 270, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset + rh - d, "float", d,
+            "float", d, "float", 0, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset + rh - d, "float", d, "float", d,
+            "float", 90, "float", 90)
         DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
 
         pBgBrush := 0
@@ -2402,7 +2479,7 @@ class ProfileOsdHUD {
         MouseGetPos(&mX, &mY)
         monCount := MonitorGetCount()
         monIndex := 1
-        Loop monCount {
+        loop monCount {
             MonitorGet(A_Index, &mL, &mT, &mR, &mB)
             if (mX >= mL && mX < mR && mY >= mT && mY < mB) {
                 monIndex := A_Index
@@ -2424,7 +2501,8 @@ class ProfileOsdHUD {
         NumPut("uchar", 255, blend, 2), NumPut("uchar", 1, blend, 3)
 
         this.guiObj.Show("x" . posX . " y" . posY . " w" . guiW . " h" . guiH . " NoActivate")
-        DllCall("UpdateLayeredWindow", "ptr", this.guiObj.Hwnd, "ptr", hDC, "ptr", ptDst, "ptr", sz, "ptr", hMemDC, "ptr", ptSrc, "uint", 0, "ptr", blend, "uint", 2)
+        DllCall("UpdateLayeredWindow", "ptr", this.guiObj.Hwnd, "ptr", hDC, "ptr", ptDst, "ptr", sz, "ptr", hMemDC,
+            "ptr", ptSrc, "uint", 0, "ptr", blend, "uint", 2)
 
         DllCall("gdiplus\GdipDeleteBrush", "ptr", pBgBrush)
         DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
@@ -2454,8 +2532,10 @@ CheckAutoProfileSwitch() {
     hasHoverProfiles := false
     for pName, pData in g_Config["profiles"] {
         if (IsObject(pData)) {
-            triggerEnabled := !pData.Has("switchTriggerEnabled") || pData["switchTriggerEnabled"] = 1 || pData["switchTriggerEnabled"] = true
-            isHover := triggerEnabled && pData.Has("switchOnHover") && (pData["switchOnHover"] = 1 || pData["switchOnHover"] = true)
+            triggerEnabled := !pData.Has("switchTriggerEnabled") || pData["switchTriggerEnabled"] = 1 || pData[
+                "switchTriggerEnabled"] = true
+            isHover := triggerEnabled && pData.Has("switchOnHover") && (pData["switchOnHover"] = 1 || pData[
+                "switchOnHover"] = true)
             if (isHover) {
                 hasHoverProfiles := true
                 break
@@ -2484,8 +2564,12 @@ CheckAutoProfileSwitch() {
                         anyCustom := FindProfileForProcess(hoverProc, "any")
                         if (anyCustom == "") {
                             defaultProf := g_Config["profiles"].Has("Default") ? g_Config["profiles"]["Default"] : ""
-                            defaultTriggerEnabled := IsObject(defaultProf) ? (!defaultProf.Has("switchTriggerEnabled") || defaultProf["switchTriggerEnabled"] = 1 || defaultProf["switchTriggerEnabled"] = true) : true
-                            defaultHover := defaultTriggerEnabled && IsObject(defaultProf) && defaultProf.Has("switchOnHover") && (defaultProf["switchOnHover"] = 1 || defaultProf["switchOnHover"] = true)
+                            defaultTriggerEnabled := IsObject(defaultProf) ? (!defaultProf.Has("switchTriggerEnabled") ||
+                            defaultProf["switchTriggerEnabled"] = 1 || defaultProf["switchTriggerEnabled"] = true) :
+                                true
+                            defaultHover := defaultTriggerEnabled && IsObject(defaultProf) && defaultProf.Has(
+                                "switchOnHover") && (defaultProf["switchOnHover"] = 1 || defaultProf["switchOnHover"] =
+                                    true)
                             if (defaultHover) {
                                 matchedProfile := "Default"
                                 triggerProc := hoverProc
@@ -2516,8 +2600,10 @@ CheckAutoProfileSwitch() {
             ; Focused window does NOT match any custom focus profile.
             ; Check if Default profile has focus switch enabled so it can switch back on focus away!
             defaultProf := g_Config["profiles"].Has("Default") ? g_Config["profiles"]["Default"] : ""
-            defaultTriggerEnabled := IsObject(defaultProf) ? (!defaultProf.Has("switchTriggerEnabled") || defaultProf["switchTriggerEnabled"] = 1 || defaultProf["switchTriggerEnabled"] = true) : true
-            defaultFocus := defaultTriggerEnabled && (IsObject(defaultProf) && defaultProf.Has("switchOnFocus") ? (defaultProf["switchOnFocus"] = 1 || defaultProf["switchOnFocus"] = true) : true)
+            defaultTriggerEnabled := IsObject(defaultProf) ? (!defaultProf.Has("switchTriggerEnabled") || defaultProf[
+                "switchTriggerEnabled"] = 1 || defaultProf["switchTriggerEnabled"] = true) : true
+            defaultFocus := defaultTriggerEnabled && (IsObject(defaultProf) && defaultProf.Has("switchOnFocus") ? (
+                defaultProf["switchOnFocus"] = 1 || defaultProf["switchOnFocus"] = true) : true)
             if (defaultFocus) {
                 matchedProfile := "Default"
                 triggerProc := activeProc
@@ -2542,7 +2628,8 @@ FindProfileForProcess(procName, triggerMode := "any") {
         if (!IsObject(pData) || pName = "Default")
             continue
 
-        triggerEnabled := !pData.Has("switchTriggerEnabled") || pData["switchTriggerEnabled"] = 1 || pData["switchTriggerEnabled"] = true
+        triggerEnabled := !pData.Has("switchTriggerEnabled") || pData["switchTriggerEnabled"] = 1 || pData[
+            "switchTriggerEnabled"] = true
         if (!triggerEnabled)
             continue
 
@@ -2652,23 +2739,24 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
 
 ApplyAppLauncher() {
     global g_Config, g_ActiveHotstrings, g_ActiveHotkeys
-    
+
     if (!g_Config.Has("appLauncher") || !g_Config["appLauncher"].Has("items")) {
         return
     }
-    
+
     launcherConfig := g_Config["appLauncher"]
     if (launcherConfig.Has("enabled") && !launcherConfig["enabled"]) {
         return
     }
-    
+
     for item in launcherConfig["items"] {
         if (IsObject(item) && item.Has("trigger") && item.Has("target")) {
             trig := Trim(item["trigger"])
             target := Trim(item["target"])
             type := item.Has("triggerType") ? item["triggerType"] : "string"
-            
-            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] = "1")
+
+            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] =
+            "1")
             if (trig != "" && target != "" && isEnabled) {
                 try {
                     handler := CreateLauncherHandler(trig, target)
@@ -2694,17 +2782,18 @@ NormalizeHotkeyToAhk(rawHk) {
     clean := Trim(rawHk)
     if (clean = "")
         return ""
-        
+
     ; If it already looks like pure AHK notation (e.g. ^!c, +F12, #Space, $^c)
-    if RegExMatch(clean, "^[\$*~<>\^!+#]+[A-Za-z0-9_]+$") || RegExMatch(clean, "^(?i)(F\d{1,2}|Space|Tab|Enter|Esc|Escape|BS|Backspace|Delete|Del|Insert|Ins|Home|End|PgUp|PgDn)$") {
+    if RegExMatch(clean, "^[\$*~<>\^!+#]+[A-Za-z0-9_]+$") || RegExMatch(clean,
+        "^(?i)(F\d{1,2}|Space|Tab|Enter|Esc|Escape|BS|Backspace|Delete|Del|Insert|Ins|Home|End|PgUp|PgDn)$") {
         return clean
     }
-    
+
     ; Replace human-readable compound formats like "Ctrl + Alt + C"
     mods := ""
     key := ""
     parts := StrSplit(clean, "+")
-    
+
     for part in parts {
         p := StrLower(Trim(part))
         if (p = "ctrl" || p = "control") {
@@ -2734,10 +2823,10 @@ NormalizeHotkeyToAhk(rawHk) {
             key := actual
         }
     }
-    
+
     if (key = "")
         return clean
-        
+
     return mods . key
 }
 
@@ -2750,7 +2839,7 @@ RunLauncherTarget(trigger, target) {
     if (!g_IsEngineActive) {
         return
     }
-    
+
     try {
         Run(target)
         SoundBeep(950, 50)
@@ -2774,23 +2863,24 @@ RunLauncherTarget(trigger, target) {
 
 ApplyFolderCreator() {
     global g_Config, g_ActiveHotstrings, g_ActiveHotkeys
-    
+
     if (!g_Config.Has("folderCreator") || !g_Config["folderCreator"].Has("items")) {
         return
     }
-    
+
     fcConfig := g_Config["folderCreator"]
     if (fcConfig.Has("enabled") && !fcConfig["enabled"]) {
         return
     }
-    
+
     for item in fcConfig["items"] {
         if (IsObject(item) && item.Has("trigger") && item.Has("folderPaths")) {
             trig := Trim(item["trigger"])
             paths := Trim(item["folderPaths"])
             type := item.Has("triggerType") ? item["triggerType"] : "string"
-            
-            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] = "1")
+
+            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] =
+            "1")
             if (trig != "" && paths != "" && isEnabled) {
                 try {
                     handler := CreateFolderCreatorHandler(item)
@@ -2820,10 +2910,10 @@ GetActiveExplorerPath() {
     activeHwnd := WinActive("A")
     if (!activeHwnd)
         return A_Desktop
-        
+
     wClass := ""
     try wClass := WinGetClass("ahk_id " . activeHwnd)
-    
+
     ; Desktop is focused
     if (wClass = "Progman" || wClass = "WorkerW")
         return A_Desktop
@@ -2867,7 +2957,7 @@ GetActiveExplorerPath() {
                     wHwnd := w.hwnd
                     if (wHwnd != activeHwnd && (wHwnd & 0xFFFFFFFF) != (activeHwnd & 0xFFFFFFFF))
                         continue
-                    
+
                     shellBrowser := ComObjQuery(w, IID_IShellBrowser, IID_IShellBrowser)
                     if (!shellBrowser)
                         continue
@@ -2963,7 +3053,7 @@ ExecuteFolderCreation(item) {
     global g_Wv, g_IsEngineActive
     if (!g_IsEngineActive)
         return
-        
+
     try {
         ; Determine base target directory
         locType := item.Has("targetLocation") ? item["targetLocation"] : "activeExplorer"
@@ -2973,18 +3063,18 @@ ExecuteFolderCreation(item) {
         } else {
             baseDir := GetActiveExplorerPath()
         }
-        
+
         if (baseDir = "")
             baseDir := A_Desktop
-            
+
         if (!DirExist(baseDir)) {
             try DirCreate(baseDir)
         }
-        
+
         rawPaths := item.Has("folderPaths") ? item["folderPaths"] : ""
         if (rawPaths = "")
             return
-            
+
         ; Check if interactive {Name} prompt is needed
         projectName := ""
         if (InStr(rawPaths, "{Name}") || InStr(rawPaths, "{name}")) {
@@ -2994,14 +3084,14 @@ ExecuteFolderCreation(item) {
                 return
             projectName := Trim(ib.Value)
         }
-        
+
         ; Replace date/time tokens
         vYear := FormatTime(, "yyyy")
         vMonth := FormatTime(, "MM")
         vDay := FormatTime(, "dd")
         vDate := FormatTime(, "yyyy-MM-dd")
         vTime := FormatTime(, "HH-mm-ss")
-        
+
         expandedPaths := rawPaths
         if (projectName != "") {
             expandedPaths := StrReplace(expandedPaths, "{Name}", projectName)
@@ -3012,25 +3102,25 @@ ExecuteFolderCreation(item) {
         expandedPaths := StrReplace(expandedPaths, "{DD}", vDay)
         expandedPaths := StrReplace(expandedPaths, "{Date}", vDate)
         expandedPaths := StrReplace(expandedPaths, "{Time}", vTime)
-        
+
         ; Split by newline to process each line
         lines := StrSplit(expandedPaths, ["`r`n", "`n", "`r"])
         createdFolders := []
-        
+
         for rawLine in lines {
             line := Trim(rawLine)
             if (line = "")
                 continue
-                
+
             ; Check for numbered range sequence e.g. [1-10] or [01-12]
             if RegExMatch(line, "\[(\d+)-(\d+)\]", &mSeq) {
                 numStart := Integer(mSeq[1])
                 numEnd := Integer(mSeq[2])
                 padLen := StrLen(mSeq[1])
                 step := numStart <= numEnd ? 1 : -1
-                
+
                 curr := numStart
-                Loop {
+                loop {
                     currStr := Format("{:0" . padLen . "}", curr)
                     seqLine := RegExReplace(line, "\[\d+-\d+\]", currStr, , 1)
                     createdFolders.Push(seqLine)
@@ -3042,7 +3132,7 @@ ExecuteFolderCreation(item) {
                 createdFolders.Push(line)
             }
         }
-        
+
         ; Create directories on disk
         firstCreatedPath := ""
         for relPath in createdFolders {
@@ -3054,7 +3144,7 @@ ExecuteFolderCreation(item) {
             } else {
                 fullPath := RTrim(baseDir, "\") . "\" . cleanRel
             }
-            
+
             if (!DirExist(fullPath)) {
                 try DirCreate(fullPath)
             }
@@ -3062,19 +3152,19 @@ ExecuteFolderCreation(item) {
                 firstCreatedPath := fullPath
             }
         }
-        
+
         ; Create Seed Files if specified
         if (item.Has("seedFiles") && Trim(item["seedFiles"]) != "") {
             seedStr := item["seedFiles"]
             seedList := StrSplit(RegExReplace(seedStr, "[\r\n,]+", "|"), "|")
-            
+
             seedTargetDir := baseDir
             if (projectName != "" && DirExist(baseDir . "\" . projectName)) {
                 seedTargetDir := baseDir . "\" . projectName
             } else if (firstCreatedPath != "" && DirExist(firstCreatedPath)) {
                 seedTargetDir := firstCreatedPath
             }
-            
+
             for rawSeed in seedList {
                 seedName := Trim(rawSeed)
                 if (seedName = "")
@@ -3085,12 +3175,13 @@ ExecuteFolderCreation(item) {
                 }
             }
         }
-        
+
         ; Sound confirmation
         SoundBeep(1200, 70)
-        
+
         ; Auto-Open in Explorer if enabled (only when user picked fixed folder option)
-        isAutoOpen := (item.Has("autoOpen") && (item["autoOpen"] = true || item["autoOpen"] = 1 || item["autoOpen"] = "1"))
+        isAutoOpen := (item.Has("autoOpen") && (item["autoOpen"] = true || item["autoOpen"] = 1 || item["autoOpen"] =
+            "1"))
         if (isAutoOpen && locType = "custom") {
             openTarget := baseDir
             if (projectName != "" && DirExist(baseDir . "\" . projectName)) {
@@ -3100,7 +3191,7 @@ ExecuteFolderCreation(item) {
             }
             try Run('explorer.exe "' . openTarget . '"')
         }
-        
+
         if (g_Wv) {
             msg := JSON.stringify(Map(
                 "type", "moduleEvent",
@@ -3121,16 +3212,16 @@ ExecuteFolderCreation(item) {
 
 ApplyAutoClicker() {
     global g_Config, g_ActiveHotkeys
-    
+
     if (!g_Config.Has("autoClicker")) {
         return
     }
-    
+
     ac := g_Config["autoClicker"]
     if (!ac.Has("hotkey") || Trim(ac["hotkey"]) = "") {
         return
     }
-    
+
     try {
         hk := Trim(ac["hotkey"])
         Hotkey(hk, (*) => ToggleAutoClicker(), "On")
@@ -3142,14 +3233,14 @@ ApplyAutoClicker() {
 
 ToggleAutoClicker() {
     global g_AutoClickerRunning, g_AutoClickerCount, g_Config, g_IsEngineActive
-    
+
     if (!g_IsEngineActive) {
         return
     }
-    
+
     g_AutoClickerRunning := !g_AutoClickerRunning
     g_AutoClickerCount := 0
-    
+
     if (g_AutoClickerRunning) {
         cps := 20
         if (g_Config.Has("autoClicker") && g_Config["autoClicker"].Has("cps")) {
@@ -3162,7 +3253,7 @@ ToggleAutoClicker() {
         SetTimer(DoAutoClick, 0)
         SoundBeep(550, 60)
     }
-    
+
     NotifyWebAutoClicker()
 }
 
@@ -3175,16 +3266,16 @@ StopAutoClicker() {
 
 DoAutoClick() {
     global g_AutoClickerRunning, g_AutoClickerCount, g_Config
-    
+
     if (!g_AutoClickerRunning) {
         SetTimer(DoAutoClick, 0)
         return
     }
-    
+
     btn := "Left"
     clickType := "Single"
     limit := 0
-    
+
     if (g_Config.Has("autoClicker")) {
         ac := g_Config["autoClicker"]
         if (ac.Has("button")) {
@@ -3197,13 +3288,13 @@ DoAutoClick() {
             limit := ac["limit"]
         }
     }
-    
+
     if (clickType = "Double") {
         Click(btn . " 2")
     } else {
         Click(btn)
     }
-    
+
     g_AutoClickerCount++
     if (limit > 0 && g_AutoClickerCount >= limit) {
         StopAutoClicker()
@@ -3230,18 +3321,18 @@ NotifyWebAutoClicker() {
 
 ApplyMacroRecorder() {
     global g_Config, g_ActiveHotkeys, g_IsEngineActive
-    
+
     StopAllMacros()
-    
+
     if (!g_Config.Has("macroRecorder") || !g_Config["macroRecorder"].Has("items")) {
         return
     }
-    
+
     modConfig := g_Config["macroRecorder"]
     if (modConfig.Has("enabled") && !modConfig["enabled"]) {
         return
     }
-    
+
     for item in modConfig["items"] {
         if (IsObject(item) && item.Has("trigger") && item.Has("steps")) {
             trig := Trim(item["trigger"])
@@ -3259,26 +3350,26 @@ ApplyMacroRecorder() {
 
 RegisterSingleMacro(item) {
     global g_ActiveHotkeys
-    
+
     trig := Trim(item["trigger"])
     ahkHk := NormalizeHotkeyToAhk(trig)
     if (ahkHk = "")
         ahkHk := trig
-        
+
     safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
     mode := item.Has("playbackMode") ? item["playbackMode"] : "NoRepeat"
-    
+
     switch mode {
         case "RepeatWhileHolding":
             Hotkey(safeHk, (*) => StartMacroHold(item), "On")
             Hotkey(safeHk . " Up", (*) => StopMacroHold(item), "On")
             g_ActiveHotkeys.Push(safeHk)
             g_ActiveHotkeys.Push(safeHk . " Up")
-            
+
         case "Toggle":
             Hotkey(safeHk, (*) => ToggleMacroLoop(item), "On")
             g_ActiveHotkeys.Push(safeHk)
-            
+
         default: ; NoRepeat / Once
             Hotkey(safeHk, (*) => ExecuteMacroAsync(item), "On")
             g_ActiveHotkeys.Push(safeHk)
@@ -3291,7 +3382,7 @@ ExecuteMacroAsync(item) {
         return
     if (!item.Has("steps") || !IsObject(item["steps"]))
         return
-        
+
     SetTimer(() => PlayMacroSteps(item["steps"]), -1)
 }
 
@@ -3301,18 +3392,18 @@ StartMacroHold(item) {
         return
     if (!item.Has("steps") || !IsObject(item["steps"]))
         return
-        
+
     if (!IsSet(g_MacroActiveTimers) || !IsObject(g_MacroActiveTimers))
         g_MacroActiveTimers := Map()
-        
+
     mId := item.Has("id") ? item["id"] : "hold_macro"
     if (g_MacroActiveTimers.Has(mId))
         return
-        
+
     interval := item.Has("repeatInterval") ? Max(10, Integer(item["repeatInterval"])) : 50
     timerFn := () => PlayMacroSteps(item["steps"])
     g_MacroActiveTimers[mId] := timerFn
-    
+
     SetTimer(timerFn, -1)
     SetTimer(timerFn, interval)
 }
@@ -3321,7 +3412,7 @@ StopMacroHold(item) {
     global g_MacroActiveTimers
     if (!IsSet(g_MacroActiveTimers) || !IsObject(g_MacroActiveTimers))
         return
-        
+
     mId := item.Has("id") ? item["id"] : "hold_macro"
     if (g_MacroActiveTimers.Has(mId)) {
         fn := g_MacroActiveTimers[mId]
@@ -3336,10 +3427,10 @@ ToggleMacroLoop(item) {
         return
     if (!item.Has("steps") || !IsObject(item["steps"]))
         return
-        
+
     if (!IsSet(g_MacroActiveTimers) || !IsObject(g_MacroActiveTimers))
         g_MacroActiveTimers := Map()
-        
+
     mId := item.Has("id") ? item["id"] : "toggle_macro"
     if (g_MacroActiveTimers.Has(mId)) {
         fn := g_MacroActiveTimers[mId]
@@ -3377,24 +3468,24 @@ PlayMacroSteps(steps) {
     global g_MacroIsExecuting
     if (!IsObject(steps) || g_MacroIsExecuting)
         return
-        
+
     g_MacroIsExecuting := true
     try {
         for s in steps {
             if (!IsObject(s))
                 continue
-                
+
             act := s.Has("action") ? s["action"] : "Down"
             k := s.Has("key") ? s["key"] : ""
             del := s.Has("delay") ? Max(5, Integer(s["delay"])) : 50
-            
+
             if (act = "Delay") {
                 Sleep(del)
                 continue
             }
             if (k = "")
                 continue
-                
+
             ; Mouse clicks
             if (k = "LButton" || k = "RButton" || k = "MButton" || k = "Left" || k = "Right" || k = "Middle") {
                 btn := (k = "Left") ? "LButton" : ((k = "Right") ? "RButton" : ((k = "Middle") ? "MButton" : k))
@@ -3425,29 +3516,31 @@ PlayMacroSteps(steps) {
 ; --- Low-Level Macro Recorder Hook ---
 
 StartMacroRecording(options := "") {
-    global g_MacroRecorderHook, g_MacroIsRecording, g_MacroLastTime, g_MacroRealDelays, g_MacroDefDelay, g_MacroActiveKeys
-    
+    global g_MacroRecorderHook, g_MacroIsRecording, g_MacroLastTime, g_MacroRealDelays, g_MacroDefDelay,
+        g_MacroActiveKeys
+
     StopMacroRecording()
-    
+
     g_MacroIsRecording := true
     g_MacroLastTime := 0
     g_MacroDefDelay := 50
     g_MacroRealDelays := false
     g_MacroActiveKeys := Map()
-    
+
     if (IsObject(options)) {
         if (options.Has("defDelay"))
             g_MacroDefDelay := Max(10, Integer(options["defDelay"]))
         if (options.Has("realDelays"))
-            g_MacroRealDelays := (options["realDelays"] = true || options["realDelays"] = 1 || options["realDelays"] = "true")
+            g_MacroRealDelays := (options["realDelays"] = true || options["realDelays"] = 1 || options["realDelays"] =
+                "true")
     }
-    
+
     ih := InputHook("I0")
     ih.KeyOpt("{All}", "+N")
     ih.VisibleNonText := false
     ih.OnKeyDown := (hook, vk, sc) => OnMacroRecordKeyDown(vk, sc)
     ih.OnKeyUp := (hook, vk, sc) => OnMacroRecordKeyUp(vk, sc)
-    
+
     g_MacroRecorderHook := ih
     ih.Start()
     SoundBeep(1100, 70)
@@ -3473,22 +3566,22 @@ OnMacroRecordKeyDown(vk, sc) {
     global g_MacroIsRecording, g_MacroLastTime, g_MacroRealDelays, g_MacroDefDelay, g_MacroActiveKeys, g_Wv
     if (!g_MacroIsRecording || !g_Wv)
         return
-        
+
     kName := NormalizeRecordedKey(vk, sc)
     if (kName = "")
         return
-        
+
     ; Ignore auto-repeat keydown
     if (g_MacroActiveKeys.Has(kName))
         return
-        
+
     tNow := A_TickCount
     del := (g_MacroRealDelays && g_MacroLastTime > 0) ? Max(10, tNow - g_MacroLastTime) : g_MacroDefDelay
     g_MacroLastTime := tNow
     g_MacroActiveKeys[kName] := tNow
-    
+
     ahkKey := (StrLen(kName) = 1) ? StrLower(kName) : ((kName = "Win") ? "LWin" : kName)
-    
+
     try {
         msg := JSON.stringify(Map(
             "type", "macroStepRecorded",
@@ -3504,11 +3597,11 @@ OnMacroRecordKeyUp(vk, sc) {
     global g_MacroIsRecording, g_MacroLastTime, g_MacroRealDelays, g_MacroDefDelay, g_MacroActiveKeys, g_Wv
     if (!g_MacroIsRecording || !g_Wv)
         return
-        
+
     kName := NormalizeRecordedKey(vk, sc)
     if (kName = "")
         return
-        
+
     tNow := A_TickCount
     del := g_MacroDefDelay
     if (g_MacroActiveKeys.Has(kName)) {
@@ -3519,9 +3612,9 @@ OnMacroRecordKeyUp(vk, sc) {
         del := Max(10, tNow - g_MacroLastTime)
     }
     g_MacroLastTime := tNow
-    
+
     ahkKey := (StrLen(kName) = 1) ? StrLower(kName) : ((kName = "Win") ? "LWin" : kName)
-    
+
     try {
         msg := JSON.stringify(Map(
             "type", "macroStepRecorded",
@@ -3542,7 +3635,7 @@ NormalizeRecordedKey(vk, sc) {
         return "Numpad" . (vk - 0x60)
     if (vk >= 0x70 && vk <= 0x87)
         return "F" . (vk - 0x6F)
-        
+
     switch vk {
         case 0x11, 0xA2, 0xA3: return "Ctrl"
         case 0x10, 0xA0, 0xA1: return "Shift"
@@ -3585,7 +3678,7 @@ NormalizeRecordedKey(vk, sc) {
         case 0xDD: return "]"
         case 0xDE: return "'"
     }
-    
+
     kName := GetKeyName(Format("vk{:02x}sc{:03x}", vk, sc))
     if (kName = "")
         return ""
@@ -3604,10 +3697,10 @@ NormalizeRecordedKey(vk, sc) {
 
 CreateMainWindow() {
     global g_MainGui, g_Wvc, g_Wv, APP_WIDTH, APP_HEIGHT, APP_NAME, g_Config
-    
+
     g_MainGui := Gui("+Resize +MaximizeBox +MinimizeBox", APP_NAME)
     g_MainGui.Opt("+MinSize720x520")
-    
+
     initBg := "e8dfd5"
     if (g_Config.Has("theme") && g_Config["theme"].Has("bgColor")) {
         cleanHex := StrReplace(g_Config["theme"]["bgColor"], "#", "")
@@ -3616,7 +3709,7 @@ CreateMainWindow() {
         }
     }
     g_MainGui.BackColor := initBg
-    
+
     targetMon := 0
     try {
         targetMon := MonitorGetPrimary()
@@ -3628,7 +3721,8 @@ CreateMainWindow() {
         if (winCfg.Has("monitor") && Integer(winCfg["monitor"]) > 0) {
             targetMon := Integer(winCfg["monitor"])
         } else if (winCfg.Has("x") && winCfg.Has("y") && winCfg.Has("width") && winCfg.Has("height")) {
-            targetMon := GetMonitorFromRect(Integer(winCfg["x"]), Integer(winCfg["y"]), Integer(winCfg["width"]), Integer(winCfg["height"]))
+            targetMon := GetMonitorFromRect(Integer(winCfg["x"]), Integer(winCfg["y"]), Integer(winCfg["width"]),
+            Integer(winCfg["height"]))
         }
     }
 
@@ -3644,7 +3738,7 @@ CreateMainWindow() {
     }
 
     GetDefaultWindowSize(&defW, &defH, &defX, &defY, targetMon)
-    
+
     winW := defW
     winH := defH
     posX := defX
@@ -3704,20 +3798,20 @@ CreateMainWindow() {
             isStartMax := 1
         }
     }
-    
+
     g_MainGui.OnEvent("Close", (*) => ExitApp())
     g_MainGui.OnEvent("Size", OnGuiSize)
-    
+
     ; Windows 11 hardware-accelerated rounded corners
     DllCall("dwmapi\DwmSetWindowAttribute", "ptr", g_MainGui.Hwnd, "uint", 33, "uint*", 2, "uint", 4)
     ; Disable DWM default border to remove top border line artifact (DWMWA_COLOR_NONE = 0xFFFFFFFE)
     DllCall("dwmapi\DwmSetWindowAttribute", "ptr", g_MainGui.Hwnd, "uint", 34, "uint*", 0xFFFFFFFE, "uint", 4)
-    
+
     ; Suppress Windows default top non-client frame calculation to eliminate the top white line artifact
     OnMessage(0x0083, OnNcCalcSize)
     OnMessage(0x0024, OnGetMinMaxInfo)
     OnMessage(0x0232, OnExitSizeMove)
-    
+
     ; Set App Icon for Windows Taskbar & System Tray
     iconPath := A_ScriptDir . "\app-icon.ico"
     if FileExist(iconPath) {
@@ -3725,15 +3819,17 @@ CreateMainWindow() {
             TraySetIcon(iconPath)
             cxBig := DllCall("GetSystemMetrics", "int", 11, "int")   ; SM_CXICON
             cyBig := DllCall("GetSystemMetrics", "int", 12, "int")   ; SM_CYICON
-            cxSm  := DllCall("GetSystemMetrics", "int", 49, "int")   ; SM_CXSMICON
-            cySm  := DllCall("GetSystemMetrics", "int", 50, "int")   ; SM_CYSMICON
+            cxSm := DllCall("GetSystemMetrics", "int", 49, "int")   ; SM_CXSMICON
+            cySm := DllCall("GetSystemMetrics", "int", 50, "int")   ; SM_CYSMICON
             cxBig := Max(cxBig, 32)
             cyBig := Max(cyBig, 32)
-            cxSm  := Max(cxSm, 16)
-            cySm  := Max(cySm, 16)
+            cxSm := Max(cxSm, 16)
+            cySm := Max(cySm, 16)
 
-            hIconBig := DllCall("LoadImage", "ptr", 0, "str", iconPath, "uint", 1, "int", cxBig, "int", cyBig, "uint", 0x00000010, "ptr")
-            hIconSmall := DllCall("LoadImage", "ptr", 0, "str", iconPath, "uint", 1, "int", cxSm, "int", cySm, "uint", 0x00000010, "ptr")
+            hIconBig := DllCall("LoadImage", "ptr", 0, "str", iconPath, "uint", 1, "int", cxBig, "int", cyBig, "uint",
+                0x00000010, "ptr")
+            hIconSmall := DllCall("LoadImage", "ptr", 0, "str", iconPath, "uint", 1, "int", cxSm, "int", cySm, "uint",
+                0x00000010, "ptr")
             if (hIconBig)
                 SendMessage(0x0080, 1, hIconBig, g_MainGui.Hwnd)
             if (hIconSmall)
@@ -3745,7 +3841,7 @@ CreateMainWindow() {
     if (isStartMax) {
         g_MainGui.Maximize()
     }
-    
+
     InitWebView2()
 }
 
@@ -3753,7 +3849,7 @@ OnNcCalcSize(wParam, lParam, msg, hwnd) {
     global g_MainGui
     if (!g_MainGui || hwnd != g_MainGui.Hwnd)
         return
-        
+
     ; If wParam is TRUE (1), lParam points to NCCALCSIZE_PARAMS
     if (wParam) {
         try {
@@ -3764,11 +3860,11 @@ OnNcCalcSize(wParam, lParam, msg, hwnd) {
                     mi := Buffer(40, 0)
                     NumPut("uint", 40, mi, 0)
                     if (DllCall("GetMonitorInfoW", "ptr", hMon, "ptr", mi)) {
-                        workLeft   := NumGet(mi, 20, "int")
-                        workTop    := NumGet(mi, 24, "int")
-                        workRight  := NumGet(mi, 28, "int")
+                        workLeft := NumGet(mi, 20, "int")
+                        workTop := NumGet(mi, 24, "int")
+                        workRight := NumGet(mi, 28, "int")
                         workBottom := NumGet(mi, 32, "int")
-                        
+
                         NumPut("int", workLeft, lParam, 0)
                         NumPut("int", workTop, lParam, 4)
                         NumPut("int", workRight, lParam, 8)
@@ -3787,26 +3883,26 @@ OnGetMinMaxInfo(wParam, lParam, msg, hwnd) {
     global g_MainGui
     if (!g_MainGui || hwnd != g_MainGui.Hwnd)
         return
-        
+
     hMon := DllCall("MonitorFromWindow", "ptr", hwnd, "uint", 2, "ptr") ; MONITOR_DEFAULTTONEAREST = 2
     if (!hMon)
         return
-        
+
     mi := Buffer(40, 0)
     NumPut("uint", 40, mi, 0)
     if (!DllCall("GetMonitorInfoW", "ptr", hMon, "ptr", mi))
         return
-        
-    monLeft   := NumGet(mi, 4, "int")
-    monTop    := NumGet(mi, 8, "int")
-    workLeft  := NumGet(mi, 20, "int")
-    workTop   := NumGet(mi, 24, "int")
+
+    monLeft := NumGet(mi, 4, "int")
+    monTop := NumGet(mi, 8, "int")
+    workLeft := NumGet(mi, 20, "int")
+    workTop := NumGet(mi, 24, "int")
     workRight := NumGet(mi, 28, "int")
-    workBottom:= NumGet(mi, 32, "int")
-    
+    workBottom := NumGet(mi, 32, "int")
+
     workW := workRight - workLeft
     workH := workBottom - workTop
-    
+
     ; ptMaxSize (offset 8) -> maximum window size when maximized to exact monitor work area (taskbar preserved)
     NumPut("int", workW, lParam, 8)
     NumPut("int", workH, lParam, 12)
@@ -3821,19 +3917,19 @@ OnGetMinMaxInfo(wParam, lParam, msg, hwnd) {
 
 InitWebView2() {
     global g_MainGui, g_Wvc, g_Wv
-    
+
     ; Dedicated WebView2 user data folder in AppData to prevent conflict with running Edge browser (0x800700AA)
     userDataDir := A_AppData . "\AutoHotKeyboard\WebView2"
     if !DirExist(userDataDir) {
         try DirCreate(userDataDir)
     }
-    
+
     ; Resolve architecture-specific WebView2Loader.dll path
     loaderDll := A_ScriptDir . "\lib\WebView2\" . (A_PtrSize = 8 ? "64bit" : "32bit") . "\WebView2Loader.dll"
     if (!FileExist(loaderDll)) {
         loaderDll := A_ScriptDir . "\WebView2Loader.dll"
     }
-    
+
     ; Attempt initialization with primary data directory, fallback to process-specific temp directory if locked
     envOpts := { AdditionalBrowserArguments: "--disable-features=FluentScrollbar,OverlayScrollbar" }
     try {
@@ -3851,39 +3947,39 @@ InitWebView2() {
             ExitApp()
         }
     }
-    
+
     try {
         g_Wv := g_Wvc.CoreWebView2
         try g_Wvc.DefaultBackgroundColor := 0
         try g_Wvc.Fill()
-        
+
         settings := g_Wv.Settings
         settings.AreDefaultContextMenusEnabled := false
         settings.IsStatusBarEnabled := false
         settings.AreDevToolsEnabled := true
         try settings.AreBrowserAcceleratorKeysEnabled := false
-        
+
         g_Wv.add_WebMessageReceived(WebView2.Handler(OnWebMessageReceived, 3))
         g_Wv.add_NavigationCompleted(WebView2.Handler((*) => SendInitialStateToWeb(), 3))
-        
+
         ; Inject initial config & theme before page DOM is created to prevent any reset or flash
         try {
             initJson := JSON.stringify(g_Config)
             g_Wv.AddScriptToExecuteOnDocumentCreatedAsync("window.__INITIAL_CONFIG__ = " . initJson . ";")
         }
-        
+
         htmlUri := "file:///" . StrReplace(A_ScriptDir . "\ui\index.html", "\", "/")
         g_Wv.Navigate(htmlUri)
         LogMessage("WebView2 successfully initialized and navigated to: " . htmlUri)
-        
+
         ; Start polling for active window changes to update Window Manager volume live
         SetTimer(CheckActiveAppFocus, 400)
         ; Start polling for real-time application profile auto-switching
         SetTimer(CheckAutoProfileSwitch, 350)
-        
+
         ; Enable window resizing/moving tracking only after window has fully initialized
         SetTimer(() => (g_IsWindowReady := true), -500)
-        
+
     } catch as err {
         LogMessage("FATAL: Failed to configure WebView2: " . err.Message)
         MsgBox("Failed to configure WebView2: " . err.Message, "AutoHotKeyboard Error", 16)
@@ -3961,25 +4057,25 @@ SaveWindowSizeDebounced() {
 
 OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
     global g_MainGui, g_Wv, g_Config, g_IsEngineActive, CONFIG_FILE
-    
+
     args := WebView2.WebMessageReceivedEventArgs(argsPtr)
     rawJson := args.TryGetWebMessageAsString()
-    
+
     if (rawJson = "") {
         return
     }
-    
+
     try {
         msg := JSON.parse(rawJson, false, true)
         action := msg.Has("action") ? msg["action"] : ""
-        
+
         switch action {
             case "getInitialState":
                 SendInitialStateToWeb()
-                
+
             case "launchColorPicker":
                 StartColorPicker()
-                
+
             case "setColorFormat":
                 if (msg.Has("format") && msg["format"] != "") {
                     global g_ColorPickerFormat
@@ -3990,7 +4086,7 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                     g_Config["windowManager"]["colorFormat"] := msg["format"]
                     SaveConfigToFile()
                 }
-                
+
             case "saveState":
                 if (msg.Has("config") && IsObject(msg["config"])) {
                     newConfig := msg["config"]
@@ -4011,7 +4107,7 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                     ApplyAllModules()
                     ProfileAppScanner.EnsureAllProfileIcons()
                 }
-                
+
             case "startDrag":
                 if (g_MainGui) {
                     DllCall("ReleaseCapture")
@@ -4021,7 +4117,7 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                             CoordMode("Mouse", "Screen")
                             MouseGetPos(&mX, &mY)
                             g_MainGui.Restore()
-                            g_MainGui.GetPos(,, &wW, &wH)
+                            g_MainGui.GetPos(, , &wW, &wH)
                             newX := mX - (wW // 2)
                             newY := Max(0, mY - 20)
                             g_MainGui.Move(newX, newY)
@@ -4029,28 +4125,28 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                     }
                     PostMessage(0x0112, 0xF012, 0, g_MainGui.Hwnd) ; WM_SYSCOMMAND, SC_MOVE | HTCAPTION
                 }
-                
+
             case "startResize":
                 dir := msg.Has("dir") ? msg["dir"] : "se"
                 dirCode := 8
                 switch dir {
-                    case "w":  dirCode := 1  ; Left
-                    case "e":  dirCode := 2  ; Right
-                    case "n":  dirCode := 3  ; Top
+                    case "w": dirCode := 1  ; Left
+                    case "e": dirCode := 2  ; Right
+                    case "n": dirCode := 3  ; Top
                     case "nw": dirCode := 4  ; Top-left
                     case "ne": dirCode := 5  ; Top-right
-                    case "s":  dirCode := 6  ; Bottom
+                    case "s": dirCode := 6  ; Bottom
                     case "sw": dirCode := 7  ; Bottom-left
                     case "se": dirCode := 8  ; Bottom-right
                 }
                 DllCall("ReleaseCapture")
                 PostMessage(0x0112, 0xF000 + dirCode, 0, g_MainGui.Hwnd)
-                
+
             case "runLauncher":
                 if (msg.Has("target")) {
                     RunLauncherTarget("", msg["target"])
                 }
-                
+
             case "toggleAutoClicker":
                 ToggleAutoClicker()
 
@@ -4067,7 +4163,8 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
             case "setMacroRecordingOptions":
                 global g_MacroRealDelays, g_MacroDefDelay
                 if (msg.Has("realDelays"))
-                    g_MacroRealDelays := (msg["realDelays"] = true || msg["realDelays"] = 1 || msg["realDelays"] = "true")
+                    g_MacroRealDelays := (msg["realDelays"] = true || msg["realDelays"] = 1 || msg["realDelays"] =
+                        "true")
                 if (msg.Has("defDelay"))
                     g_MacroDefDelay := Max(10, Integer(msg["defDelay"]))
 
@@ -4083,10 +4180,10 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
 
             case "stopAllMacros":
                 StopAllMacros()
-                
+
             case "minimize":
                 g_MainGui.Minimize()
-                
+
             case "maximize":
                 if (g_MainGui) {
                     try {
@@ -4098,20 +4195,24 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                         }
                     }
                 }
-                
+
             case "close":
-                ExitApp()
-                
+                SetTimer(() => ExitApp(), -1)
+
+            case "openLog":
+                OpenDebugLog()
+
             case "reload":
                 InitConfig()
                 SendInitialStateToWeb()
-                
+
             case "openConfig":
                 try Run('explorer.exe /select,"' . CONFIG_FILE . '"')
-                
+
             case "browseApp":
                 try {
-                    selectedFile := FileSelect(1, , "Select Application or Executable", "Programs (*.exe; *.lnk; *.bat; *.cmd; *.com; *.ps1; *.vbs)|All Files (*.*)")
+                    selectedFile := FileSelect(1, , "Select Application or Executable",
+                        "Programs (*.exe; *.lnk; *.bat; *.cmd; *.com; *.ps1; *.vbs)|All Files (*.*)")
                     if (selectedFile != "") {
                         SplitPath(selectedFile, &outFileName, &outDir, &outExt, &outNameNoExt)
                         if (g_Wv) {
@@ -4194,7 +4295,8 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
 
             case "browseProfileApp":
                 try {
-                    selectedFile := FileSelect(1, , "Select Target Application", "Programs (*.exe; *.lnk; *.bat; *.cmd; *.com)|All Files (*.*)")
+                    selectedFile := FileSelect(1, , "Select Target Application",
+                        "Programs (*.exe; *.lnk; *.bat; *.cmd; *.com)|All Files (*.*)")
                     if (selectedFile != "") {
                         SplitPath(selectedFile, &outFileName, &outDir, &outExt, &outNameNoExt)
                         iconName := outNameNoExt
@@ -4226,11 +4328,12 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
 }
 
 SendInitialStateToWeb() {
-    global g_Wv, g_Config, g_IsEngineActive, g_AutoClickerRunning, g_SleepTimerActive, g_SleepTimerSecondsLeft, g_SleepTimerMode
+    global g_Wv, g_Config, g_IsEngineActive, g_AutoClickerRunning, g_SleepTimerActive, g_SleepTimerSecondsLeft,
+        g_SleepTimerMode
     if (!g_Wv) {
         return
     }
-    
+
     try {
         isMax := false
         if (g_MainGui) {
@@ -4259,19 +4362,29 @@ SendInitialStateToWeb() {
 
 SetupTrayMenu() {
     global g_MainGui, APP_NAME
-    
+
     iconPath := A_ScriptDir . "\app-icon.ico"
     if FileExist(iconPath) {
         try TraySetIcon(iconPath)
     }
-    
+
     tray := A_TrayMenu
     tray.Delete()
     tray.Add("Show AutoHotKeyboard", (*) => (g_MainGui.Restore(), g_MainGui.Show()))
     tray.Add("Toggle Active/Suspended", (*) => ToggleEngineFromTray())
+    tray.Add("View Debug Log", (*) => OpenDebugLog())
     tray.Add()
     tray.Add("Exit", (*) => ExitApp())
     tray.Default := "Show AutoHotKeyboard"
+}
+
+OpenDebugLog() {
+    logPath := A_ScriptDir . "\debug.log"
+    if (!FileExist(logPath)) {
+        try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") . " [AutoHotKeyboard] Log file initialized.`n", logPath,
+        "UTF-8")
+    }
+    try Run('notepad.exe "' . logPath . '"')
 }
 
 ToggleEngineFromTray() {
@@ -4280,7 +4393,7 @@ ToggleEngineFromTray() {
     g_Config["enabled"] := g_IsEngineActive
     SaveConfigToFile()
     ApplyAllModules()
-    
+
     if (g_Wv) {
         try {
             msg := JSON.stringify(Map(
@@ -4309,14 +4422,15 @@ global g_GestureWheelFired := false
 global g_RockerFired := false
 
 ApplyMouseGestures() {
-    global g_Config, g_ActiveHotkeys, g_IsEngineActive, g_WheelGesturesActive, g_RockerGesturesActive, g_WheelTriggerBtn
-    
+    global g_Config, g_ActiveHotkeys, g_IsEngineActive, g_WheelGesturesActive, g_RockerGesturesActive,
+        g_WheelTriggerBtn
+
     if (!g_Config.Has("mouseGestures")) {
         return
     }
-    
+
     mg := g_Config["mouseGestures"]
-    
+
     ; 1. Screen Hot Corners
     cornersOn := (mg.Has("cornersEnabled") && (mg["cornersEnabled"] = 1 || mg["cornersEnabled"] = true))
     if (cornersOn && g_IsEngineActive) {
@@ -4324,7 +4438,7 @@ ApplyMouseGestures() {
     } else {
         SetTimer(CheckScreenHotCorners, 0)
     }
-    
+
     ; 2. Mouse Gestures
     gesturesOn := (mg.Has("gesturesEnabled") && (mg["gesturesEnabled"] = 1 || mg["gesturesEnabled"] = true))
     trigBtn := mg.Has("triggerButton") && Trim(mg["triggerButton"]) != "" ? Trim(mg["triggerButton"]) : "MButton"
@@ -4338,7 +4452,7 @@ ApplyMouseGestures() {
 
     ; 2b. Gesture Wheel Scrolling (Hold Trigger + Wheel)
     wheelOn := (mg.Has("wheelGestureEnabled") && (mg["wheelGestureEnabled"] = 1 || mg["wheelGestureEnabled"] = true))
-            || (mg.Has("wheelGesturesEnabled") && (mg["wheelGesturesEnabled"] = 1 || mg["wheelGesturesEnabled"] = true))
+    || (mg.Has("wheelGesturesEnabled") && (mg["wheelGesturesEnabled"] = 1 || mg["wheelGesturesEnabled"] = true))
     g_WheelGesturesActive := (wheelOn && g_IsEngineActive)
     g_WheelTriggerBtn := trigBtn
 
@@ -4348,16 +4462,16 @@ ApplyMouseGestures() {
 }
 
 #HotIf g_RockerGesturesActive && GetKeyState("RButton", "P")
-*LButton::HandleRockerLeft()
+*LButton:: HandleRockerLeft()
 #HotIf
 
 #HotIf g_RockerGesturesActive && GetKeyState("LButton", "P")
-*RButton::HandleRockerRight()
+*RButton:: HandleRockerRight()
 #HotIf
 
 #HotIf g_WheelGesturesActive && (GetKeyState(g_WheelTriggerBtn, "P") || g_GestureTriggerDown)
-*WheelUp::HandleGestureWheel(1)
-*WheelDown::HandleGestureWheel(-1)
+*WheelUp:: HandleGestureWheel(1)
+*WheelDown:: HandleGestureWheel(-1)
 #HotIf
 
 HandleGestureWheel(direction) {
@@ -4414,30 +4528,30 @@ HandleRockerRight() {
 
 CheckScreenHotCorners() {
     global g_Config, g_CornerActive, g_CornerTick, g_CornerTriggered, g_IsEngineActive
-    
+
     if (!g_IsEngineActive || !g_Config.Has("mouseGestures")) {
         return
     }
-    
+
     mg := g_Config["mouseGestures"]
     if (!mg.Has("cornersEnabled") || (!mg["cornersEnabled"])) {
         return
     }
-    
+
     dwellMs := mg.Has("dwellDuration") ? Integer(mg["dwellDuration"]) : 250
     if (dwellMs < 20) {
         dwellMs := 20
     }
-    
+
     CoordMode("Mouse", "Screen")
     MouseGetPos(&mx, &my)
-    
+
     cornerName := ""
     tol := mg.Has("cornerSize") ? Max(5, Min(40, Integer(mg["cornerSize"]))) : 14
-    
+
     ; Check across each individual active physical monitor
     monCount := MonitorGetCount()
-    Loop monCount {
+    loop monCount {
         MonitorGet(A_Index, &mL, &mT, &mR, &mB)
         ; Check if mouse is on this monitor (or within tolerance)
         if (mx >= mL - tol && mx <= mR + tol && my >= mT - tol && my <= mB + tol) {
@@ -4455,7 +4569,7 @@ CheckScreenHotCorners() {
             }
         }
     }
-    
+
     if (cornerName != "") {
         if (g_CornerActive != cornerName) {
             g_CornerActive := cornerName
@@ -4485,17 +4599,17 @@ HandleMouseGesture(triggerBtn) {
         Click(triggerBtn)
         return
     }
-    
+
     mg := g_Config["mouseGestures"]
     timeoutMs := mg.Has("gestureTimeout") ? mg["gestureTimeout"] : 1200
     threshPx := mg.Has("strokeThreshold") ? mg["strokeThreshold"] : 35
     isRockerOn := (mg.Has("rockerEnabled") && (mg["rockerEnabled"] = 1 || mg["rockerEnabled"] = true))
-    
+
     CoordMode("Mouse", "Screen")
     MouseGetPos(&startX, &startY)
     startTick := A_TickCount
     rockerTriggered := false
-    
+
     ; Wait while trigger button is physically held down
     while GetKeyState(triggerBtn, "P") {
         Sleep(15)
@@ -4524,14 +4638,14 @@ HandleMouseGesture(triggerBtn) {
         g_RockerFired := false
         return
     }
-    
+
     elapsed := A_TickCount - startTick
     MouseGetPos(&endX, &endY)
-    
+
     dx := endX - startX
     dy := endY - startY
     dist := Sqrt((dx * dx) + (dy * dy))
-    
+
     ; If the movement did not exceed threshold, perform standard click (e.g. right-click menu)
     if (dist < threshPx) {
         if (triggerBtn = "RButton") {
@@ -4545,16 +4659,16 @@ HandleMouseGesture(triggerBtn) {
         }
         return
     }
-    
+
     ; If held longer than 3.5s without completing, abort to prevent accidental stroke execution
     if (elapsed > 3500) {
         return
     }
-    
+
     ; 8-octant angle detection: (0=Up, 1=UpRight, 2=Right, 3=DownRight, 4=Down, 5=DownLeft, 6=Left, 7=UpLeft)
     angle := (ATan2(dx, -dy) * 57.2957795)
     if (angle < 0) angle += 360
-    octant := Mod(Round(angle / 45.0), 8)
+        octant := Mod(Round(angle / 45.0), 8)
 
     gesture := ""
     switch octant {
@@ -4567,7 +4681,7 @@ HandleMouseGesture(triggerBtn) {
         case 6: gesture := "actionLeft"
         case 7: gesture := "actionUpLeft"
     }
-    
+
     actionName := mg.Has(gesture) ? mg[gesture] : ""
     if (actionName != "" && StrLower(actionName) != "none") {
         ; Activate the window under the starting point so actions apply to it
@@ -4584,7 +4698,7 @@ HandleMouseGesture(triggerBtn) {
 
 ExecuteSystemAction(actionName, triggerSource := "") {
     global g_Wv
-    
+
     switch actionName {
         case "TaskView":
             Send("#{Tab}")
@@ -4601,7 +4715,7 @@ ExecuteSystemAction(actionName, triggerSource := "") {
         case "Hibernate":
             res := DllCall("PowrProf\SetSuspendState", "int", 1, "int", 0, "int", 0)
             if (!res) {
-                Run("shutdown /h",, "Hide")
+                Run("shutdown /h", , "Hide")
             }
         case "MuteVolume":
             Send("{Volume_Mute}")
@@ -4698,7 +4812,7 @@ ExecuteSystemAction(actionName, triggerSource := "") {
                 actionCoreId := RegExReplace(actionName, "^(al-)+", "")
                 targetToRun := ""
                 targetName := ""
-                
+
                 ; 1. Search in active profile's appLauncher
                 if (g_Config.Has("appLauncher") && g_Config["appLauncher"].Has("items")) {
                     for item in g_Config["appLauncher"]["items"] {
@@ -4712,7 +4826,7 @@ ExecuteSystemAction(actionName, triggerSource := "") {
                         }
                     }
                 }
-                
+
                 ; 2. Fallback: Search across all profiles
                 if (targetToRun == "" && g_Config.Has("profiles")) {
                     for pName, pData in g_Config["profiles"] {
@@ -4730,11 +4844,11 @@ ExecuteSystemAction(actionName, triggerSource := "") {
                         }
                     }
                 }
-                
+
                 if (targetName != "") {
                     displayActionName := targetName
                 }
-                
+
                 if (targetToRun != "") {
                     try {
                         Run(targetToRun)
@@ -4750,7 +4864,7 @@ ExecuteSystemAction(actionName, triggerSource := "") {
                 actionCoreId := RegExReplace(actionName, "^(macro-)+", "")
                 macroToRun := ""
                 macroName := ""
-                
+
                 ; 1. Search in active profile's macroRecorder
                 if (g_Config.Has("macroRecorder") && g_Config["macroRecorder"].Has("items")) {
                     for item in g_Config["macroRecorder"]["items"] {
@@ -4764,7 +4878,7 @@ ExecuteSystemAction(actionName, triggerSource := "") {
                         }
                     }
                 }
-                
+
                 ; 2. Fallback: Search across all profiles
                 if (!IsObject(macroToRun) && g_Config.Has("profiles")) {
                     for pName, pData in g_Config["profiles"] {
@@ -4782,19 +4896,19 @@ ExecuteSystemAction(actionName, triggerSource := "") {
                         }
                     }
                 }
-                
+
                 if (macroName != "") {
                     displayActionName := macroName
                 }
-                
+
                 if (IsObject(macroToRun)) {
                     try ExecuteMacroAsync(macroToRun)
                 }
             }
     }
-    
+
     SoundBeep(1100, 45)
-    
+
     if (g_Wv) {
         try {
             ; Friendly source mapping
@@ -4803,7 +4917,7 @@ ExecuteSystemAction(actionName, triggerSource := "") {
             friendlySource := StrReplace(friendlySource, "cornerTopRight", "Top-Right Corner")
             friendlySource := StrReplace(friendlySource, "cornerBottomLeft", "Bottom-Left Corner")
             friendlySource := StrReplace(friendlySource, "cornerBottomRight", "Bottom-Right Corner")
-            
+
             msg := JSON.stringify(Map(
                 "type", "moduleEvent",
                 "module", "systemTools",
@@ -4820,18 +4934,18 @@ ExecuteSystemAction(actionName, triggerSource := "") {
 
 ApplyRadialMenu() {
     global g_Config, g_ActiveHotkeys, g_IsEngineActive
-    
+
     if (!g_Config.Has("radialMenu")) {
         return
     }
-    
+
     rm := g_Config["radialMenu"]
     isEnabled := (rm.Has("enabled") && (rm["enabled"] = 1 || rm["enabled"] = true))
     trig := (rm.Has("triggerButton") && Trim(rm["triggerButton"]) != "") ? Trim(rm["triggerButton"]) : "MButton"
     if (!isEnabled || !g_IsEngineActive || StrLower(trig) = "none") {
         return
     }
-    
+
     try {
         hkStr := "*" . trig
         Hotkey(hkStr, (*) => HandleRadialMenuTrigger(trig), "On")
@@ -4845,22 +4959,27 @@ HandleRadialMenuTrigger(trigBtn) {
         Click(trigBtn)
         return
     }
-    
+
     rm := g_Config["radialMenu"]
     slices := rm.Has("slices") ? rm["slices"] : []
     radSize := rm.Has("wheelRadius") ? rm["wheelRadius"] : 180
     sliceCount := (rm.Has("sliceCount") && rm["sliceCount"] = 4) ? 4 : 8
     centerAction := rm.Has("centerAction") ? Trim(rm["centerAction"]) : ""
-    
+
     CoordMode("Mouse", "Screen")
     MouseGetPos(&originX, &originY)
-    
+
     RadialMenuHUD.ShowMenu(originX, originY, radSize, slices, trigBtn, sliceCount, centerAction)
 }
 
 class RadialMenuHUD {
     static guiObj := 0
     static isShowing := false
+    static pressedKey := ""
+
+    static OnHotKey(key) {
+        this.pressedKey := StrLower(key)
+    }
 
     static GetActionFriendlyName(actionName) {
         static nameMap := Map(
@@ -4928,10 +5047,14 @@ class RadialMenuHUD {
             DllCall("gdiplus\GdipAddPathEllipse", "ptr", pPath, "float", x, "float", y, "float", w, "float", h)
         } else {
             d := r * 2.0
-            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y, "float", d, "float", d, "float", 180.0, "float", 90.0)
-            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y, "float", d, "float", d, "float", 270.0, "float", 90.0)
-            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y + h - d, "float", d, "float", d, "float", 0.0, "float", 90.0)
-            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y + h - d, "float", d, "float", d, "float", 90.0, "float", 90.0)
+            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y, "float", d, "float", d, "float",
+                180.0, "float", 90.0)
+            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y, "float", d, "float", d,
+                "float", 270.0, "float", 90.0)
+            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y + h - d, "float", d, "float",
+                d, "float", 0.0, "float", 90.0)
+            DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y + h - d, "float", d, "float", d,
+                "float", 90.0, "float", 90.0)
             DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
         }
     }
@@ -4941,10 +5064,20 @@ class RadialMenuHUD {
         if (this.isShowing)
             return
         this.isShowing := true
+        this.pressedKey := ""
+
+        ; If triggered by a Space combo, wait for Space release so center hub isn't immediately activated
+        if (InStr(trigBtn, "SPACE") || InStr(trigBtn, "Space")) {
+            while (GetKeyState("Space", "P")) {
+                Sleep(10)
+            }
+        }
 
         sliceCount := (sliceCount = 4) ? 4 : 8
         is4Slice := (sliceCount = 4)
         dirs := is4Slice ? ["N", "E", "S", "W"] : ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        ; Ergonomic WASD-cluster key mapping: N=W, NE=E, E=D, SE=C, S=S, SW=Z, W=A, NW=Q
+        dirs := is4Slice ? ["W", "D", "S", "A"] : ["W", "E", "D", "C", "S", "Z", "A", "Q"]
         wedgeStep := is4Slice ? 90.0 : 45.0
         halfWedge := wedgeStep / 2.0
         cardinalMap := is4Slice ? [1, 3, 5, 7] : [1, 2, 3, 4, 5, 6, 7, 8]
@@ -4964,9 +5097,12 @@ class RadialMenuHUD {
         nodeHoverDiam := 58.0 * dpiScale
 
         ; Read active theme dynamically
-        themeBg := (g_Config.Has("theme") && g_Config["theme"].Has("bgColor")) ? g_Config["theme"]["bgColor"] : "#f1f5f9"
-        themeAccent := (g_Config.Has("theme") && g_Config["theme"].Has("accentColor")) ? g_Config["theme"]["accentColor"] : "#2563eb"
-        themeRadius := (g_Config.Has("theme") && g_Config["theme"].Has("radius")) ? Integer(g_Config["theme"]["radius"]) : 10
+        themeBg := (g_Config.Has("theme") && g_Config["theme"].Has("bgColor")) ? g_Config["theme"]["bgColor"] :
+            "#f1f5f9"
+        themeAccent := (g_Config.Has("theme") && g_Config["theme"].Has("accentColor")) ? g_Config["theme"][
+            "accentColor"] : "#2563eb"
+        themeRadius := (g_Config.Has("theme") && g_Config["theme"].Has("radius")) ? Integer(g_Config["theme"]["radius"]
+        ) : 10
 
         bgArgb := RadialMenuHUD.ParseHexColor(themeBg, 255)
         accentArgb := RadialMenuHUD.ParseHexColor(themeAccent, 255)
@@ -4996,7 +5132,8 @@ class RadialMenuHUD {
         NumPut("ushort", 32, bi, 14)
 
         pBits := 0
-        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0, "ptr")
+        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0,
+            "ptr")
         hOldBmp := DllCall("SelectObject", "ptr", hMemDC, "ptr", hBmp, "ptr")
 
         pGraphics := 0
@@ -5006,7 +5143,8 @@ class RadialMenuHUD {
 
         ; GDI+ Fonts matching JetBrains Mono / Segoe UI
         pFamily := 0
-        if (DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "JetBrains Mono", "ptr", 0, "ptr*", &pFamily) != 0 || !pFamily) {
+        if (DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "JetBrains Mono", "ptr", 0, "ptr*", &pFamily) != 0 ||
+        !pFamily) {
             DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "Segoe UI", "ptr", 0, "ptr*", &pFamily)
         }
         scaleRatio := radSize / 180.0
@@ -5018,11 +5156,14 @@ class RadialMenuHUD {
         pFontDir := 0
         DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontDirSize, "int", 1, "int", 2, "ptr*", &pFontDir)
         pFontLabel := 0
-        DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontLabelSize, "int", 1, "int", 2, "ptr*", &pFontLabel)
+        DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontLabelSize, "int", 1, "int", 2, "ptr*", &
+            pFontLabel)
         pFontCenter := 0
-        DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontCenterSize, "int", 1, "int", 2, "ptr*", &pFontCenter)
+        DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontCenterSize, "int", 1, "int", 2, "ptr*", &
+            pFontCenter)
         pFontCenterAction := 0
-        DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontCenterActionSize, "int", 1, "int", 2, "ptr*", &pFontCenterAction)
+        DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontCenterActionSize, "int", 1, "int", 2, "ptr*", &
+            pFontCenterAction)
 
         ; String formats (centered)
         pFormat := 0
@@ -5032,9 +5173,11 @@ class RadialMenuHUD {
 
         ; Brushes & Pens dynamically mapped to the current theme
         cBackdrop := (0xFC << 24) | (bgArgb & 0x00FFFFFF)
-        cBorder := isLight ? ((0x80 << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, -45) & 0x00FFFFFF)) : ((0x60 << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, 40) & 0x00FFFFFF))
+        cBorder := isLight ? ((0x80 << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, -45) & 0x00FFFFFF)) : ((0x60 << 24
+        ) | (RadialMenuHUD.AdjustBrightness(bgArgb, 40) & 0x00FFFFFF))
         cShadow := isLight ? ((0x30 << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, -60) & 0x00FFFFFF)) : 0x50000000
-        cSpoke := isLight ? ((0x35 << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, -50) & 0x00FFFFFF)) : ((0x30 << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, 50) & 0x00FFFFFF))
+        cSpoke := isLight ? ((0x35 << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, -50) & 0x00FFFFFF)) : ((0x30 << 24) |
+        (RadialMenuHUD.AdjustBrightness(bgArgb, 50) & 0x00FFFFFF))
         cHoverWedge := (0x35 << 24) | (accentArgb & 0x00FFFFFF)
 
         cNodeNormalBg := (0xFF << 24) | (RadialMenuHUD.AdjustBrightness(bgArgb, isLight ? 10 : 15) & 0x00FFFFFF)
@@ -5073,23 +5216,27 @@ class RadialMenuHUD {
         DllCall("gdiplus\GdipCreateSolidFill", "uint", cNodeNormalBg, "ptr*", &pNodeNormalBrush)
 
         pNodeNormalPen := 0
-        DllCall("gdiplus\GdipCreatePen1", "uint", cNodeNormalBorder, "float", 1.5 * dpiScale, "int", 2, "ptr*", &pNodeNormalPen)
+        DllCall("gdiplus\GdipCreatePen1", "uint", cNodeNormalBorder, "float", 1.5 * dpiScale, "int", 2, "ptr*", &
+            pNodeNormalPen)
 
         pNodeHoverBrush := 0
         DllCall("gdiplus\GdipCreateSolidFill", "uint", cNodeHoverBg, "ptr*", &pNodeHoverBrush)
 
         pNodeHoverPen := 0
-        DllCall("gdiplus\GdipCreatePen1", "uint", cNodeHoverBorder, "float", 2.2 * dpiScale, "int", 2, "ptr*", &pNodeHoverPen)
+        DllCall("gdiplus\GdipCreatePen1", "uint", cNodeHoverBorder, "float", 2.2 * dpiScale, "int", 2, "ptr*", &
+            pNodeHoverPen)
 
         ; Center Hub
         pCenterHubBrush := 0
         DllCall("gdiplus\GdipCreateSolidFill", "uint", cCenterHubBg, "ptr*", &pCenterHubBrush)
 
         pCenterHubPen := 0
-        DllCall("gdiplus\GdipCreatePen1", "uint", cCenterHubBorder, "float", 2.0 * dpiScale, "int", 2, "ptr*", &pCenterHubPen)
+        DllCall("gdiplus\GdipCreatePen1", "uint", cCenterHubBorder, "float", 2.0 * dpiScale, "int", 2, "ptr*", &
+            pCenterHubPen)
 
         pTargetIconPen := 0
-        DllCall("gdiplus\GdipCreatePen1", "uint", cTargetIcon, "float", 1.6 * dpiScale, "int", 2, "ptr*", &pTargetIconPen)
+        DllCall("gdiplus\GdipCreatePen1", "uint", cTargetIcon, "float", 1.6 * dpiScale, "int", 2, "ptr*", &
+            pTargetIconPen)
 
         pTargetIconDotBrush := 0
         DllCall("gdiplus\GdipCreateSolidFill", "uint", cTargetIcon, "ptr*", &pTargetIconDotBrush)
@@ -5129,14 +5276,16 @@ class RadialMenuHUD {
             ; 1. Outer backdrop path (sharp square if radius 0, squircle, or circle)
             pBackdropPath := 0
             DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &pBackdropPath)
-            RadialMenuHUD.AddShapeToPath(pBackdropPath, cx - R_outer, cy - R_outer, R_outer * 2.0, R_outer * 2.0, outerCornerR)
+            RadialMenuHUD.AddShapeToPath(pBackdropPath, cx - R_outer, cy - R_outer, R_outer * 2.0, R_outer * 2.0,
+                outerCornerR)
 
             ; Shadow path
             pShadowPath := 0
             DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &pShadowPath)
             shadowOffset := 1.5 * dpiScale
             shadowR := (outerCornerR > 0) ? (outerCornerR + shadowOffset) : 0.0
-            RadialMenuHUD.AddShapeToPath(pShadowPath, cx - R_outer - shadowOffset, cy - R_outer - shadowOffset, (R_outer + shadowOffset) * 2.0, (R_outer + shadowOffset) * 2.0, shadowR)
+            RadialMenuHUD.AddShapeToPath(pShadowPath, cx - R_outer - shadowOffset, cy - R_outer - shadowOffset, (
+                R_outer + shadowOffset) * 2.0, (R_outer + shadowOffset) * 2.0, shadowR)
             DllCall("gdiplus\GdipDrawPath", "ptr", pGraphics, "ptr", pWheelShadowPen, "ptr", pShadowPath)
             DllCall("gdiplus\GdipDeletePath", "ptr", pShadowPath)
 
@@ -5148,20 +5297,22 @@ class RadialMenuHUD {
                 DllCall("gdiplus\GdipSetClipPath", "ptr", pGraphics, "ptr", pBackdropPath, "int", 0)
                 startAngle := (selIndex * wedgeStep) - 90.0 - halfWedge
                 DllCall("gdiplus\GdipFillPie", "ptr", pGraphics, "ptr", pHoverWedgeBrush
-                    , "float", cx - R_outer * 1.5, "float", cy - R_outer * 1.5, "float", R_outer * 3.0, "float", R_outer * 3.0
+                    , "float", cx - R_outer * 1.5, "float", cy - R_outer * 1.5, "float", R_outer * 3.0, "float",
+                    R_outer * 3.0
                     , "float", startAngle, "float", wedgeStep)
                 DllCall("gdiplus\GdipResetClip", "ptr", pGraphics)
             }
 
             ; 3. Radial Spoke Dividers (clipped to backdrop)
             DllCall("gdiplus\GdipSetClipPath", "ptr", pGraphics, "ptr", pBackdropPath, "int", 0)
-            Loop (is4Slice ? 4 : 8) {
+            loop (is4Slice ? 4 : 8) {
                 spokeAng := ((A_Index - 1) * wedgeStep - 90.0 - halfWedge) * (0.0174532925)
                 x1 := cx + R_inner * Cos(spokeAng)
                 y1 := cy + R_inner * Sin(spokeAng)
                 x2 := cx + R_outer * 1.5 * Cos(spokeAng)
                 y2 := cy + R_outer * 1.5 * Sin(spokeAng)
-                DllCall("gdiplus\GdipDrawLine", "ptr", pGraphics, "ptr", pSpokePen, "float", x1, "float", y1, "float", x2, "float", y2)
+                DllCall("gdiplus\GdipDrawLine", "ptr", pGraphics, "ptr", pSpokePen, "float", x1, "float", y1, "float",
+                    x2, "float", y2)
             }
             DllCall("gdiplus\GdipResetClip", "ptr", pGraphics)
 
@@ -5170,7 +5321,7 @@ class RadialMenuHUD {
             DllCall("gdiplus\GdipDeletePath", "ptr", pBackdropPath)
 
             ; 5. Slice Option Labels (Floating freely without surrounding boxes, scaling with wheel diameter)
-            Loop (is4Slice ? 4 : 8) {
+            loop (is4Slice ? 4 : 8) {
                 idx := A_Index - 1
                 isHov := (idx == selIndex)
                 rad := (idx * wedgeStep - 90.0) * (0.0174532925)
@@ -5192,7 +5343,8 @@ class RadialMenuHUD {
                 NumPut("float", tagW, rectBuf, 8)
                 NumPut("float", tagH, rectBuf, 12)
                 DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", dirs[idx + 1], "int", -1
-                    , "ptr", pFontDir, "ptr", rectBuf.Ptr, "ptr", pFormat, "ptr", (isHov ? pTextTagHoverBrush : pTextTagNormalBrush))
+                    , "ptr", pFontDir, "ptr", rectBuf.Ptr, "ptr", pFormat, "ptr", (isHov ? pTextTagHoverBrush :
+                        pTextTagNormalBrush))
 
                 ; Action Label (OCR, Next Desk, etc.)
                 NumPut("float", nx - (lblW / 2.0), rectBuf, 0)
@@ -5200,15 +5352,18 @@ class RadialMenuHUD {
                 NumPut("float", lblW, rectBuf, 8)
                 NumPut("float", lblH, rectBuf, 12)
                 DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", friendly, "int", -1
-                    , "ptr", pFontLabel, "ptr", rectBuf.Ptr, "ptr", pFormat, "ptr", (isHov ? pTextLblHoverBrush : pTextLblNormalBrush))
+                    , "ptr", pFontLabel, "ptr", rectBuf.Ptr, "ptr", pFormat, "ptr", (isHov ? pTextLblHoverBrush :
+                        pTextLblNormalBrush))
             }
 
             ; 6. Center Hub (Recessed Hub with Target Icon or Action Name)
             pHubPath := 0
             DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &pHubPath)
-            RadialMenuHUD.AddShapeToPath(pHubPath, cx - R_inner, cy - R_inner, R_inner * 2.0, R_inner * 2.0, hubCornerR)
+            RadialMenuHUD.AddShapeToPath(pHubPath, cx - R_inner, cy - R_inner, R_inner * 2.0, R_inner * 2.0, hubCornerR
+            )
             DllCall("gdiplus\GdipFillPath", "ptr", pGraphics, "ptr", pCenterHubBrush, "ptr", pHubPath)
-            DllCall("gdiplus\GdipDrawPath", "ptr", pGraphics, "ptr", (selIndex == -2 ? pNodeHoverPen : pCenterHubPen), "ptr", pHubPath)
+            DllCall("gdiplus\GdipDrawPath", "ptr", pGraphics, "ptr", (selIndex == -2 ? pNodeHoverPen : pCenterHubPen),
+            "ptr", pHubPath)
             DllCall("gdiplus\GdipDeletePath", "ptr", pHubPath)
 
             if (selIndex >= 0) {
@@ -5221,7 +5376,8 @@ class RadialMenuHUD {
                 DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", centerTxt, "int", -1
                     , "ptr", pFontCenterAction, "ptr", rectBuf.Ptr, "ptr", pFormat, "ptr", pTextCenterHoverBrush)
             } else if (selIndex == -2) {
-                centerTxt := (centerAction != "" && centerAction != "none") ? RadialMenuHUD.GetActionFriendlyName(centerAction) : "DISMISS"
+                centerTxt := (centerAction != "" && centerAction != "none") ? RadialMenuHUD.GetActionFriendlyName(
+                    centerAction) : "DISMISS"
                 NumPut("float", cx - R_inner, rectBuf, 0)
                 NumPut("float", cy - (11.0 * dpiScale), rectBuf, 4)
                 NumPut("float", R_inner * 2.0, rectBuf, 8)
@@ -5232,17 +5388,21 @@ class RadialMenuHUD {
                 if (hubCornerR <= 0.5) {
                     targetRingR := 8.0 * dpiScale
                     DllCall("gdiplus\GdipDrawRectangle", "ptr", pGraphics, "ptr", pTargetIconPen
-                        , "float", cx - targetRingR, "float", cy - (14.0 * dpiScale) - targetRingR, "float", targetRingR * 2.0, "float", targetRingR * 2.0)
+                        , "float", cx - targetRingR, "float", cy - (14.0 * dpiScale) - targetRingR, "float",
+                        targetRingR * 2.0, "float", targetRingR * 2.0)
                     dotR := 3.0 * dpiScale
                     DllCall("gdiplus\GdipFillRectangle", "ptr", pGraphics, "ptr", pTargetIconDotBrush
-                        , "float", cx - dotR, "float", cy - (14.0 * dpiScale) - dotR, "float", dotR * 2.0, "float", dotR * 2.0)
+                        , "float", cx - dotR, "float", cy - (14.0 * dpiScale) - dotR, "float", dotR * 2.0, "float",
+                        dotR * 2.0)
                 } else {
                     targetRingR := 9.0 * dpiScale
                     DllCall("gdiplus\GdipDrawEllipse", "ptr", pGraphics, "ptr", pTargetIconPen
-                        , "float", cx - targetRingR, "float", cy - (14.0 * dpiScale) - targetRingR, "float", targetRingR * 2.0, "float", targetRingR * 2.0)
+                        , "float", cx - targetRingR, "float", cy - (14.0 * dpiScale) - targetRingR, "float",
+                        targetRingR * 2.0, "float", targetRingR * 2.0)
                     dotR := 3.2 * dpiScale
                     DllCall("gdiplus\GdipFillEllipse", "ptr", pGraphics, "ptr", pTargetIconDotBrush
-                        , "float", cx - dotR, "float", cy - (14.0 * dpiScale) - dotR, "float", dotR * 2.0, "float", dotR * 2.0)
+                        , "float", cx - dotR, "float", cy - (14.0 * dpiScale) - dotR, "float", dotR * 2.0, "float",
+                        dotR * 2.0)
                 }
 
                 NumPut("float", cx - R_inner, rectBuf, 0)
@@ -5250,11 +5410,13 @@ class RadialMenuHUD {
                 NumPut("float", R_inner * 2.0, rectBuf, 8)
                 NumPut("float", 18.0 * dpiScale, rectBuf, 12)
                 hubPrompt := (centerAction != "" && centerAction != "none") ? "CLICK HUB" : "CLICK SLICE"
+                hubPrompt := (centerAction != "" && centerAction != "none") ? "SPACE" : "WASD / CLICK"
                 DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", hubPrompt, "int", -1
                     , "ptr", pFontCenter, "ptr", rectBuf.Ptr, "ptr", pFormat, "ptr", pTextCenterNormalBrush)
             }
 
-            DllCall("UpdateLayeredWindow", "ptr", this.guiObj.Hwnd, "ptr", hDC, "ptr", ptDst, "ptr", sz, "ptr", hMemDC, "ptr", ptSrc, "uint", 0, "ptr", blend, "uint", 2)
+            DllCall("UpdateLayeredWindow", "ptr", this.guiObj.Hwnd, "ptr", hDC, "ptr", ptDst, "ptr", sz, "ptr", hMemDC,
+                "ptr", ptSrc, "uint", 0, "ptr", blend, "uint", 2)
         }
 
         DrawFrame(-1)
@@ -5271,133 +5433,227 @@ class RadialMenuHUD {
             MouseGetPos(&curX, &curY)
             dx := curX - originX
             dy := curY - originY
-            dist := Sqrt(dx*dx + dy*dy)
+            dist := Sqrt(dx * dx + dy * dy)
             newSel := -1
             if (dist < (26.0 * dpiScale)) {
                 newSel := -2 ; Center hub hovered
             } else if (dist <= (radSize + 40.0 * dpiScale)) {
                 angle := (ATan2(dx, -dy) * 57.2957795)
                 if (angle < 0) angle += 360
-                newSel := Mod(Round(angle / wedgeStep), sliceCount)
+                    newSel := Mod(Round(angle / wedgeStep), sliceCount)
             }
             if (newSel != selectedSlice) {
                 selectedSlice := newSel
                 DrawFrame(selectedSlice)
             }
             if (GetKeyState("LButton", "P") || GetKeyState("Escape", "P")) {
-                break
+                if (this.pressedKey != "" || GetKeyState("LButton", "P") || GetKeyState("Escape", "P")) {
+                    break
+                }
+            }
+
+            ; CLICK-TO-ACTIVATE ONLY:
+            ; The menu remains open until the user explicitly clicks on one of the slices or center hub,
+            ; or cancels via Escape, Right Click.
+            ; CLICK OR WASD-KEY TO ACTIVATE:
+            ; The menu remains open until the user clicks a slice/hub, presses a WASD key,
+            ; or cancels via Escape / Right Click.
+            while (true) {
+                Sleep(15)
+
+                ; Cancellation via Escape or Right Click
+                if (GetKeyState("Escape", "P") || GetKeyState("RButton", "P")) {
+                    if (this.pressedKey = "escape" || GetKeyState("Escape", "P") || GetKeyState("RButton", "P")) {
+                        clickedSlice := -1
+                        break
+                    }
+
+                    ; WASD-cluster keyboard activation (ergonomic left-hand cluster around WASD)
+                    kPress := this.pressedKey
+                    if (kPress = "" && GetKeyState("w", "P"))
+                        kPress := "w"
+                    else if (kPress = "" && GetKeyState("d", "P"))
+                        kPress := "d"
+                    else if (kPress = "" && (GetKeyState("s", "P") || GetKeyState("x", "P")))
+                        kPress := "s"
+                    else if (kPress = "" && GetKeyState("a", "P"))
+                        kPress := "a"
+                    else if (kPress = "" && GetKeyState("q", "P"))
+                        kPress := "q"
+                    else if (kPress = "" && GetKeyState("e", "P"))
+                        kPress := "e"
+                    else if (kPress = "" && GetKeyState("z", "P"))
+                        kPress := "z"
+                    else if (kPress = "" && GetKeyState("c", "P"))
+                        kPress := "c"
+                    else if (kPress = "" && (GetKeyState("Space", "P") || GetKeyState("f", "P")))
+                        kPress := "space"
+
+                    if (kPress != "") {
+                        if (kPress = "w") {
+                            clickedSlice := 0 ; North / Up
+                        } else if (is4Slice) {
+                            if (kPress = "d")
+                                clickedSlice := 1 ; East / Right
+                            else if (kPress = "s" || kPress = "x")
+                                clickedSlice := 2 ; South / Down
+                            else if (kPress = "a")
+                                clickedSlice := 3 ; West / Left
+                            else if (kPress = "space" || kPress = "f")
+                                clickedSlice := -2 ; Center hub
+                        } else {
+                            if (kPress = "e")
+                                clickedSlice := 1 ; North-East / Up-Right
+                            else if (kPress = "d")
+                                clickedSlice := 2 ; East / Right
+                            else if (kPress = "c")
+                                clickedSlice := 3 ; South-East / Down-Right
+                            else if (kPress = "s" || kPress = "x")
+                                clickedSlice := 4 ; South / Down
+                            else if (kPress = "z")
+                                clickedSlice := 5 ; South-West / Down-Left
+                            else if (kPress = "a")
+                                clickedSlice := 6 ; West / Left
+                            else if (kPress = "q")
+                                clickedSlice := 7 ; North-West / Up-Left
+                            else if (kPress = "space" || kPress = "f")
+                                clickedSlice := -2 ; Center hub
+                        }
+
+                        if (clickedSlice != -1) {
+                            ; Briefly highlight the activated slice for snappy visual confirmation
+                            DrawFrame(clickedSlice)
+                            Sleep(35)
+                            if (kPress = "space")
+                                KeyWait("Space", "T0.2")
+                            else
+                                KeyWait(kPress, "T0.2")
+                            break
+                        }
+                    }
+
+                    MouseGetPos(&curX, &curY)
+                    dx := curX - originX
+                    dy := curY - originY
+                    dist := Sqrt(dx * dx + dy * dy)
+
+                    newSel := -1
+                    if (dist < (26.0 * dpiScale)) {
+                        newSel := -2 ; Center hub hovered
+                    } else if (dist <= (radSize + 40.0 * dpiScale)) {
+                        angle := (ATan2(dx, -dy) * 57.2957795)
+                        if (angle < 0) angle += 360
+                            newSel := Mod(Round(angle / wedgeStep), sliceCount)
+                    }
+
+                    if (newSel != selectedSlice) {
+                        selectedSlice := newSel
+                        DrawFrame(selectedSlice)
+                    }
+
+                    ; Left Click to activate directly
+                    if (GetKeyState("LButton", "P")) {
+                        ; Wait for mouse button release to prevent click pass-through
+                        while (GetKeyState("LButton", "P")) {
+                            Sleep(10)
+                        }
+                        if (dist < (26.0 * dpiScale)) {
+                            clickedSlice := -2
+                        } else if (dist <= (radSize + 40.0 * dpiScale) && selectedSlice >= 0) {
+                            clickedSlice := selectedSlice
+                        } else {
+                            ; Clicked outside -> dismiss cleanly
+                            clickedSlice := -1
+                        }
+                        break
+                    }
+                }
+
+                this.guiObj.Destroy()
+                this.guiObj := 0
+                this.isShowing := false
+                this.pressedKey := ""
+
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pWheelBackdropBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pHoverWedgeBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeNormalBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeHoverBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pCenterHubBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTargetIconDotBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagNormalBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblNormalBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagHoverBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblHoverBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterNormalBrush)
+                DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterHoverBrush)
+                DllCall("gdiplus\GdipDeletePen", "ptr", pWheelShadowPen)
+                DllCall("gdiplus\GdipDeletePen", "ptr", pWheelBorderPen)
+                DllCall("gdiplus\GdipDeletePen", "ptr", pSpokePen)
+                DllCall("gdiplus\GdipDeletePen", "ptr", pNodeNormalPen)
+                DllCall("gdiplus\GdipDeletePen", "ptr", pNodeHoverPen)
+                DllCall("gdiplus\GdipDeletePen", "ptr", pCenterHubPen)
+                DllCall("gdiplus\GdipDeletePen", "ptr", pTargetIconPen)
+                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontDir)
+                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontLabel)
+                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenter)
+                DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenterAction)
+                DllCall("gdiplus\GdipDeleteFontFamily", "ptr", pFamily)
+                DllCall("gdiplus\GdipDeleteStringFormat", "ptr", pFormat)
+                DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
+                DllCall("SelectObject", "ptr", hMemDC, "ptr", hOldBmp)
+                DllCall("DeleteObject", "ptr", hBmp)
+                DllCall("DeleteDC", "ptr", hMemDC)
+                DllCall("ReleaseDC", "ptr", 0, "ptr", hDC)
+
+                if (clickedSlice == -2) {
+                    if (centerAction != "" && centerAction != "none") {
+                        ExecuteSystemAction(centerAction, "Radial Menu (Center Hub)")
+                    }
+                } else if (clickedSlice >= 0 && clickedSlice < cardinalMap.Length) {
+                    sourceIdx := cardinalMap[clickedSlice + 1]
+                    if (sourceIdx <= slices.Length) {
+                        actionName := slices[sourceIdx]
+                        if (actionName != "" && actionName != "none") {
+                            ExecuteSystemAction(actionName, "Radial Menu (" . dirs[clickedSlice + 1] . ")")
+                        }
+                    }
+                }
+            }
+
+            static AddRoundRectToPath(pPath, x, y, w, h, r) {
+                d := r * 2.0
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y, "float", d, "float", d, "float",
+                    180.0, "float", 90.0)
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y, "float", d, "float", d,
+                    "float", 270.0, "float", 90.0)
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y + h - d, "float", d,
+                    "float", d, "float", 0.0, "float", 90.0)
+                DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y + h - d, "float", d, "float", d,
+                    "float", 90.0, "float", 90.0)
+                DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
             }
         }
 
-        ; CLICK-TO-ACTIVATE ONLY:
-        ; The menu remains open until the user explicitly clicks on one of the slices or center hub,
-        ; or cancels via Escape, Right Click.
-        while (true) {
-            Sleep(15)
-
-            ; Cancellation via Escape or Right Click
-            if (GetKeyState("Escape", "P") || GetKeyState("RButton", "P")) {
-                clickedSlice := -1
-                break
-            }
-
-            MouseGetPos(&curX, &curY)
-            dx := curX - originX
-            dy := curY - originY
-            dist := Sqrt(dx*dx + dy*dy)
-
-            newSel := -1
-            if (dist < (26.0 * dpiScale)) {
-                newSel := -2 ; Center hub hovered
-            } else if (dist <= (radSize + 40.0 * dpiScale)) {
-                angle := (ATan2(dx, -dy) * 57.2957795)
-                if (angle < 0) angle += 360
-                newSel := Mod(Round(angle / wedgeStep), sliceCount)
-            }
-
-            if (newSel != selectedSlice) {
-                selectedSlice := newSel
-                DrawFrame(selectedSlice)
-            }
-
-            ; Left Click to activate directly
-            if (GetKeyState("LButton", "P")) {
-                ; Wait for mouse button release to prevent click pass-through
-                while (GetKeyState("LButton", "P")) {
-                    Sleep(10)
-                }
-                if (dist < (26.0 * dpiScale)) {
-                    clickedSlice := -2
-                } else if (dist <= (radSize + 40.0 * dpiScale) && selectedSlice >= 0) {
-                    clickedSlice := selectedSlice
-                } else {
-                    ; Clicked outside -> dismiss cleanly
-                    clickedSlice := -1
-                }
-                break
-            }
+        ATan2(x, y) {
+            return DllCall("msvcrt\atan2", "Double", x, "Double", y, "Cdecl Double")
         }
 
-        this.guiObj.Destroy()
-        this.guiObj := 0
-        this.isShowing := false
-
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pWheelBackdropBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pHoverWedgeBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeNormalBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pNodeHoverBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pCenterHubBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTargetIconDotBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagNormalBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblNormalBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextTagHoverBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextLblHoverBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterNormalBrush)
-        DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextCenterHoverBrush)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pWheelShadowPen)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pWheelBorderPen)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pSpokePen)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pNodeNormalPen)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pNodeHoverPen)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pCenterHubPen)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pTargetIconPen)
-        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontDir)
-        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontLabel)
-        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenter)
-        DllCall("gdiplus\GdipDeleteFont", "ptr", pFontCenterAction)
-        DllCall("gdiplus\GdipDeleteFontFamily", "ptr", pFamily)
-        DllCall("gdiplus\GdipDeleteStringFormat", "ptr", pFormat)
-        DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
-        DllCall("SelectObject", "ptr", hMemDC, "ptr", hOldBmp)
-        DllCall("DeleteObject", "ptr", hBmp)
-        DllCall("DeleteDC", "ptr", hMemDC)
-        DllCall("ReleaseDC", "ptr", 0, "ptr", hDC)
-
-        if (clickedSlice == -2) {
-            if (centerAction != "" && centerAction != "none") {
-                ExecuteSystemAction(centerAction, "Radial Menu (Center Hub)")
-            }
-        } else if (clickedSlice >= 0 && clickedSlice < cardinalMap.Length) {
-            sourceIdx := cardinalMap[clickedSlice + 1]
-            if (sourceIdx <= slices.Length) {
-                actionName := slices[sourceIdx]
-                if (actionName != "" && actionName != "none") {
-                    ExecuteSystemAction(actionName, "Radial Menu (" . dirs[clickedSlice + 1] . ")")
-                }
-            }
-        }
-    }
-
-    static AddRoundRectToPath(pPath, x, y, w, h, r) {
-        d := r * 2.0
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y, "float", d, "float", d, "float", 180.0, "float", 90.0)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y, "float", d, "float", d, "float", 270.0, "float", 90.0)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x + w - d, "float", y + h - d, "float", d, "float", d, "float", 0.0, "float", 90.0)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", x, "float", y + h - d, "float", d, "float", d, "float", 90.0, "float", 90.0)
-        DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
-    }
-}
-
-ATan2(x, y) {
-    return DllCall("msvcrt\atan2", "Double", x, "Double", y, "Cdecl Double")
-}
+        ; ----------------------------------------------------------------------
+        ; Radial Menu (Pie Wheel) WASD Cluster Keyboard Interception Hotkeys
+        ; Active ONLY while the Radial Menu on-screen overlay is showing.
+        ; Intercepts and suppresses keystrokes to prevent pass-through to background apps.
+        ; ----------------------------------------------------------------------
+        #HotIf RadialMenuHUD.isShowing
+        *w:: RadialMenuHUD.OnHotKey("w")
+        *a:: RadialMenuHUD.OnHotKey("a")
+        *s:: RadialMenuHUD.OnHotKey("s")
+        *d:: RadialMenuHUD.OnHotKey("d")
+        *q:: RadialMenuHUD.OnHotKey("q")
+        *e:: RadialMenuHUD.OnHotKey("e")
+        *z:: RadialMenuHUD.OnHotKey("z")
+        *c:: RadialMenuHUD.OnHotKey("c")
+        *x:: RadialMenuHUD.OnHotKey("x")
+        *f:: RadialMenuHUD.OnHotKey("f")
+        *Space:: RadialMenuHUD.OnHotKey("space")
+        *Escape:: RadialMenuHUD.OnHotKey("escape")
+        #HotIf
