@@ -293,6 +293,7 @@ InitConfig() {
         g_Config["enabled"] := true
     }
 
+    SyncForcedItemsAcrossProfilesAhk()
     ApplyAllModules()
     ProfileAppScanner.EnsureAllProfileIcons()
     ProfileAppScanner.CleanAllCachedIcons()
@@ -514,7 +515,7 @@ UnregisterAllHooks() {
     try SetTimer(CheckScreenHotCorners, 0)
 
     for trig in g_ActiveHotstrings {
-        try Hotstring(":*:" . trig, "Off")
+        try Hotstring(":*:" . trig, , "Off")
     }
     g_ActiveHotstrings := []
 
@@ -552,9 +553,9 @@ ApplyTextExpander() {
     }
 
     for item in modConfig["items"] {
-        if (IsObject(item) && item.Has("input") && item.Has("output")) {
+        if (IsObject(item) && item.Has("input")) {
             trig := Trim(item["input"])
-            outText := item["output"]
+            outText := item.Has("output") ? item["output"] : ""
             isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] =
             "1")
             if (trig != "" && outText != "" && isEnabled) {
@@ -565,6 +566,8 @@ ApplyTextExpander() {
                 } catch as err {
                     LogMessage("Expander error for " . trig . ": " . err.Message)
                 }
+            } else if (trig != "") {
+                try Hotstring(":*:" . trig, , "Off")
             }
         }
     }
@@ -2450,8 +2453,10 @@ class ProfileOsdHUD {
 
         ; Theme settings
         bgHex := (g_Config.Has("theme") && g_Config["theme"].Has("bgColor")) ? g_Config["theme"]["bgColor"] : "#E8DFD5"
-        accentHex := (g_Config.Has("theme") && g_Config["theme"].Has("accentColor")) ? g_Config["theme"]["accentColor"] : "#D97706"
-        isIconOnly := (g_Config.Has("theme") && g_Config["theme"].Has("osdIconOnly")) ? (g_Config["theme"]["osdIconOnly"] = 1 || g_Config["theme"]["osdIconOnly"] = true) : false
+        accentHex := (g_Config.Has("theme") && g_Config["theme"].Has("accentColor")) ? g_Config["theme"]["accentColor"] :
+            "#D97706"
+        isIconOnly := (g_Config.Has("theme") && g_Config["theme"].Has("osdIconOnly")) ? (g_Config["theme"][
+            "osdIconOnly"] = 1 || g_Config["theme"]["osdIconOnly"] = true) : false
 
         ; Parse hex colors
         cleanBg := StrReplace(bgHex, "#", "")
@@ -2492,7 +2497,8 @@ class ProfileOsdHUD {
 
         ; GDI+ Fonts matching JetBrains Mono / Segoe UI
         pFamily := 0
-        if (DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "JetBrains Mono", "ptr", 0, "ptr*", &pFamily) != 0 || !pFamily) {
+        if (DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "JetBrains Mono", "ptr", 0, "ptr*", &pFamily) != 0 ||
+        !pFamily) {
             DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "Segoe UI", "ptr", 0, "ptr*", &pFamily)
         }
         fontSize := 11.0 * dpiScale
@@ -2514,7 +2520,8 @@ class ProfileOsdHUD {
             NumPut("float", 0.0, layoutRect, 0), NumPut("float", 0.0, layoutRect, 4)
             NumPut("float", 2000.0, layoutRect, 8), NumPut("float", 100.0, layoutRect, 12)
             bbox := Buffer(16, 0)
-            DllCall("gdiplus\GdipMeasureString", "ptr", pTempGraphics, "wstr", displayText, "int", -1, "ptr", pFont, "ptr", layoutRect.Ptr, "ptr", pFormat, "ptr", bbox.Ptr, "int*", 0, "int*", 0)
+            DllCall("gdiplus\GdipMeasureString", "ptr", pTempGraphics, "wstr", displayText, "int", -1, "ptr", pFont,
+                "ptr", layoutRect.Ptr, "ptr", pFormat, "ptr", bbox.Ptr, "int*", 0, "int*", 0)
             textW := NumGet(bbox, 8, "float")
             textH := NumGet(bbox, 12, "float")
             DllCall("gdiplus\GdipDeleteGraphics", "ptr", pTempGraphics)
@@ -2545,7 +2552,8 @@ class ProfileOsdHUD {
         NumPut("uint", 0, bi, 16)
 
         pBits := 0
-        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0, "ptr")
+        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0,
+            "ptr")
         hOldBmp := DllCall("SelectObject", "ptr", hMemDC, "ptr", hBmp, "ptr")
 
         pGraphics := 0
@@ -2562,10 +2570,14 @@ class ProfileOsdHUD {
 
         pPath := 0
         DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &pPath)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset, "float", d, "float", d, "float", 180, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset, "float", d, "float", d, "float", 270, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset + rh - d, "float", d, "float", d, "float", 0, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset + rh - d, "float", d, "float", d, "float", 90, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset, "float", d, "float", d, "float",
+            180, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset, "float", d, "float", d,
+            "float", 270, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset + rh - d, "float", d,
+            "float", d, "float", 0, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset + rh - d, "float", d, "float", d,
+            "float", 90, "float", 90)
         DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
 
         ; Fill Background (Neumorphic Surface)
@@ -2607,7 +2619,8 @@ class ProfileOsdHUD {
         } else {
             pEmblemPen := 0
             DllCall("gdiplus\GdipCreatePen1", "uint", cAccent, "float", 1.6 * dpiScale, "int", 2, "ptr*", &pEmblemPen)
-            DllCall("gdiplus\GdipDrawEllipse", "ptr", pGraphics, "ptr", pEmblemPen, "float", iconX + 1.0, "float", iconY + 1.0, "float", Float(iconBoxSize - 2), "float", Float(iconBoxSize - 2))
+            DllCall("gdiplus\GdipDrawEllipse", "ptr", pGraphics, "ptr", pEmblemPen, "float", iconX + 1.0, "float",
+                iconY + 1.0, "float", Float(iconBoxSize - 2), "float", Float(iconBoxSize - 2))
             DllCall("gdiplus\GdipDeletePen", "ptr", pEmblemPen)
         }
 
@@ -2621,7 +2634,8 @@ class ProfileOsdHUD {
             NumPut("float", 0.0, tRect, 4)
             NumPut("float", textW + 8.0, tRect, 8)
             NumPut("float", Float(guiH), tRect, 12)
-            DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", displayText, "int", -1, "ptr", pFont, "ptr", tRect.Ptr, "ptr", pFormat, "ptr", pTextBrush)
+            DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", displayText, "int", -1, "ptr", pFont, "ptr",
+                tRect.Ptr, "ptr", pFormat, "ptr", pTextBrush)
             DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextBrush)
         }
 
@@ -2847,6 +2861,8 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
             g_Config["keyRemapper"] := prof["keyRemapper"]
         if (prof.Has("appLauncher"))
             g_Config["appLauncher"] := prof["appLauncher"]
+        if (prof.Has("folderCreator"))
+            g_Config["folderCreator"] := prof["folderCreator"]
         if (prof.Has("macroRecorder"))
             g_Config["macroRecorder"] := prof["macroRecorder"]
         if (prof.Has("windowManager"))
@@ -2881,6 +2897,7 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
         }
     }
 
+    SyncForcedItemsAcrossProfilesAhk()
     SaveConfigToFile()
     ApplyAllModules()
 
@@ -2900,6 +2917,99 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
     }
     if (showOsd) {
         ProfileOsdHUD.ShowProfileHUD(targetProfile, triggerExe, 1600)
+    }
+}
+
+SyncForcedItemsAcrossProfilesAhk() {
+    global g_Config
+    if (!g_Config.Has("profiles") || !IsObject(g_Config["profiles"]))
+        return
+
+    listMods := ["textExpander", "keyRemapper", "appLauncher", "folderCreator", "macroRecorder"]
+
+    ; 1. If canonical forcedItemStates map exists, enforce it strictly across root and all profiles
+    if (g_Config.Has("forcedItemStates") && IsObject(g_Config["forcedItemStates"])) {
+        for modName in listMods {
+            for itemId, stateVal in g_Config["forcedItemStates"] {
+                numVal := (stateVal = 1 || stateVal = true || stateVal = "1") ? 1 : 0
+                if (g_Config.Has(modName) && g_Config[modName].Has("items") && IsObject(g_Config[modName]["items"])) {
+                    for item in g_Config[modName]["items"] {
+                        if (IsObject(item) && item.Has("id") && item["id"] = itemId)
+                            item["enabled"] := numVal
+                    }
+                }
+                for pName, pObj in g_Config["profiles"] {
+                    if (pObj.Has(modName) && pObj[modName].Has("items") && IsObject(pObj[modName]["items"])) {
+                        for item in pObj[modName]["items"] {
+                            if (IsObject(item) && item.Has("id") && item["id"] = itemId)
+                                item["enabled"] := numVal
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    ; 2. Fallback heuristic: If any profile or root has a forced item disabled, it stays disabled everywhere
+    for modName in listMods {
+        forcedDisabledMap := Map()
+
+        ; Check root config items
+        if (g_Config.Has(modName) && g_Config[modName].Has("items") && IsObject(g_Config[modName]["items"])) {
+            for item in g_Config[modName]["items"] {
+                if (IsObject(item) && item.Has("id")) {
+                    isForced := (item.Has("forcedAllProfiles") && (item["forcedAllProfiles"] = true || item[
+                        "forcedAllProfiles"] = 1 || item["forcedAllProfiles"] = "1"))
+                    || (item.Has("allProfiles") && (item["allProfiles"] = true || item["allProfiles"] = 1 || item[
+                        "allProfiles"] = "1"))
+                    if (isForced) {
+                        isDisabled := (item.Has("enabled") && (item["enabled"] = 0 || item["enabled"] = false || item[
+                            "enabled"] = "0"))
+                        if (isDisabled)
+                            forcedDisabledMap[item["id"]] := true
+                    }
+                }
+            }
+        }
+
+        ; Check profiles
+        for pName, pObj in g_Config["profiles"] {
+            if (pObj.Has(modName) && pObj[modName].Has("items") && IsObject(pObj[modName]["items"])) {
+                for item in pObj[modName]["items"] {
+                    if (IsObject(item) && item.Has("id")) {
+                        isForced := (item.Has("forcedAllProfiles") && (item["forcedAllProfiles"] = true || item[
+                            "forcedAllProfiles"] = 1 || item["forcedAllProfiles"] = "1"))
+                        || (item.Has("allProfiles") && (item["allProfiles"] = true || item["allProfiles"] = 1 || item[
+                            "allProfiles"] = "1"))
+                        if (isForced) {
+                            isDisabled := (item.Has("enabled") && (item["enabled"] = 0 || item["enabled"] = false ||
+                                item["enabled"] = "0"))
+                            if (isDisabled)
+                                forcedDisabledMap[item["id"]] := true
+                        }
+                    }
+                }
+            }
+        }
+
+        ; Enforce disabled state across root and every profile
+        for itemId, _ in forcedDisabledMap {
+            if (g_Config.Has(modName) && g_Config[modName].Has("items") && IsObject(g_Config[modName]["items"])) {
+                for item in g_Config[modName]["items"] {
+                    if (IsObject(item) && item.Has("id") && item["id"] = itemId)
+                        item["enabled"] := 0
+                }
+            }
+            for pName, pObj in g_Config["profiles"] {
+                if (pObj.Has(modName) && pObj[modName].Has("items") && IsObject(pObj[modName]["items"])) {
+                    for item in pObj[modName]["items"] {
+                        if (IsObject(item) && item.Has("id") && item["id"] = itemId)
+                            item["enabled"] := 0
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2943,6 +3053,8 @@ ApplyAppLauncher() {
                 } catch as err {
                     LogMessage("Launcher error for " . trig . ": " . err.Message)
                 }
+            } else if (trig != "" && type != "hotkey" && type != "shortcut") {
+                try Hotstring(":*:" . trig, , "Off")
             }
         }
     }
@@ -3067,6 +3179,8 @@ ApplyFolderCreator() {
                 } catch as err {
                     LogMessage("FolderCreator error for " . trig . ": " . err.Message)
                 }
+            } else if (trig != "" && type != "hotkey" && type != "shortcut") {
+                try Hotstring(":*:" . trig, , "Off")
             }
         }
     }
@@ -4247,7 +4361,8 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                 StartColorPicker()
 
             case "showProfileOsd":
-                profName := msg.Has("profile") ? msg["profile"] : (g_Config.Has("activeProfile") ? g_Config["activeProfile"] : "Default")
+                profName := msg.Has("profile") ? msg["profile"] : (g_Config.Has("activeProfile") ? g_Config[
+                    "activeProfile"] : "Default")
                 ProfileOsdHUD.ShowProfileHUD(profName)
 
             case "previewCornerZones":
@@ -4570,6 +4685,7 @@ ToggleEngineFromTray() {
     global g_IsEngineActive, g_Config, g_Wv
     g_IsEngineActive := !g_IsEngineActive
     g_Config["enabled"] := g_IsEngineActive
+    SyncForcedItemsAcrossProfilesAhk()
     SaveConfigToFile()
     ApplyAllModules()
 
