@@ -12,6 +12,8 @@
 
 #Requires AutoHotkey v2
 #SingleInstance Force
+#UseHook true
+InstallKeybdHook(true, true)
 SetWorkingDir(A_ScriptDir)
 Persistent(true)
 try DllCall("shell32\SetCurrentProcessExplicitAppUserModelID", "wstr", "AutoHotKeyboard.Engine.v2")
@@ -35,7 +37,7 @@ global DEFAULT_WINDOW_WIDTH_PCT := 70   ; Default 70% of screen work area
 global DEFAULT_WINDOW_HEIGHT_PCT := 75  ; Default 75% of screen work area
 global CONFIG_FILE := A_ScriptDir . "\config.json"
 
-GetDefaultWindowSize(&defW, &defH, &defX, &defY, monIndex := 1) {
+GetDefaultWindowSize(&defW, &defH, &defX, &defY, monIndex := 0) {
     global DEFAULT_WINDOW_WIDTH_PCT, DEFAULT_WINDOW_HEIGHT_PCT
     try {
         monCount := MonitorGetCount()
@@ -88,6 +90,7 @@ global g_Wvc := 0
 global g_Wv := 0
 global g_Config := Map()
 global g_IsEngineActive := true
+global g_IsWindowReady := false
 
 ; Module active hook tracking
 global g_ActiveHotstrings := []
@@ -139,7 +142,8 @@ SaveWindowState() {
         }
         g_Config["window"]["isMaximized"] := isMax ? 1 : 0
         
-        g_MainGui.GetPos(&curX, &curY, &curW, &curH)
+        g_MainGui.GetPos(&curX, &curY)
+        g_MainGui.GetClientPos(&dummyX, &dummyY, &curW, &curH)
         targetMon := GetMonitorFromRect(curX, curY, curW, curH)
         g_Config["window"]["monitor"] := targetMon
         
@@ -301,9 +305,25 @@ GetDefaultConfig() {
             "appVolumeMuteHotkey", "!m",
             "masterAudioMuteEnabled", true,
             "masterAudioMuteHotkey", "^!m",
+            "borderlessEnabled", true,
+            "borderlessHotkey", "^!Enter",
+            "textTransformEnabled", true,
+            "textTransformUpperHotkey", "^!u",
+            "textTransformLowerHotkey", "^!l",
+            "textTransformTitleHotkey", "^!t",
+            "textTransformCleanEnabled", true,
+            "textTransformCleanHotkey", "^!k",
+            "screenOcrEnabled", true,
+            "screenOcrHotkey", "^!o",
+            "colorPickerEnabled", true,
+            "colorPickerHotkey", "^!p",
+            "colorFormat", "RGB",
+            "virtualDesktopsEnabled", true,
+            "taskbarScrollEnabled", true,
             "sleepEnabled", true,
             "sleepHotkey", "#s",
-            "sleepModeHibernate", false
+            "sleepModeHibernate", true,
+            "sleepTimer", 30
         ),
         "appLauncher", Map(
             "enabled", true,
@@ -777,7 +797,7 @@ ApplyWindowManager() {
     }
 
     ; Text Transformer (Case Converters: UPPER, lower, Title Case)
-    if (wm.Has("textTransformEnabled") && wm["textTransformEnabled"]) {
+    if (!wm.Has("textTransformEnabled") || wm["textTransformEnabled"]) {
         rawUpper := (wm.Has("textTransformUpperHotkey") && Trim(wm["textTransformUpperHotkey"]) != "") ? Trim(wm["textTransformUpperHotkey"]) : "^!u"
         rawLower := (wm.Has("textTransformLowerHotkey") && Trim(wm["textTransformLowerHotkey"]) != "") ? Trim(wm["textTransformLowerHotkey"]) : "^!l"
         rawTitle := (wm.Has("textTransformTitleHotkey") && Trim(wm["textTransformTitleHotkey"]) != "") ? Trim(wm["textTransformTitleHotkey"]) : "^!t"
@@ -808,7 +828,7 @@ ApplyWindowManager() {
     }
 
     ; Clean Plain Text & Strip Formatting Hotkey
-    if (wm.Has("textTransformCleanEnabled") && wm["textTransformCleanEnabled"]) {
+    if (!wm.Has("textTransformCleanEnabled") || wm["textTransformCleanEnabled"]) {
         rawClean := (wm.Has("textTransformCleanHotkey") && Trim(wm["textTransformCleanHotkey"]) != "") ? Trim(wm["textTransformCleanHotkey"]) : "^!k"
         cleanHk := NormalizeHotkeyToAhk(rawClean)
         if (cleanHk = "") {
@@ -821,7 +841,7 @@ ApplyWindowManager() {
     }
 
     ; Instant Screen OCR (Text Grabber) Hotkey
-    if (wm.Has("screenOcrEnabled") && wm["screenOcrEnabled"]) {
+    if (!wm.Has("screenOcrEnabled") || wm["screenOcrEnabled"]) {
         rawOcr := (wm.Has("screenOcrHotkey") && Trim(wm["screenOcrHotkey"]) != "") ? Trim(wm["screenOcrHotkey"]) : "^!o"
         ocrHk := NormalizeHotkeyToAhk(rawOcr)
         if (ocrHk = "") {
@@ -834,7 +854,7 @@ ApplyWindowManager() {
     }
 
     ; Precision Screen Color Picker Hotkey
-    if (wm.Has("colorPickerEnabled") && wm["colorPickerEnabled"]) {
+    if (!wm.Has("colorPickerEnabled") || wm["colorPickerEnabled"]) {
         rawCp := (wm.Has("colorPickerHotkey") && Trim(wm["colorPickerHotkey"]) != "") ? Trim(wm["colorPickerHotkey"]) : "^!p"
         cpHk := NormalizeHotkeyToAhk(rawCp)
         if (cpHk = "") {
@@ -847,7 +867,7 @@ ApplyWindowManager() {
     }
 
     ; Fast Virtual Desktop Navigation Hotkeys & Taskbar Mouse Wheel Hopping
-    if (wm.Has("virtualDesktopsEnabled") && (wm["virtualDesktopsEnabled"] = 1 || wm["virtualDesktopsEnabled"] = true)) {
+    if (!wm.Has("virtualDesktopsEnabled") || wm["virtualDesktopsEnabled"] = 1 || wm["virtualDesktopsEnabled"] = true) {
         try {
             Hotkey("^!Left", (*) => SwitchVirtualDesktop(-1), "On")
             Hotkey("^!Right", (*) => SwitchVirtualDesktop(1), "On")
@@ -869,7 +889,7 @@ ApplyWindowManager() {
     }
 
     ; Quick PC Sleep / Hibernate Hotkey (Win+S)
-    if (wm.Has("sleepEnabled") && (wm["sleepEnabled"] = 1 || wm["sleepEnabled"] = true)) {
+    if (!wm.Has("sleepEnabled") || wm["sleepEnabled"] = 1 || wm["sleepEnabled"] = true) {
         rawSleep := (wm.Has("sleepHotkey") && Trim(wm["sleepHotkey"]) != "") ? Trim(wm["sleepHotkey"]) : "#s"
         sleepHk := NormalizeHotkeyToAhk(rawSleep)
         if (sleepHk = "") {
@@ -890,7 +910,12 @@ ApplyWindowManager() {
 }
 
 TransformSelectedText(transType) {
-    global g_Wv
+    global g_Wv, g_MainGui, g_LastExternalHwnd
+    activeHwnd := WinExist("A")
+    if (g_MainGui && activeHwnd = g_MainGui.Hwnd && g_LastExternalHwnd && WinExist("ahk_id " . g_LastExternalHwnd)) {
+        try WinActivate("ahk_id " . g_LastExternalHwnd)
+        Sleep(60)
+    }
     clipSaved := ClipboardAll()
     A_Clipboard := ""
     Send("^c")
@@ -1447,6 +1472,7 @@ StartSleepCountdown(seconds, isHibernate) {
 
     SoundBeep(850, 80)
     NotifySleepMessage("System: " . g_SleepTimerMode . " in " . FormatDurationSeconds(seconds) . " (Press Win+S or Esc to cancel)")
+    NotifySleepTimerState(true, seconds, g_SleepTimerMode)
 
     SetTimer(SleepCountdownTick, 1000)
 }
@@ -1455,6 +1481,7 @@ SleepCountdownTick() {
     global g_SleepTimerActive, g_SleepTimerSecondsLeft, g_SleepTimerMode
     if (!g_SleepTimerActive) {
         SetTimer(SleepCountdownTick, 0)
+        NotifySleepTimerState(false, 0, "")
         return
     }
 
@@ -1464,9 +1491,12 @@ SleepCountdownTick() {
         SetTimer(SleepCountdownTick, 0)
         g_SleepTimerActive := false
         isHib := (g_SleepTimerMode = "Hibernate")
+        NotifySleepTimerState(false, 0, "")
         ExecuteSleepNow(isHib)
         return
     }
+
+    NotifySleepTimerState(true, g_SleepTimerSecondsLeft, g_SleepTimerMode)
 
     ; Audio & message cues for final seconds or interval
     shouldNotify := false
@@ -1492,12 +1522,14 @@ CancelSleepTimer(reason := "Sleep timer cancelled.") {
     g_SleepTimerActive := false
     g_SleepTimerSecondsLeft := 0
     SetTimer(SleepCountdownTick, 0)
+    NotifySleepTimerState(false, 0, "")
     SoundBeep(450, 70)
     NotifySleepMessage(reason)
 }
 
 ExecuteSleepNow(isHibernate) {
     global g_Wv
+    NotifySleepTimerState(false, 0, "")
     SoundBeep(isHibernate ? 700 : 900, 60)
     NotifySleepMessage(isHibernate ? "System: Entering Hibernate now..." : "System: Entering Sleep now...")
 
@@ -1510,6 +1542,21 @@ ExecuteSleepNow(isHibernate) {
         }
     } else {
         DllCall("PowrProf\SetSuspendState", "int", 0, "int", 0, "int", 0)
+    }
+}
+
+NotifySleepTimerState(isActive, secondsLeft, mode) {
+    global g_Wv
+    if (g_Wv) {
+        try {
+            msg := JSON.stringify(Map(
+                "type", "sleepTimerState",
+                "active", isActive ? 1 : 0,
+                "secondsLeft", secondsLeft,
+                "mode", mode
+            ))
+            g_Wv.PostWebMessageAsString(msg)
+        }
     }
 }
 
@@ -1533,10 +1580,14 @@ ToggleAlwaysOnTop() {
         return
     }
     try {
-        hwnd := WinGetID("A")
-        if (hwnd = g_MainGui.Hwnd) {
-            return
+        hwnd := WinExist("A")
+        if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+            extHwnd := GetActiveExternalWindow()
+            if (extHwnd)
+                hwnd := extHwnd
         }
+        if (!hwnd)
+            return
         isTop := WinGetExStyle("ahk_id " . hwnd) & 0x8
         WinSetAlwaysOnTop(-1, "ahk_id " . hwnd)
         SoundBeep(isTop ? 600 : 900, 60)
@@ -1558,10 +1609,14 @@ CenterActiveWindow() {
         return
     }
     try {
-        hwnd := WinGetID("A")
-        if (hwnd = g_MainGui.Hwnd) {
-            return
+        hwnd := WinExist("A")
+        if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+            extHwnd := GetActiveExternalWindow()
+            if (extHwnd)
+                hwnd := extHwnd
         }
+        if (!hwnd)
+            return
         MonitorGetWorkArea(, &l, &t, &r, &b)
         WinGetPos(,, &w, &h, "ahk_id " . hwnd)
         newX := l + (r - l - w) // 2
@@ -1586,10 +1641,14 @@ HideActiveWindow() {
         return
     }
     try {
-        hwnd := WinGetID("A")
-        if (hwnd = g_MainGui.Hwnd) {
-            return
+        hwnd := WinExist("A")
+        if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+            extHwnd := GetActiveExternalWindow()
+            if (extHwnd)
+                hwnd := extHwnd
         }
+        if (!hwnd)
+            return
         WinMinimize("ahk_id " . hwnd)
         SoundBeep(500, 40)
     }
@@ -1601,10 +1660,14 @@ AdjustActiveWindowTransparency(delta) {
         return
     }
     try {
-        hwnd := WinGetID("A")
-        if (hwnd = g_MainGui.Hwnd) {
-            return
+        hwnd := WinExist("A")
+        if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+            extHwnd := GetActiveExternalWindow()
+            if (extHwnd)
+                hwnd := extHwnd
         }
+        if (!hwnd)
+            return
         curAlpha := WinGetTransparent("ahk_id " . hwnd)
         if (curAlpha = "") {
             curAlpha := 255
@@ -1637,8 +1700,13 @@ AdjustActiveWindowTransparency(delta) {
 ToggleGhostMode() {
     global g_MainGui, g_Wv, g_Config
     try {
-        hwnd := WinGetID("A")
-        if (hwnd = g_MainGui.Hwnd)
+        hwnd := WinExist("A")
+        if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+            extHwnd := GetActiveExternalWindow()
+            if (extHwnd)
+                hwnd := extHwnd
+        }
+        if (!hwnd || (g_MainGui && hwnd = g_MainGui.Hwnd))
             return
         exStyle := WinGetExStyle("ahk_id " . hwnd)
         isGhost := (exStyle & 0x20)
@@ -1668,8 +1736,13 @@ ToggleWindowShade() {
     if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("windowShadeEnabled") && !g_Config["windowManager"]["windowShadeEnabled"])
         return
     try {
-        hwnd := WinGetID("A")
-        if (hwnd = g_MainGui.Hwnd)
+        hwnd := WinExist("A")
+        if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+            extHwnd := GetActiveExternalWindow()
+            if (extHwnd)
+                hwnd := extHwnd
+        }
+        if (!hwnd || (g_MainGui && hwnd = g_MainGui.Hwnd))
             return
         
         if (g_ShadedWindows.Has(hwnd)) {
@@ -1705,8 +1778,13 @@ ToggleBorderlessFullscreen() {
     if (g_Config.Has("windowManager") && g_Config["windowManager"].Has("borderlessEnabled") && !g_Config["windowManager"]["borderlessEnabled"])
         return
     try {
-        hwnd := WinGetID("A")
-        if (hwnd = g_MainGui.Hwnd)
+        hwnd := WinExist("A")
+        if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+            extHwnd := GetActiveExternalWindow()
+            if (extHwnd)
+                hwnd := extHwnd
+        }
+        if (!hwnd || (g_MainGui && hwnd = g_MainGui.Hwnd))
             return
         
         if (g_BorderlessWindows.Has(hwnd)) {
@@ -1958,7 +2036,7 @@ class ProfileAppScanner {
             ; Flood-fill from 4 outer corners to convert connected white background to alpha 0
             queue := [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1]]
             visited := Map()
-            maxIters := 2000
+            maxIters := 500
             iter := 0
             while (queue.Length > 0 && ++iter <= maxIters) {
                 pt := queue.Pop()
@@ -2020,11 +2098,11 @@ class ProfileAppScanner {
         try {
             hIcon := 0
             res := 0
-            ; Use SendMessageTimeout with 150ms to prevent hanging on unresponsive or suspended windows
-            if (DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 1, "Ptr", 0, "UInt", 0x0002, "UInt", 150, "Ptr*", &res)) {
+            ; Use SendMessageTimeout with 40ms to prevent hanging on unresponsive or suspended windows
+            if (DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 1, "Ptr", 0, "UInt", 0x0002, "UInt", 40, "Ptr*", &res)) {
                 hIcon := res
             }
-            if (!hIcon && DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 0, "Ptr", 0, "UInt", 0x0002, "UInt", 150, "Ptr*", &res)) {
+            if (!hIcon && DllCall("user32\SendMessageTimeoutW", "Ptr", hwnd, "UInt", 0x007F, "Ptr", 0, "Ptr", 0, "UInt", 0x0002, "UInt", 40, "Ptr*", &res)) {
                 hIcon := res
             }
             if (!hIcon)
@@ -3539,7 +3617,12 @@ CreateMainWindow() {
     }
     g_MainGui.BackColor := initBg
     
-    targetMon := 1
+    targetMon := 0
+    try {
+        targetMon := MonitorGetPrimary()
+    } catch {
+        targetMon := 1
+    }
     if (g_Config.Has("window") && IsObject(g_Config["window"])) {
         winCfg := g_Config["window"]
         if (winCfg.Has("monitor") && Integer(winCfg["monitor"]) > 0) {
@@ -3580,38 +3663,28 @@ CreateMainWindow() {
             monH := A_ScreenHeight
         }
 
-        isUserCustomized := (winCfg.Has("userCustomized") && winCfg["userCustomized"])
-
-        ; Width
-        if (isUserCustomized && winCfg.Has("width") && Integer(winCfg["width"]) >= 720) {
+        ; Width (exact saved pixel width takes priority, fallback to widthPercent)
+        if (winCfg.Has("width") && Integer(winCfg["width"]) >= 720) {
             winW := Min(Integer(winCfg["width"]), monW - 20)
         } else if (winCfg.Has("widthPercent") && Float(winCfg["widthPercent"]) > 0) {
             valPct := Float(winCfg["widthPercent"])
-            if (isUserCustomized || valPct >= 50.0 || monW < 1400) {
-                winW := Max(720, Min(monW - 40, Round(monW * (valPct / 100.0))))
-            } else {
-                winW := defW
-            }
+            winW := Max(720, Min(monW - 40, Round(monW * (valPct / 100.0))))
         } else {
             winW := defW
         }
 
-        ; Height
-        if (isUserCustomized && winCfg.Has("height") && Integer(winCfg["height"]) >= 520) {
+        ; Height (exact saved pixel height takes priority, fallback to heightPercent)
+        if (winCfg.Has("height") && Integer(winCfg["height"]) >= 520) {
             winH := Min(Integer(winCfg["height"]), monH - 20)
         } else if (winCfg.Has("heightPercent") && Float(winCfg["heightPercent"]) > 0) {
             valHPct := Float(winCfg["heightPercent"])
-            if (isUserCustomized || valHPct >= 50.0 || monH < 900) {
-                winH := Max(520, Min(monH - 60, Round(monH * (valHPct / 100.0))))
-            } else {
-                winH := defH
-            }
+            winH := Max(520, Min(monH - 60, Round(monH * (valHPct / 100.0))))
         } else {
             winH := defH
         }
 
         ; Position
-        if (isUserCustomized && winCfg.Has("x") && winCfg.Has("y")) {
+        if (winCfg.Has("x") && winCfg.Has("y")) {
             savedX := Integer(winCfg["x"])
             savedY := Integer(winCfg["y"])
             ; Validate that saved coordinates are visible on target monitor
@@ -3669,8 +3742,6 @@ CreateMainWindow() {
     }
 
     g_MainGui.Show(Format("x{} y{} w{} h{}", posX, posY, winW, winH))
-    ; Explicitly enforce exact dimensions to prevent AHK's internal non-client padding from inflating frameless window
-    DllCall("SetWindowPos", "ptr", g_MainGui.Hwnd, "ptr", 0, "int", posX, "int", posY, "int", winW, "int", winH, "uint", 0x0040)
     if (isStartMax) {
         g_MainGui.Maximize()
     }
@@ -3790,6 +3861,7 @@ InitWebView2() {
         settings.AreDefaultContextMenusEnabled := false
         settings.IsStatusBarEnabled := false
         settings.AreDevToolsEnabled := true
+        try settings.AreBrowserAcceleratorKeysEnabled := false
         
         g_Wv.add_WebMessageReceived(WebView2.Handler(OnWebMessageReceived, 3))
         g_Wv.add_NavigationCompleted(WebView2.Handler((*) => SendInitialStateToWeb(), 3))
@@ -3809,6 +3881,9 @@ InitWebView2() {
         ; Start polling for real-time application profile auto-switching
         SetTimer(CheckAutoProfileSwitch, 350)
         
+        ; Enable window resizing/moving tracking only after window has fully initialized
+        SetTimer(() => (g_IsWindowReady := true), -500)
+        
     } catch as err {
         LogMessage("FATAL: Failed to configure WebView2: " . err.Message)
         MsgBox("Failed to configure WebView2: " . err.Message, "AutoHotKeyboard Error", 16)
@@ -3817,7 +3892,7 @@ InitWebView2() {
 }
 
 OnGuiSize(guiObj, minMax, width, height) {
-    global g_Wvc, g_Wv, g_Config, g_MainGui
+    global g_Wvc, g_Wv, g_Config, g_MainGui, g_IsWindowReady
     if (g_Wvc && minMax != -1) {
         try g_Wvc.Fill()
     }
@@ -3826,6 +3901,9 @@ OnGuiSize(guiObj, minMax, width, height) {
             stateMsg := Map("type", "windowStateChanged", "isMaximized", (minMax = 1))
             g_Wv.PostWebMessageAsString(JSON.stringify(stateMsg))
         }
+    }
+    if (!g_IsWindowReady) {
+        return
     }
     if (minMax = 0 && width >= 720 && height >= 520) {
         if (!g_Config.Has("window") || !IsObject(g_Config["window"])) {
@@ -3855,7 +3933,8 @@ OnGuiSize(guiObj, minMax, width, height) {
             g_Config["window"] := Map()
         }
         try {
-            g_MainGui.GetPos(&curX, &curY, &curW, &curH)
+            g_MainGui.GetPos(&curX, &curY)
+            g_MainGui.GetClientPos(&dummyX, &dummyY, &curW, &curH)
             targetMon := GetMonitorFromRect(curX, curY, curW, curH)
             g_Config["window"]["monitor"] := targetMon
         }
@@ -3865,10 +3944,10 @@ OnGuiSize(guiObj, minMax, width, height) {
 }
 
 OnExitSizeMove(wParam, lParam, msg, hwnd) {
-    global g_MainGui
-    if (g_MainGui && hwnd = g_MainGui.Hwnd) {
+    global g_MainGui, g_IsWindowReady
+    if (g_MainGui && hwnd = g_MainGui.Hwnd && g_IsWindowReady) {
         SaveWindowState()
-        SetTimer(SaveWindowSizeDebounced, -300)
+        SaveConfigToFile()
     }
 }
 
@@ -3915,7 +3994,7 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
             case "saveState":
                 if (msg.Has("config") && IsObject(msg["config"])) {
                     newConfig := msg["config"]
-                    if (!newConfig.Has("window") && g_Config.Has("window")) {
+                    if (g_Config.Has("window")) {
                         newConfig["window"] := g_Config["window"]
                     }
                     g_Config := newConfig
@@ -4147,7 +4226,7 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
 }
 
 SendInitialStateToWeb() {
-    global g_Wv, g_Config, g_IsEngineActive, g_AutoClickerRunning
+    global g_Wv, g_Config, g_IsEngineActive, g_AutoClickerRunning, g_SleepTimerActive, g_SleepTimerSecondsLeft, g_SleepTimerMode
     if (!g_Wv) {
         return
     }
@@ -4166,6 +4245,9 @@ SendInitialStateToWeb() {
         )
         jsonStr := JSON.stringify(response)
         g_Wv.PostWebMessageAsString(jsonStr)
+        if (g_SleepTimerActive) {
+            NotifySleepTimerState(true, g_SleepTimerSecondsLeft, g_SleepTimerMode)
+        }
     } catch as err {
         LogMessage("Failed to send initial state: " . err.Message)
     }

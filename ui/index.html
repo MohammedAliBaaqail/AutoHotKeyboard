@@ -169,8 +169,27 @@
           </div>
           <div class="rocker-thumb"></div>
         </div>
-        <div class="squircle-btn" id="btnStats" title="Active Items Count">
+        <button type="button" class="squircle-btn" id="btnStats" title="Active Items Count">
           <span class="badge-num" id="activeCountBadge">0</span>
+        </button>
+        <!-- Quick Sleep / Hibernate Active Countdown Widget with Cancel X -->
+        <div class="sleep-countdown-pill hidden-field" id="headerSleepCountdown"
+          title="Quick Sleep / Hibernate Countdown Active • Click X or press Esc to cancel">
+          <div class="sleep-countdown-icon" id="headerSleepIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </div>
+          <div class="sleep-countdown-text">
+            <span class="sleep-countdown-mode" id="headerSleepMode">SLEEP</span>
+            <span class="sleep-countdown-digits" id="headerSleepDigits">00:00</span>
+          </div>
+          <button type="button" class="sleep-countdown-close" id="btnHeaderCancelSleep" title="Cancel Countdown (Esc)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="18" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -2751,38 +2770,39 @@
                 assignment.</span>
             </div>
 
-            <!-- Option 1: Profile Switch Trigger (Fully Off vs Window Focus vs Mouse Hover) -->
-            <div class="profile-option-row profile-trigger-row" id="profHoverRow">
-              <div class="option-meta" style="flex: 1; width: 100%;">
-                <div class="trigger-mode-header">
-                  <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <span class="option-title" id="profHoverTitle">Switch Trigger</span>
-                    <span class="option-desc" id="profTriggerDesc">Choose when to automatically activate this
-                      profile</span>
-                  </div>
-                  <div class="trigger-mode-pills" role="radiogroup" aria-label="Auto Switch Trigger">
-                    <button type="button" class="trigger-pill" id="chipTriggerOff" data-trigger="off">Fully Off</button>
-                    <button type="button" class="trigger-pill" id="chipTriggerFocus" data-trigger="focus">Window
-                      Focus</button>
-                    <button type="button" class="trigger-pill" id="chipTriggerHover" data-trigger="hover">Mouse
-                      Hover</button>
+            <!-- Option 1: Profile Auto-Switch (Normal Switch + Focus vs Hover Pills) -->
+            <div class="profile-option-row profile-trigger-card" id="profHoverRow">
+              <div class="profile-option-header">
+                <div class="profile-option-text">
+                  <span class="option-title" id="profHoverTitle">Auto-Switch Profile</span>
+                  <span class="option-desc" id="profTriggerDesc">Active. Switches to this profile whenever its target window gains focus.</span>
+                </div>
+                <div class="toggle-wrapper" title="Enable / Disable Auto-Switch for this profile">
+                  <input class="toggle-checkbox" type="checkbox" id="profSwitchAutoSwitch" checked>
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
                   </div>
                 </div>
+              </div>
+              <div class="trigger-mode-pills" id="profAutoSwitchPills" role="toolbar" aria-label="Auto Switch Trigger">
+                <button type="button" class="trigger-pill active" id="chipTriggerFocus" data-trigger="focus">Window Focus</button>
+                <button type="button" class="trigger-pill" id="chipTriggerHover" data-trigger="hover">Mouse Hover</button>
               </div>
             </div>
 
             <!-- Option 2: Show App Icon on Switch (OSD HUD) -->
-            <div class="profile-option-row" id="profOsdRow">
-              <div class="toggle-wrapper" title="Show app icon popup on profile switch">
-                <input class="toggle-checkbox" type="checkbox" id="profSwitchOsdIcon" checked>
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
+            <div class="profile-option-row profile-trigger-card" id="profOsdRow">
+              <div class="profile-option-header">
+                <div class="profile-option-text">
+                  <span class="option-title">Show App Icon on Switch</span>
+                  <span class="option-desc">Display a sleek floating on-screen HUD badge showing the target app icon whenever switched.</span>
                 </div>
-              </div>
-              <div class="option-meta">
-                <span class="option-title">Show App Icon on Switch</span>
-                <span class="option-desc">Display a sleek floating on-screen HUD badge showing the target app icon
-                  whenever switched.</span>
+                <div class="toggle-wrapper" title="Show app icon popup on profile switch">
+                  <input class="toggle-checkbox" type="checkbox" id="profSwitchOsdIcon" checked>
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2861,108 +2881,93 @@
   </div>
 
   <!-- Profile Right-Click Neumorphic Context Menu -->
-  <div class="profile-context-menu" id="profileContextMenu" role="menu" aria-label="Profile Context Menu">
-    <div class="profile-context-menu" id="profileContextMenu" role="menu" aria-label="Profile Context Menu"
-      style="display: none;">
-      <div class="profile-ctx-header">
-        <div class="profile-ctx-icon" id="profileCtxIcon"></div>
-        <div class="profile-ctx-info">
-          <div class="profile-ctx-title" id="profileCtxTitle">Profile</div>
-          <div class="profile-ctx-sub" id="profileCtxSub">0 active scripts</div>
-        </div>
+  <div class="profile-context-menu" id="profileContextMenu" role="menu" aria-label="Profile Context Menu"
+    style="display: none;">
+    <div class="profile-ctx-header">
+      <div class="profile-ctx-icon" id="profileCtxIcon"></div>
+      <div class="profile-ctx-info">
+        <div class="profile-ctx-title" id="profileCtxTitle">Profile</div>
+        <div class="profile-ctx-sub" id="profileCtxSub">0 active scripts</div>
       </div>
-      <div class="profile-ctx-divider"></div>
-      <button type="button" class="profile-ctx-item" id="btnCtxCopyProfile" role="menuitem">
-        <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <svg class="profile-ctx-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-          <div class="profile-ctx-item-text">
-            <span>Copy Active Scripts</span>
-            <small id="profileCtxCopyHint">Copy all active scripts from this profile</small>
-          </div>
-      </button>
-      <button type="button" class="profile-ctx-item" id="btnCtxPasteProfile" role="menuitem">
-        <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <svg class="profile-ctx-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2">
-            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-          </svg>
-          <div class="profile-ctx-item-text">
-            <span>Paste Active Scripts</span>
-            <small id="profileCtxPasteHint">Paste copied scripts into this profile</small>
-          </div>
-      </button>
-      <div class="profile-ctx-divider"></div>
-      <button type="button" class="profile-ctx-item" id="btnCtxSwitchProfile" role="menuitem">
-        <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <svg class="profile-ctx-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-          <div class="profile-ctx-item-text">
-            <span>Switch to Profile</span>
-            <small>Activate this profile</small>
-          </div>
-      </button>
     </div>
-
-    <!-- Script / Switch Right-Click Neumorphic Context Menu -->
-    <div class="profile-context-menu script-context-menu" id="scriptContextMenu" role="menu"
-      aria-label="Script Context Menu">
-      <div class="profile-context-menu script-context-menu" id="scriptContextMenu" role="menu"
-        aria-label="Script Context Menu" style="display: none;">
-        <div class="profile-ctx-header">
-          <div class="profile-ctx-icon" id="scriptCtxIcon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="16 18 22 12 16 6"></polyline>
-                <polyline points="8 6 2 12 8 18"></polyline>
-              </svg>
-          </div>
-          <div class="profile-ctx-info">
-            <div class="profile-ctx-title" id="scriptCtxTitle">Script</div>
-            <div class="profile-ctx-sub" id="scriptCtxSub">Module</div>
-          </div>
-        </div>
-        <div class="profile-ctx-divider"></div>
-        <button type="button" class="profile-ctx-item" id="btnCtxForceAllProfiles" role="menuitem">
-          <svg class="profile-ctx-svg" id="scriptCtxForceSvg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2">
-            <svg class="profile-ctx-svg" id="scriptCtxForceSvg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="2" y1="12" x2="22" y2="12"></line>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
-              </path>
-            </svg>
-            <div class="profile-ctx-item-text">
-              <span id="scriptCtxForceTitle">Force on All Profiles</span>
-              <small id="scriptCtxForceHint">Run and activate this script in every profile</small>
-            </div>
-        </button>
-        <div class="profile-ctx-divider"></div>
-        <button type="button" class="profile-ctx-item" id="btnCtxToggleScript" role="menuitem">
-          <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <svg class="profile-ctx-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2">
-              <rect x="1" y="5" width="22" height="14" rx="7" ry="7"></rect>
-              <circle cx="16" cy="12" r="3"></circle>
-            </svg>
-            <div class="profile-ctx-item-text">
-              <span id="scriptCtxToggleTitle">Toggle Switch</span>
-              <small id="scriptCtxToggleHint">Turn script on or off</small>
-            </div>
-        </button>
+    <div class="profile-ctx-divider"></div>
+    <button type="button" class="profile-ctx-item" id="btnCtxCopyProfile" role="menuitem">
+      <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <div class="profile-ctx-item-text">
+        <span>Copy Active Scripts</span>
+        <small id="profileCtxCopyHint">Copy all active scripts from this profile</small>
       </div>
+    </button>
+    <button type="button" class="profile-ctx-item" id="btnCtxPasteProfile" role="menuitem">
+      <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+      </svg>
+      <div class="profile-ctx-item-text">
+        <span>Paste Active Scripts</span>
+        <small id="profileCtxPasteHint">Paste copied scripts into this profile</small>
+      </div>
+    </button>
+    <div class="profile-ctx-divider"></div>
+    <button type="button" class="profile-ctx-item" id="btnCtxSwitchProfile" role="menuitem">
+      <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"></polyline>
+      </svg>
+      <div class="profile-ctx-item-text">
+        <span>Switch to Profile</span>
+        <small>Activate this profile</small>
+      </div>
+    </button>
+  </div>
 
-      <!-- Global Toast Notification Container -->
-      <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+  <!-- Script / Switch Right-Click Neumorphic Context Menu -->
+  <div class="profile-context-menu script-context-menu" id="scriptContextMenu" role="menu"
+    aria-label="Script Context Menu" style="display: none;">
+    <div class="profile-ctx-header">
+      <div class="profile-ctx-icon" id="scriptCtxIcon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      </div>
+      <div class="profile-ctx-info">
+        <div class="profile-ctx-title" id="scriptCtxTitle">Script</div>
+        <div class="profile-ctx-sub" id="scriptCtxSub">Module</div>
+      </div>
+    </div>
+    <div class="profile-ctx-divider"></div>
+    <button type="button" class="profile-ctx-item" id="btnCtxForceAllProfiles" role="menuitem">
+      <svg class="profile-ctx-svg" id="scriptCtxForceSvg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="2" y1="12" x2="22" y2="12"></line>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+      </svg>
+      <div class="profile-ctx-item-text">
+        <span id="scriptCtxForceTitle">Force on All Profiles</span>
+        <small id="scriptCtxForceHint">Run and activate this script in every profile</small>
+      </div>
+    </button>
+    <div class="profile-ctx-divider"></div>
+    <button type="button" class="profile-ctx-item" id="btnCtxToggleScript" role="menuitem">
+      <svg class="profile-ctx-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="1" y="5" width="22" height="14" rx="7" ry="7"></rect>
+        <circle cx="16" cy="12" r="3"></circle>
+      </svg>
+      <div class="profile-ctx-item-text">
+        <span id="scriptCtxToggleTitle">Toggle Switch</span>
+        <small id="scriptCtxToggleHint">Turn script on or off</small>
+      </div>
+    </button>
+  </div>
 
-      <script src="app.js"></script>
+  <!-- Global Toast Notification Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <script src="app.js"></script>
 </body>
 
 </html>

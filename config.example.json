@@ -1,24 +1,24 @@
 {
   "version": "2.0",
-  "activeProfile": "default",
+  "activeProfile": "Default",
   "activeTab": "textExpander",
-  "profiles": [
-    {
+  "profiles": {
+    "Default": {
       "id": "default",
       "name": "Default",
       "icon": "monitor",
       "color": "#d97706",
       "enabled": 1
     }
-  ],
+  },
   "textExpander": {
     "enabled": 1,
     "items": [
       {
         "id": "te-1",
-        "trigger": "@@email",
-        "replacement": "user@example.com",
-        "description": "Sample email snippet",
+        "input": "@@email",
+        "output": "user@example.com",
+        "multiline": 0,
         "enabled": 1
       }
     ]

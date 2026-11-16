@@ -41,6 +41,7 @@ Name: "startupicon"; Description: "Launch AutoHotKeyboard automatically when Win
 
 [Files]
 Source: "..\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\main.ahk"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\app-icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\app-icon.svg"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion

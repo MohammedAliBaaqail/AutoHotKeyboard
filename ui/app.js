@@ -210,8 +210,7 @@
           }
         ]
       },
-      theme: initialTheme,
-      window: { width: 1320, height: 760 }
+      theme: initialTheme
     },
     editingTeId: null,
     isMultiline: false
@@ -396,7 +395,9 @@
     saveCurrentProfileState();
     state.config.enabled = state.enabled;
     state.config.activeTab = state.activeTab;
-    sendToAhk('saveState', { config: state.config });
+    const cfgToSend = { ...state.config };
+    delete cfgToSend.window;
+    sendToAhk('saveState', { config: cfgToSend });
     updateGlobalIndicators();
   }
 
@@ -472,11 +473,29 @@
     if (!cfg.profiles || typeof cfg.profiles !== 'object') {
       cfg.profiles = {};
     }
-    if (!cfg.activeProfile || typeof cfg.activeProfile !== 'string') {
-      cfg.activeProfile = 'Default';
+    // If cfg.profiles is an Array, convert to an object map keyed by profile name
+    if (Array.isArray(cfg.profiles)) {
+      const converted = {};
+      cfg.profiles.forEach(p => {
+        if (!p) return;
+        const name = p.name || p.id || 'Default';
+        converted[name] = p;
+      });
+      cfg.profiles = converted;
+    }
+    if (!cfg.activeProfile || typeof cfg.activeProfile !== 'string' || !cfg.profiles[cfg.activeProfile]) {
+      const keys = Object.keys(cfg.profiles);
+      if (keys.length > 0 && keys.includes('Default')) {
+        cfg.activeProfile = 'Default';
+      } else if (keys.length > 0) {
+        cfg.activeProfile = keys[0];
+      } else {
+        cfg.activeProfile = 'Default';
+      }
     }
     if (!cfg.profiles['Default']) {
       cfg.profiles['Default'] = {
+        name: 'Default',
         textExpander: JSON.parse(JSON.stringify(cfg.textExpander || { enabled: 1, items: [] })),
         keyRemapper: JSON.parse(JSON.stringify(cfg.keyRemapper || { enabled: 1, items: [] })),
         appLauncher: JSON.parse(JSON.stringify(cfg.appLauncher || { enabled: 1, items: [] })),
@@ -1076,13 +1095,10 @@
 
     const cloneItems = (items) => (items || []).map(i => ({ ...JSON.parse(JSON.stringify(i)), enabled: 0 }));
 
-    const curWm = state.config.windowManager || {};
-    const newWm = JSON.parse(JSON.stringify(curWm));
-    ['alwaysOnTopEnabled', 'appVolumeMuteEnabled', 'masterAudioMuteEnabled', 'appVolumeWheel', 'borderlessEnabled',
-      'centerWindowEnabled', 'clickThroughGhost', 'hideWindowEnabled', 'transparencyWheel', 'windowShadeEnabled',
-      'textTransformEnabled', 'textTransformCleanEnabled', 'screenOcrEnabled', 'colorPickerEnabled', 'virtualDesktopsEnabled', 'taskbarScrollEnabled', 'sleepEnabled'].forEach(k => {
-        newWm[k] = 0;
-      });
+    const defaultWm = (state.config.profiles && state.config.profiles.Default && state.config.profiles.Default.windowManager)
+      ? state.config.profiles.Default.windowManager
+      : (state.config.windowManager || {});
+    const newWm = JSON.parse(JSON.stringify(defaultWm));
 
     const curAc = state.config.autoClicker || {};
     const newAc = { ...JSON.parse(JSON.stringify(curAc)), enabled: 0 };
@@ -1211,17 +1227,28 @@
   } catch (e) { }
 
   function getProfileActiveScriptsCount(pName) {
-    if (!state.config || !state.config.profiles || !state.config.profiles[pName]) return 0;
-    if (state.config.activeProfile === pName) {
+    if (!state.config) return 0;
+    const currentName = pName || state.config.activeProfile || 'Default';
+    if (state.config.activeProfile === currentName) {
       saveCurrentProfileState();
     }
-    const prof = state.config.profiles[pName];
-    let count = 0;
+    let prof = null;
+    if (state.config.profiles) {
+      if (!Array.isArray(state.config.profiles) && state.config.profiles[currentName]) {
+        prof = state.config.profiles[currentName];
+      } else if (Array.isArray(state.config.profiles)) {
+        prof = state.config.profiles.find(p => p && (p.name === currentName || p.id === currentName));
+      }
+    }
+    if (!prof) prof = state.config;
+    if (!prof) return 0;
 
+    let count = 0;
     const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'];
     listModules.forEach(mod => {
-      if (prof[mod] && Array.isArray(prof[mod].items)) {
-        prof[mod].items.forEach(item => {
+      const m = prof[mod] || (state.config && state.config[mod]);
+      if (m && Array.isArray(m.items)) {
+        m.items.forEach(item => {
           if (item && item.enabled !== false && item.enabled !== 0) {
             count++;
           }
@@ -1229,25 +1256,31 @@
       }
     });
 
-    if (prof.windowManager) {
+    const wm = prof.windowManager || prof.systemTools || (state.config && (state.config.windowManager || state.config.systemTools));
+    if (wm) {
       const wmKeys = [
         'alwaysOnTopEnabled', 'centerWindowEnabled', 'hideWindowEnabled',
         'appVolumeMuteEnabled', 'masterAudioMuteEnabled', 'windowShadeEnabled',
         'borderlessEnabled', 'textTransformEnabled', 'textTransformCleanEnabled',
-        'screenOcrEnabled', 'colorPickerEnabled', 'virtualDesktopsEnabled', 'sleepEnabled'
+        'screenOcrEnabled', 'colorPickerEnabled', 'virtualDesktopsEnabled', 'sleepEnabled',
+        'appVolumeWheel', 'transparencyWheel', 'clickThroughGhost', 'taskbarScrollEnabled'
       ];
       wmKeys.forEach(k => {
-        if (prof.windowManager[k] === 1 || prof.windowManager[k] === true) count++;
+        if (wm[k] === 1 || wm[k] === true) count++;
       });
     }
 
-    if (prof.mouseGestures) {
-      if (prof.mouseGestures.cornersEnabled === 1 || prof.mouseGestures.cornersEnabled === true) count++;
-      if (prof.mouseGestures.gesturesEnabled === 1 || prof.mouseGestures.gesturesEnabled === true) count++;
+    const mg = prof.mouseGestures || prof.gesturesAndCorners || (state.config && (state.config.mouseGestures || state.config.gesturesAndCorners));
+    if (mg) {
+      if (mg.cornersEnabled === 1 || mg.cornersEnabled === true) count++;
+      if (mg.gesturesEnabled === 1 || mg.gesturesEnabled === true) count++;
     }
 
-    if (prof.radialMenu && (prof.radialMenu.enabled === 1 || prof.radialMenu.enabled === true)) count++;
-    if (prof.autoClicker && (prof.autoClicker.enabled === 1 || prof.autoClicker.enabled === true)) count++;
+    const rm = prof.radialMenu || (state.config && state.config.radialMenu);
+    if (rm && (rm.enabled === 1 || rm.enabled === true)) count++;
+
+    const ac = prof.autoClicker || (state.config && state.config.autoClicker);
+    if (ac && (ac.enabled === 1 || ac.enabled === true)) count++;
 
     return count;
   }
@@ -2075,24 +2108,33 @@
   let profileModalMode = 'add'; // 'add' | 'edit' | 'rename' | 'delete'
   let cachedRunningApps = [];
 
-  // 3-State Profile Trigger: 'off' | 'focus' | 'hover'
+  // Profile Trigger Mode: 'off' | 'focus' | 'hover'
   let modalTriggerMode = 'focus';
+  let modalLastActiveTrigger = 'focus';
 
   function updateProfileTriggerModeUI(mode) {
     if (mode === 'off' || mode === 'focus' || mode === 'hover') {
       modalTriggerMode = mode;
+      if (mode !== 'off') modalLastActiveTrigger = mode;
     } else if (typeof mode === 'boolean') {
-      modalTriggerMode = mode ? 'focus' : 'off';
+      modalTriggerMode = mode ? modalLastActiveTrigger : 'off';
     }
 
-    const chipTriggerOff = document.getElementById('chipTriggerOff');
+    const profSwitchAutoSwitch = document.getElementById('profSwitchAutoSwitch');
     const chipTriggerFocus = document.getElementById('chipTriggerFocus');
     const chipTriggerHover = document.getElementById('chipTriggerHover');
+    const profAutoSwitchPills = document.getElementById('profAutoSwitchPills');
     const profTriggerDesc = document.getElementById('profTriggerDesc');
 
-    if (chipTriggerOff) {
-      chipTriggerOff.classList.toggle('active', modalTriggerMode === 'off');
+    const isAutoOn = (modalTriggerMode !== 'off');
+    if (profSwitchAutoSwitch) {
+      profSwitchAutoSwitch.checked = isAutoOn;
     }
+
+    if (profAutoSwitchPills) {
+      profAutoSwitchPills.classList.toggle('disabled-pills', !isAutoOn);
+    }
+
     if (chipTriggerFocus) {
       chipTriggerFocus.classList.toggle('active', modalTriggerMode === 'focus');
     }
@@ -2101,12 +2143,12 @@
     }
 
     if (profTriggerDesc) {
-      if (modalTriggerMode === 'off') {
+      if (!isAutoOn) {
         profTriggerDesc.textContent = 'Disabled. This profile will only be activated manually.';
       } else if (modalTriggerMode === 'focus') {
-        profTriggerDesc.textContent = 'Active. Switches to this profile whenever its target window gains focus.';
+        profTriggerDesc.textContent = 'Active. Automatically switches to this profile whenever its target window gains focus.';
       } else if (modalTriggerMode === 'hover') {
-        profTriggerDesc.textContent = 'Active. Switches to this profile whenever your mouse cursor hovers over its window.';
+        profTriggerDesc.textContent = 'Active. Automatically switches to this profile whenever your mouse cursor hovers over its window.';
       }
     }
   }
@@ -2280,9 +2322,10 @@
     const curName = (state.config && state.config.activeProfile) || 'Default';
     const profInputExe = document.getElementById('profInputExe');
     const profSwitchOsdIcon = document.getElementById('profSwitchOsdIcon');
+    const profSwitchAutoSwitch = document.getElementById('profSwitchAutoSwitch');
 
     const targetExe = profInputExe ? profInputExe.value.trim() : '';
-    const switchTriggerEnabled = (modalTriggerMode !== 'off');
+    const switchTriggerEnabled = profSwitchAutoSwitch ? Boolean(profSwitchAutoSwitch.checked) : (modalTriggerMode !== 'off');
     const switchOnFocus = (modalTriggerMode === 'focus');
     const switchOnHover = (modalTriggerMode === 'hover');
     const showOsdIcon = profSwitchOsdIcon ? profSwitchOsdIcon.checked : true;
@@ -3480,6 +3523,7 @@
 
       const currWm = (state.config && state.config.windowManager) ? state.config.windowManager : {};
       const isEnabled = (currWm[key] !== false && currWm[key] !== 0);
+      currWm[key] = isEnabled ? 1 : 0;
       sw.checked = isEnabled;
       const card = sw.closest('.wm-card');
       const iconBadge = card ? card.querySelector('.wm-icon-badge') : null;
@@ -6281,79 +6325,8 @@
   }
 
   function updateGlobalIndicators() {
-    let totalItems = 0;
-    const isEngActive = state.enabled && state.config && state.config.enabled !== false && state.config.enabled !== 0;
-
-    if (isEngActive && state.config) {
-      const currentProfName = state.config.activeProfile || 'Default';
-      const prof = (state.config.profiles && state.config.profiles[currentProfName])
-        ? state.config.profiles[currentProfName]
-        : (state.config || {});
-
-      // 1. Text Expander items
-      const te = prof.textExpander || (state.config && state.config.textExpander);
-      if (te && te.enabled !== false && te.enabled !== 0 && Array.isArray(te.items)) {
-        totalItems += te.items.filter(i => i && i.enabled !== false && i.enabled !== 0).length;
-      }
-
-      // 2. Key Remapper items
-      const kr = prof.keyRemapper || (state.config && state.config.keyRemapper);
-      if (kr && kr.enabled !== false && kr.enabled !== 0 && Array.isArray(kr.items)) {
-        totalItems += kr.items.filter(i => i && i.enabled !== false && i.enabled !== 0).length;
-      }
-
-      // 3. App Launcher items
-      const al = prof.appLauncher || (state.config && state.config.appLauncher);
-      if (al && al.enabled !== false && al.enabled !== 0 && Array.isArray(al.items)) {
-        totalItems += al.items.filter(i => i && i.enabled !== false && i.enabled !== 0).length;
-      }
-
-      // 3.5. Folder Creator items
-      const fc = prof.folderCreator || (state.config && state.config.folderCreator);
-      if (fc && fc.enabled !== false && fc.enabled !== 0 && Array.isArray(fc.items)) {
-        totalItems += fc.items.filter(i => i && i.enabled !== false && i.enabled !== 0).length;
-      }
-
-      // 4. Macro Recorder items
-      const mr = prof.macroRecorder || (state.config && state.config.macroRecorder);
-      if (mr && mr.enabled !== false && mr.enabled !== 0 && Array.isArray(mr.items)) {
-        totalItems += mr.items.filter(i => i && i.enabled !== false && i.enabled !== 0).length;
-      }
-
-      // 5. Window Tools & Productivity Features
-      const wm = prof.windowManager || (state.config && state.config.windowManager);
-      if (wm && wm.enabled !== false && wm.enabled !== 0) {
-        const wmKeys = [
-          'alwaysOnTopEnabled', 'centerWindowEnabled', 'hideWindowEnabled',
-          'borderlessEnabled', 'windowShadeEnabled', 'appVolumeWheel',
-          'appVolumeMuteEnabled', 'masterAudioMuteEnabled', 'transparencyWheel', 'clickThroughGhost',
-          'textTransformEnabled', 'textTransformCleanEnabled', 'screenOcrEnabled',
-          'colorPickerEnabled', 'virtualDesktopsEnabled', 'taskbarScrollEnabled', 'sleepEnabled'
-        ];
-        for (const k of wmKeys) {
-          if (wm[k] === 1 || wm[k] === true) totalItems++;
-        }
-      }
-
-      // 6. Auto Clicker
-      const ac = prof.autoClicker || (state.config && state.config.autoClicker);
-      if (ac && (ac.enabled === 1 || ac.enabled === true)) {
-        totalItems++;
-      }
-
-      // 7. Mouse Gestures & Hot Corners
-      const mg = prof.mouseGestures || (state.config && state.config.mouseGestures);
-      if (mg) {
-        if (mg.cornersEnabled === 1 || mg.cornersEnabled === true) totalItems++;
-        if (mg.gesturesEnabled === 1 || mg.gesturesEnabled === true) totalItems++;
-      }
-
-      // 8. Radial Menu
-      const rm = prof.radialMenu || (state.config && state.config.radialMenu);
-      if (rm && (rm.enabled === 1 || rm.enabled === true)) {
-        totalItems++;
-      }
-    }
+    const currentProfName = (state.config && state.config.activeProfile) || 'Default';
+    const totalItems = getProfileActiveScriptsCount(currentProfName);
 
     const badge = document.getElementById('activeCountBadge') || activeCountBadge;
     if (badge) {
@@ -6383,9 +6356,15 @@
 
     saveCurrentProfileState();
     const currentProfName = (state.config && state.config.activeProfile) || 'Default';
-    const prof = (state.config && state.config.profiles && state.config.profiles[currentProfName])
-      ? state.config.profiles[currentProfName]
-      : (state.config || {});
+    let prof = null;
+    if (state.config && state.config.profiles) {
+      if (!Array.isArray(state.config.profiles) && state.config.profiles[currentProfName]) {
+        prof = state.config.profiles[currentProfName];
+      } else if (Array.isArray(state.config.profiles)) {
+        prof = state.config.profiles.find(p => p && (p.name === currentProfName || p.id === currentProfName));
+      }
+    }
+    if (!prof) prof = state.config || {};
 
     if (titleEl) {
       titleEl.textContent = `ACTIVE SCRIPTS (${currentProfName.toUpperCase()})`;
@@ -6582,7 +6561,7 @@
     }
 
     // 5. Window Tools
-    const wm = prof.windowManager || {};
+    const wm = prof.windowManager || prof.systemTools || (state.config && (state.config.windowManager || state.config.systemTools)) || {};
     const wmDefinitions = [
       { key: 'alwaysOnTopEnabled', title: 'Always on Top', meta: wm.alwaysOnTopHotkey ? formatKeyDisplay(wm.alwaysOnTopHotkey) : 'Ctrl+Space' },
       { key: 'centerWindowEnabled', title: 'Center Window', meta: wm.centerWindowHotkey ? formatKeyDisplay(wm.centerWindowHotkey) : 'Ctrl+Alt+C' },
@@ -6627,7 +6606,7 @@
     appendSection('Window Tools & Productivity', activeWmCards);
 
     // 6. Mouse Gestures & Corners
-    const mg = prof.mouseGestures || {};
+    const mg = prof.mouseGestures || prof.gesturesAndCorners || (state.config && (state.config.mouseGestures || state.config.gesturesAndCorners)) || {};
     const mgCards = [];
     if (mg.cornersEnabled === 1 || mg.cornersEnabled === true) {
       totalActive++;
@@ -8486,11 +8465,10 @@
         renderRunningAppsList();
       });
     }
-    const chipTriggerOff = document.getElementById('chipTriggerOff');
-    if (chipTriggerOff) {
-      chipTriggerOff.addEventListener('click', (e) => {
-        e.stopPropagation();
-        updateProfileTriggerModeUI('off');
+    const profSwitchAutoSwitch = document.getElementById('profSwitchAutoSwitch');
+    if (profSwitchAutoSwitch) {
+      profSwitchAutoSwitch.addEventListener('change', () => {
+        updateProfileTriggerModeUI(profSwitchAutoSwitch.checked ? modalLastActiveTrigger : 'off');
       });
     }
     const chipTriggerFocus = document.getElementById('chipTriggerFocus');
@@ -8708,6 +8686,8 @@
     function handleDragStart(e) {
       if (
         e.target.closest('button') ||
+        e.target.closest('#btnStats') ||
+        e.target.closest('.squircle-btn') ||
         e.target.closest('input') ||
         e.target.closest('textarea') ||
         e.target.closest('select') ||
@@ -8717,6 +8697,8 @@
         e.target.closest('.macro-timeline-track') ||
         e.target.closest('.macro-inject-btn') ||
         e.target.closest('[draggable="true"]') ||
+        e.target.closest('#headerSleepCountdown') ||
+        e.target.closest('.sleep-countdown-pill') ||
         e.target.closest('#mainEngineSwitch') ||
         e.target.closest('.vertical-rocker') ||
         e.target.closest('.lgs-profile-card') ||
@@ -8728,6 +8710,8 @@
     dragHeader.addEventListener('mousedown', handleDragStart);
     dragHeader.addEventListener('dblclick', (e) => {
       if (
+        e.target.closest('#headerSleepCountdown') ||
+        e.target.closest('.sleep-countdown-pill') ||
         e.target.closest('#mainEngineSwitch') ||
         e.target.closest('.vertical-rocker') ||
         e.target.closest('.lgs-profile-card') ||
@@ -8880,6 +8864,17 @@
         if (e.target === activeScriptsModal) {
           closeActiveScriptsModal();
         }
+      });
+    }
+
+    // Quick Sleep / Hibernate Countdown Header Cancel Button
+    const btnHeaderCancelSleep = document.getElementById('btnHeaderCancelSleep');
+    if (btnHeaderCancelSleep) {
+      btnHeaderCancelSleep.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sendToAhk('cancelSleepTimer');
+        handleSleepTimerState({ active: false });
+        showToast('Countdown cancelled', 'info');
       });
     }
 
@@ -9099,7 +9094,6 @@
         } catch (e) { }
 
         syncConfig();
-        sendToAhk('saveState', { config: state.config });
 
         // 4. Positive visual feedback
         showToast('Theme applied and saved successfully!', 'success');
@@ -9167,10 +9161,68 @@
     }
   }
 
+  // Quick Sleep / Hibernate Live Countdown State Handler
+  function handleSleepTimerState(msg) {
+    const pill = document.getElementById('headerSleepCountdown');
+    const modeEl = document.getElementById('headerSleepMode');
+    const digitsEl = document.getElementById('headerSleepDigits');
+    const iconEl = document.getElementById('headerSleepIcon');
+    const cardBadge = document.getElementById('wmSleepStatusBadge');
+
+    if (!pill) return;
+
+    if (msg && (msg.active === 1 || msg.active === true)) {
+      pill.classList.remove('hidden-field');
+      const isHib = (msg.mode === 'Hibernate');
+      if (modeEl) {
+        modeEl.textContent = isHib ? 'HIBERNATE' : 'SLEEP';
+      }
+      if (iconEl) {
+        if (isHib) {
+          iconEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10M18.4 6.6L12 12m-6.4-5.4L12 12m0 0v10m6.4-3.4L12 12m-6.4 3.4L12 12"></path></svg>`;
+        } else {
+          iconEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+        }
+      }
+      const sec = Math.max(0, parseInt(msg.secondsLeft, 10) || 0);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      let timeStr = '';
+      if (h > 0) {
+        timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      } else {
+        timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+      if (digitsEl) {
+        digitsEl.textContent = timeStr;
+      }
+      if (cardBadge) {
+        cardBadge.textContent = `${isHib ? 'Hibernate' : 'Sleep'} in ${timeStr} (Click to Cancel)`;
+        cardBadge.style.color = 'var(--accent-primary)';
+        cardBadge.style.cursor = 'pointer';
+      }
+    } else {
+      pill.classList.add('hidden-field');
+      if (cardBadge) {
+        const isHibMode = (state.config && state.config.windowManager && (state.config.windowManager.sleepMode === 'hibernate' || state.config.windowManager.sleepModeHibernate));
+        const timerVal = (state.config && state.config.windowManager && state.config.windowManager.sleepTimer) || 0;
+        cardBadge.textContent = timerVal > 0 ? `${timerVal}m Timer Active` : (isHibMode ? 'Instant Hibernate' : 'Instant Sleep');
+        cardBadge.style.color = 'var(--text-muted)';
+        cardBadge.style.cursor = 'default';
+      }
+    }
+  }
+
   // Handle IPC Messages from AHK
   function onAhkMessage(event) {
     try {
       const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+      if (msg.type === 'sleepTimerState') {
+        handleSleepTimerState(msg);
+        return;
+      }
 
       if (msg.type === 'windowStateChanged' || msg.action === 'windowStateChanged') {
         updateMaximizeButtonState(Boolean(msg.isMaximized));

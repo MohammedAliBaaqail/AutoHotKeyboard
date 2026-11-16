@@ -276,6 +276,100 @@ body {
   color: var(--green-primary);
 }
 
+/* Quick Sleep / Hibernate Active Countdown Header Pill */
+.sleep-countdown-pill {
+  height: 42px;
+  padding: 0 6px 0 12px;
+  border-radius: var(--radius-btn, 12px);
+  background: var(--surface-color);
+  box-shadow: var(--raised-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  animation: sleepPillGlow 2.2s ease-in-out infinite;
+  user-select: none;
+  flex-shrink: 0;
+  transition: var(--transition-smooth);
+}
+
+@keyframes sleepPillGlow {
+  0%, 100% {
+    box-shadow: var(--raised-sm), 0 0 0 0 rgba(217, 119, 6, 0);
+  }
+  50% {
+    box-shadow: var(--raised-sm), 0 0 8px 1px rgba(217, 119, 6, 0.25);
+  }
+}
+
+.sleep-countdown-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.sleep-countdown-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sleep-countdown-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.1;
+}
+
+.sleep-countdown-mode {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.sleep-countdown-digits {
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, monospace);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent-primary);
+  letter-spacing: 0.5px;
+}
+
+.sleep-countdown-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+  margin-left: 2px;
+}
+
+.sleep-countdown-close:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #ef4444;
+  transform: scale(1.1);
+}
+
+.sleep-countdown-close:active {
+  transform: scale(0.92);
+}
+
+.sleep-countdown-close svg {
+  width: 14px;
+  height: 14px;
+}
+
 .icon-svg {
   width: 18px;
   height: 18px;
@@ -890,6 +984,27 @@ body {
   background: var(--surface-color);
   box-shadow: var(--raised-sm);
   transition: var(--transition-smooth);
+}
+
+.profile-option-row.profile-trigger-card {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-option-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.profile-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .profile-option-row.profile-trigger-row {
