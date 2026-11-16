@@ -1123,11 +1123,11 @@
     if (shouldSync) {
       try {
         syncConfig();
+        sendToAhk('showProfileOsd', { profile: name });
       } catch (err) {
         console.error('Error syncing config in switchProfile:', err);
       }
     }
-    showToast(`Profile: ${name}`);
   }
 
   function createNewProfile(name, targetExe = '', switchOnHover = false, showOsdIcon = true, switchTriggerEnabled = true, switchOnFocus = true) {
@@ -7796,6 +7796,56 @@
       darkIntensity: 65,
       blur: 6
     },
+    'atomic-tangerine': {
+      name: 'Atomic Tangerine',
+      bgColor: '#151922',
+      accentColor: '#ff6b35',
+      radius: 12,
+      distance: 3,
+      lightIntensity: 20,
+      darkIntensity: 42,
+      blur: 8
+    },
+    'matcha-pistachio': {
+      name: 'Matcha Cream',
+      bgColor: '#dce5d8',
+      accentColor: '#2d6a4f',
+      radius: 16,
+      distance: 4,
+      lightIntensity: 65,
+      darkIntensity: 18,
+      blur: 10
+    },
+    'velvet-amethyst': {
+      name: 'Velvet Amethyst',
+      bgColor: '#241829',
+      accentColor: '#e0aaff',
+      radius: 14,
+      distance: 4,
+      lightIntensity: 22,
+      darkIntensity: 48,
+      blur: 9
+    },
+    'golden-dunes': {
+      name: 'Golden Dunes',
+      bgColor: '#d9c5b2',
+      accentColor: '#b05b3b',
+      radius: 10,
+      distance: 4,
+      lightIntensity: 55,
+      darkIntensity: 16,
+      blur: 8
+    },
+    'glacial-teal': {
+      name: 'Glacial Teal',
+      bgColor: '#11222c',
+      accentColor: '#00f5d4',
+      radius: 12,
+      distance: 3,
+      lightIntensity: 22,
+      darkIntensity: 45,
+      blur: 8
+    },
     'soft-gray': {
       name: 'Warm Clay (Default)',
       bgColor: '#e8dfd5',
@@ -8164,6 +8214,11 @@
       themeSliderBlur.value = blur;
       updateSliderProgress(themeSliderBlur);
       if (badgeBlur) badgeBlur.textContent = `${blur}px`;
+    }
+
+    const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
+    if (themeOsdIconOnly) {
+      themeOsdIconOnly.checked = !!(state.config && state.config.theme && (state.config.theme.osdIconOnly === 1 || state.config.theme.osdIconOnly === true));
     }
 
     // Refresh all neumorphic sliders so track fills dynamically adapt to the active theme colors
@@ -9274,6 +9329,18 @@
       });
     }
 
+    const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
+    if (themeOsdIconOnly && !themeOsdIconOnly.dataset.bound) {
+      themeOsdIconOnly.dataset.bound = 'true';
+      themeOsdIconOnly.addEventListener('change', () => {
+        if (!state.config.theme) state.config.theme = {};
+        state.config.theme.osdIconOnly = themeOsdIconOnly.checked ? 1 : 0;
+        syncConfig();
+        const curProf = state.config.activeProfile || 'Default';
+        sendToAhk('showProfileOsd', { profile: curProf });
+      });
+    }
+
     // Reset Theme to Default Preset (Warm Clay)
     if (btnResetTheme) {
       btnResetTheme.addEventListener('click', () => {
@@ -9529,9 +9596,6 @@
       } else if (msg.type === 'profileAutoSwitched') {
         if (msg.activeProfile && state.config && state.config.profiles && state.config.profiles[msg.activeProfile]) {
           switchProfile(msg.activeProfile, false);
-          if (msg.triggerExe) {
-            showToast(`Switched Profile: ${msg.activeProfile} (${msg.triggerExe})`);
-          }
         }
       } else if (msg.type === 'autoClickerState') {
         updateAutoClickerUi(msg.running);

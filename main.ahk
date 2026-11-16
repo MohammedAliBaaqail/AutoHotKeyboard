@@ -2398,15 +2398,143 @@ class ProfileOsdHUD {
         this.guiObj := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +E0x08000000 +E0x00000020 +E0x00080000")
     }
 
-    static ShowIcon(iconPath := "", durationMs := 1200) {
+    static GetProfileIconPath(profileName, triggerExe := "") {
+        global g_Config
+        iconsDir := A_ScriptDir . "\ui\icons"
+
+        ; 1. Check triggerExe icon
+        if (triggerExe != "") {
+            cleanExe := RegExReplace(triggerExe, "i)\.exe$", "")
+            testPath := iconsDir . "\" . cleanExe . ".png"
+            if (FileExist(testPath))
+                return testPath
+        }
+
+        ; 2. Check profile targetExe in configuration
+        if (g_Config.Has("profiles") && g_Config["profiles"].Has(profileName)) {
+            prof := g_Config["profiles"][profileName]
+            if (IsObject(prof) && prof.Has("targetExe") && prof["targetExe"] != "") {
+                cleanExe := RegExReplace(prof["targetExe"], "i)\.exe$", "")
+                testPath := iconsDir . "\" . cleanExe . ".png"
+                if (FileExist(testPath))
+                    return testPath
+                try {
+                    foundExe := ProfileAppScanner.FindExePath(cleanExe . ".exe")
+                    if (foundExe != "") {
+                        ProfileAppScanner.ExtractExeIcon(foundExe, testPath)
+                        if (FileExist(testPath))
+                            return testPath
+                    }
+                }
+            }
+        }
+
+        ; 3. Check profile name icon directly
+        testNamed := iconsDir . "\" . profileName . ".png"
+        if (FileExist(testNamed))
+            return testNamed
+
+        ; 4. Default / App Icon fallback
+        defaultIcon := A_ScriptDir . "\ui\app-icon.png"
+        if (FileExist(defaultIcon))
+            return defaultIcon
+
+        return ""
+    }
+
+    static ShowProfileHUD(profileName := "Default", triggerExe := "", durationMs := 1600) {
+        global g_Config
         this.Init()
+
         dpiScale := A_ScreenDPI / 96.0
-        guiW := Round(56 * dpiScale)
-        guiH := Round(56 * dpiScale)
-        cornerRadius := 14.0 * dpiScale
+
+        ; Theme settings
+        bgHex := (g_Config.Has("theme") && g_Config["theme"].Has("bgColor")) ? g_Config["theme"]["bgColor"] : "#E8DFD5"
+        accentHex := (g_Config.Has("theme") && g_Config["theme"].Has("accentColor")) ? g_Config["theme"]["accentColor"] : "#D97706"
+        isIconOnly := (g_Config.Has("theme") && g_Config["theme"].Has("osdIconOnly")) ? (g_Config["theme"]["osdIconOnly"] = 1 || g_Config["theme"]["osdIconOnly"] = true) : false
+
+        ; Parse hex colors
+        cleanBg := StrReplace(bgHex, "#", "")
+        if (StrLen(cleanBg) = 6) {
+            bgR := Integer("0x" . SubStr(cleanBg, 1, 2))
+            bgG := Integer("0x" . SubStr(cleanBg, 3, 2))
+            bgB := Integer("0x" . SubStr(cleanBg, 5, 2))
+        } else {
+            bgR := 232, bgG := 223, bgB := 213
+        }
+        cBg := (0xF8 << 24) | (bgR << 16) | (bgG << 8) | bgB
+
+        cleanAcc := StrReplace(accentHex, "#", "")
+        if (StrLen(cleanAcc) = 6) {
+            accR := Integer("0x" . SubStr(cleanAcc, 1, 2))
+            accG := Integer("0x" . SubStr(cleanAcc, 3, 2))
+            accB := Integer("0x" . SubStr(cleanAcc, 5, 2))
+        } else {
+            accR := 217, accG := 119, accB := 6
+        }
+        cAccent := (0xFF << 24) | (accR << 16) | (accG << 8) | accB
+
+        ; Calculate text color and border based on background luminance
+        lum := (bgR * 299 + bgG * 587 + bgB * 114) // 1000
+        if (lum > 130) {
+            cText := 0xFF18181B       ; Dark slate text
+            cBorder := 0x2E000000     ; Soft dark shadow border
+        } else {
+            cText := 0xFFF8FAFC       ; Light text
+            cBorder := 0x35FFFFFF     ; Soft light border
+        }
+
+        iconPath := this.GetProfileIconPath(profileName, triggerExe)
+        displayText := "Profile: " . profileName
 
         hDC := DllCall("GetDC", "ptr", 0, "ptr")
         hMemDC := DllCall("CreateCompatibleDC", "ptr", hDC, "ptr")
+
+        ; GDI+ Fonts matching JetBrains Mono / Segoe UI
+        pFamily := 0
+        if (DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "JetBrains Mono", "ptr", 0, "ptr*", &pFamily) != 0 || !pFamily) {
+            DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "Segoe UI", "ptr", 0, "ptr*", &pFamily)
+        }
+        fontSize := 11.0 * dpiScale
+        pFont := 0
+        DllCall("gdiplus\GdipCreateFont", "ptr", pFamily, "float", fontSize, "int", 1, "int", 2, "ptr*", &pFont)
+
+        pFormat := 0
+        DllCall("gdiplus\GdipCreateStringFormat", "int", 0, "int", 0, "ptr*", &pFormat)
+        DllCall("gdiplus\GdipSetStringFormatAlign", "ptr", pFormat, "int", 0)       ; Near (left)
+        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", pFormat, "int", 1)   ; Center vertical
+
+        ; Measure text width
+        textW := 0.0
+        textH := 0.0
+        if (!isIconOnly) {
+            pTempGraphics := 0
+            DllCall("gdiplus\GdipCreateFromHDC", "ptr", hMemDC, "ptr*", &pTempGraphics)
+            layoutRect := Buffer(16, 0)
+            NumPut("float", 0.0, layoutRect, 0), NumPut("float", 0.0, layoutRect, 4)
+            NumPut("float", 2000.0, layoutRect, 8), NumPut("float", 100.0, layoutRect, 12)
+            bbox := Buffer(16, 0)
+            DllCall("gdiplus\GdipMeasureString", "ptr", pTempGraphics, "wstr", displayText, "int", -1, "ptr", pFont, "ptr", layoutRect.Ptr, "ptr", pFormat, "ptr", bbox.Ptr, "int*", 0, "int*", 0)
+            textW := NumGet(bbox, 8, "float")
+            textH := NumGet(bbox, 12, "float")
+            DllCall("gdiplus\GdipDeleteGraphics", "ptr", pTempGraphics)
+        }
+
+        ; Layout dimensions matching the pill in the image
+        padX := Round(13 * dpiScale)
+        iconBoxSize := Round(20 * dpiScale)
+        gap := Round(9 * dpiScale)
+        cornerRadius := 10.0 * dpiScale
+
+        if (isIconOnly) {
+            guiW := Round(44 * dpiScale)
+            guiH := Round(44 * dpiScale)
+            cornerRadius := 12.0 * dpiScale
+            iconBoxSize := Round(24 * dpiScale)
+        } else {
+            guiH := Round(38 * dpiScale)
+            guiW := Round(padX + iconBoxSize + gap + textW + padX + (4 * dpiScale))
+        }
 
         bi := Buffer(40, 0)
         NumPut("uint", 40, bi, 0)
@@ -2417,15 +2545,16 @@ class ProfileOsdHUD {
         NumPut("uint", 0, bi, 16)
 
         pBits := 0
-        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0,
-            "ptr")
+        hBmp := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", &pBits, "ptr", 0, "uint", 0, "ptr")
         hOldBmp := DllCall("SelectObject", "ptr", hMemDC, "ptr", hBmp, "ptr")
 
         pGraphics := 0
         DllCall("gdiplus\GdipCreateFromHDC", "ptr", hMemDC, "ptr*", &pGraphics)
         DllCall("gdiplus\GdipSetSmoothingMode", "ptr", pGraphics, "int", 4)
+        DllCall("gdiplus\GdipSetTextRenderingHint", "ptr", pGraphics, "int", 5) ; ClearType
 
-        inset := 1.2 * dpiScale
+        ; Construct Pill Rounded Path
+        inset := 1.0 * dpiScale
         r := cornerRadius
         d := r * 2.0
         rw := Float(guiW) - (inset * 2.0)
@@ -2433,39 +2562,41 @@ class ProfileOsdHUD {
 
         pPath := 0
         DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &pPath)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset, "float", d, "float", d, "float",
-            180, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset, "float", d, "float", d,
-            "float", 270, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset + rh - d, "float", d,
-            "float", d, "float", 0, "float", 90)
-        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset + rh - d, "float", d, "float", d,
-            "float", 90, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset, "float", d, "float", d, "float", 180, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset, "float", d, "float", d, "float", 270, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset + rw - d, "float", inset + rh - d, "float", d, "float", d, "float", 0, "float", 90)
+        DllCall("gdiplus\GdipAddPathArc", "ptr", pPath, "float", inset, "float", inset + rh - d, "float", d, "float", d, "float", 90, "float", 90)
         DllCall("gdiplus\GdipClosePathFigure", "ptr", pPath)
 
+        ; Fill Background (Neumorphic Surface)
         pBgBrush := 0
-        DllCall("gdiplus\GdipCreateSolidFill", "uint", 0xF218181B, "ptr*", &pBgBrush)
+        DllCall("gdiplus\GdipCreateSolidFill", "uint", cBg, "ptr*", &pBgBrush)
         DllCall("gdiplus\GdipFillPath", "ptr", pGraphics, "ptr", pBgBrush, "ptr", pPath)
 
-        pPen := 0
-        DllCall("gdiplus\GdipCreatePen1", "uint", 0xFFD97706, "float", 1.5 * dpiScale, "int", 2, "ptr*", &pPen)
-        DllCall("gdiplus\GdipDrawPath", "ptr", pGraphics, "ptr", pPen, "ptr", pPath)
+        ; Draw Subtle Border
+        pBorderPen := 0
+        DllCall("gdiplus\GdipCreatePen1", "uint", cBorder, "float", 1.2 * dpiScale, "int", 2, "ptr*", &pBorderPen)
+        DllCall("gdiplus\GdipDrawPath", "ptr", pGraphics, "ptr", pBorderPen, "ptr", pPath)
+
+        ; Draw Profile Icon
+        iconX := isIconOnly ? (Float(guiW) - iconBoxSize) / 2.0 : Float(padX)
+        iconY := (Float(guiH) - iconBoxSize) / 2.0
 
         pBitmap := 0
         if (iconPath != "" && FileExist(iconPath)) {
             DllCall("gdiplus\GdipCreateBitmapFromFile", "wstr", iconPath, "ptr*", &pBitmap)
         }
+
         if (pBitmap) {
             imgW := 0, imgH := 0
             DllCall("gdiplus\GdipGetImageWidth", "ptr", pBitmap, "uint*", &imgW)
             DllCall("gdiplus\GdipGetImageHeight", "ptr", pBitmap, "uint*", &imgH)
             if (imgW > 0 && imgH > 0) {
-                maxBox := 34.0 * dpiScale
-                scale := Min(maxBox / imgW, maxBox / imgH)
+                scale := Min(iconBoxSize / imgW, iconBoxSize / imgH)
                 drawW := imgW * scale
                 drawH := imgH * scale
-                dstX := (Float(guiW) - drawW) / 2.0
-                dstY := (Float(guiH) - drawH) / 2.0
+                dstX := iconX + (iconBoxSize - drawW) / 2.0
+                dstY := iconY + (iconBoxSize - drawH) / 2.0
                 DllCall("gdiplus\GdipSetInterpolationMode", "ptr", pGraphics, "int", 7)
                 DllCall("gdiplus\GdipDrawImageRectRect", "ptr", pGraphics, "ptr", pBitmap
                     , "float", dstX, "float", dstY, "float", drawW, "float", drawH
@@ -2473,8 +2604,28 @@ class ProfileOsdHUD {
                     , "int", 2, "ptr", 0, "ptr", 0, "ptr", 0)
             }
             DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+        } else {
+            pEmblemPen := 0
+            DllCall("gdiplus\GdipCreatePen1", "uint", cAccent, "float", 1.6 * dpiScale, "int", 2, "ptr*", &pEmblemPen)
+            DllCall("gdiplus\GdipDrawEllipse", "ptr", pGraphics, "ptr", pEmblemPen, "float", iconX + 1.0, "float", iconY + 1.0, "float", Float(iconBoxSize - 2), "float", Float(iconBoxSize - 2))
+            DllCall("gdiplus\GdipDeletePen", "ptr", pEmblemPen)
         }
 
+        ; Draw Text (if not icon only)
+        if (!isIconOnly) {
+            pTextBrush := 0
+            DllCall("gdiplus\GdipCreateSolidFill", "uint", cText, "ptr*", &pTextBrush)
+            tX := iconX + iconBoxSize + gap
+            tRect := Buffer(16, 0)
+            NumPut("float", tX, tRect, 0)
+            NumPut("float", 0.0, tRect, 4)
+            NumPut("float", textW + 8.0, tRect, 8)
+            NumPut("float", Float(guiH), tRect, 12)
+            DllCall("gdiplus\GdipDrawString", "ptr", pGraphics, "wstr", displayText, "int", -1, "ptr", pFont, "ptr", tRect.Ptr, "ptr", pFormat, "ptr", pTextBrush)
+            DllCall("gdiplus\GdipDeleteBrush", "ptr", pTextBrush)
+        }
+
+        ; Position above taskbar at bottom-right of current monitor
         CoordMode("Mouse", "Screen")
         MouseGetPos(&mX, &mY)
         monCount := MonitorGetCount()
@@ -2488,7 +2639,7 @@ class ProfileOsdHUD {
         }
         MonitorGetWorkArea(monIndex, &WL, &WT, &WR, &WB)
         posX := WR - guiW - Round(24 * dpiScale)
-        posY := WB - guiH - Round(24 * dpiScale)
+        posY := WB - guiH - Round(28 * dpiScale)
 
         ptDst := Buffer(8, 0)
         NumPut("int", posX, ptDst, 0), NumPut("int", posY, ptDst, 4)
@@ -2504,8 +2655,12 @@ class ProfileOsdHUD {
         DllCall("UpdateLayeredWindow", "ptr", this.guiObj.Hwnd, "ptr", hDC, "ptr", ptDst, "ptr", sz, "ptr", hMemDC,
             "ptr", ptSrc, "uint", 0, "ptr", blend, "uint", 2)
 
+        ; Cleanup GDI+ resources
+        DllCall("gdiplus\GdipDeleteStringFormat", "ptr", pFormat)
+        DllCall("gdiplus\GdipDeleteFont", "ptr", pFont)
+        DllCall("gdiplus\GdipDeleteFontFamily", "ptr", pFamily)
         DllCall("gdiplus\GdipDeleteBrush", "ptr", pBgBrush)
-        DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pBorderPen)
         DllCall("gdiplus\GdipDeletePath", "ptr", pPath)
         DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGraphics)
         DllCall("SelectObject", "ptr", hMemDC, "ptr", hOldBmp)
@@ -2513,7 +2668,12 @@ class ProfileOsdHUD {
         DllCall("DeleteDC", "ptr", hMemDC)
         DllCall("ReleaseDC", "ptr", 0, "ptr", hDC)
 
+        SetTimer(this.hideFn, 0)
         SetTimer(this.hideFn, -durationMs)
+    }
+
+    static ShowIcon(iconPath := "", durationMs := 1200) {
+        this.ShowProfileHUD("Default", "", durationMs)
     }
 
     static Hide() {
@@ -2733,24 +2893,13 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
         )))
     }
 
-    ; Trigger App Icon OSD popup if enabled for this profile
-    showIcon := (targetProfile != "Default")
+    ; Trigger Profile OSD HUD notification on user's screen
+    showOsd := true
     if (IsObject(prof) && prof.Has("showOsdIcon")) {
-        showIcon := (prof["showOsdIcon"] = 1 || prof["showOsdIcon"] = true)
+        showOsd := (prof["showOsdIcon"] = 1 || prof["showOsdIcon"] = true)
     }
-    if (showIcon) {
-        iconPath := ""
-        if (triggerExe != "") {
-            cleanName := RegExReplace(triggerExe, "i)\.exe$", "")
-            testPng := A_ScriptDir . "\ui\icons\" . cleanName . ".png"
-            if (FileExist(testPng)) {
-                iconPath := testPng
-            }
-        }
-        if (iconPath == "") {
-            iconPath := A_ScriptDir . "\ui\app-icon.png"
-        }
-        ProfileOsdHUD.ShowIcon(iconPath, 1200)
+    if (showOsd) {
+        ProfileOsdHUD.ShowProfileHUD(targetProfile, triggerExe, 1600)
     }
 }
 
@@ -4096,6 +4245,10 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
 
             case "launchColorPicker":
                 StartColorPicker()
+
+            case "showProfileOsd":
+                profName := msg.Has("profile") ? msg["profile"] : (g_Config.Has("activeProfile") ? g_Config["activeProfile"] : "Default")
+                ProfileOsdHUD.ShowProfileHUD(profName)
 
             case "previewCornerZones":
                 size := msg.Has("size") ? Integer(msg["size"]) : 14

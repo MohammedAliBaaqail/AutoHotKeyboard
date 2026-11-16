@@ -48,7 +48,7 @@ Source: "..\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\config.example.json"; DestDir: "{app}"; Flags: ignoreversion
 ; User preferences config: template for new installs, preserve existing user configurations on updates
 Source: "..\config.example.json"; DestDir: "{app}"; DestName: "config.json"; Flags: onlyifdoesntexist uninsneveruninstall
-Source: "..\ui\*"; DestDir: "{app}\ui"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\ui\*"; DestDir: "{app}\ui"; Excludes: "icons\*.png"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\lib\*"; DestDir: "{app}\lib"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
