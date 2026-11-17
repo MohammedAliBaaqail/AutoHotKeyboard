@@ -97,6 +97,26 @@ global g_ActiveHotstrings := []
 global g_ActiveHotkeys := []
 global g_AutoClickerRunning := false
 global g_AutoClickerCount := 0
+global g_MouseRecordActive := false
+global g_MousePlaybackActive := false
+global g_MouseRecordTechnique := "polling"
+global g_MouseRecordPollingRate := 20
+global g_MouseRecordedEvents := []
+global g_MouseRecordLastTime := 0
+global g_MouseRecordLastX := -1
+global g_MouseRecordLastY := -1
+global g_MouseHookHandle := 0
+global g_MouseHookCallback := 0
+global g_MousePlaybackStopReq := false
+global g_ClickHotkeysActive := false
+global g_MouseRecordKeys := true
+global g_MouseKeyHook := ""
+global g_MouseRecordWinHwnd := 0
+global g_MouseRecordWinX := 0
+global g_MouseRecordWinY := 0
+global g_EmergencyEscActive := false
+global g_MouseCountdownGui := ""
+global g_MouseRecordCountdownActive := false
 global g_LastExternalHwnd := 0
 global g_LastPolledHwnd := 0
 global g_ShadedWindows := Map()
@@ -112,6 +132,12 @@ global g_MacroActiveTimers := Map()
 global g_MacroActiveKeys := Map()
 global g_MacroIsExecuting := false
 global g_IsExiting := false
+
+; Screen Scanner tracking
+global g_ScreenScannerActive := false
+global g_ScreenScannerLastTriggerTime := Map()
+global g_ScreenScannerLastFoundState := Map()
+global g_ColorPickerTarget := ""
 
 LogMessage(msg) {
     OutputDebug("[AutoHotKeyboard] " . msg)
@@ -197,9 +223,13 @@ OnAppExit(exitReason, exitCode) {
     try SetTimer(CheckAutoProfileSwitch, 0)
     try SetTimer(SaveWindowSizeDebounced, 0)
     try ProfileOsdHUD.Hide()
+    try HideMouseOSD()
     try SaveWindowState()
     try SaveConfigToFile()
     try StopAutoClicker()
+    try StopMouseRecording()
+    try StopMousePlayback()
+    try StopScreenScanner()
     try UnregisterAllHooks()
     try CloseColorPickerLoupe()
     if (g_Wvc) {
@@ -419,6 +449,11 @@ GetDefaultConfig() {
                 )
             ]
         ),
+        "screenScanner", Map(
+            "enabled", true,
+            "scanRate", 150,
+            "items", []
+        ),
         "theme", Map(
             "bgColor", "#e8dfd5",
             "accentColor", "#d97706",
@@ -460,7 +495,10 @@ ApplyAllModules() {
 
     ; Unregister all existing hooks and stop auto clicker and macros
     StopAutoClicker()
+    StopMouseRecording()
+    StopMousePlayback()
     StopAllMacros()
+    StopScreenScanner()
     UnregisterAllHooks()
 
     if (!g_IsEngineActive) {
@@ -477,6 +515,7 @@ ApplyAllModules() {
     ApplyMacroRecorder()
     ApplyMouseGestures()
     ApplyRadialMenu()
+    ApplyScreenScanner()
 }
 
 IsNotAppWindowActive(*) {
@@ -1284,7 +1323,7 @@ UpdateColorPickerLoupe() {
 }
 
 ColorPickerPickColor(*) {
-    global g_ColorPickerFormat, g_Wv
+    global g_ColorPickerFormat, g_Wv, g_ColorPickerTarget
     CoordMode("Mouse", "Screen")
     CoordMode("Pixel", "Screen")
     MouseGetPos(&mx, &my)
@@ -1292,6 +1331,7 @@ ColorPickerPickColor(*) {
     formatted := FormatColorValue(cVal, g_ColorPickerFormat)
     A_Clipboard := formatted
     SoundBeep(1200, 50)
+    target := g_ColorPickerTarget
     CloseColorPickerLoupe()
     if (g_Wv) {
         msg := JSON.stringify(Map(
@@ -1305,7 +1345,10 @@ ColorPickerPickColor(*) {
             "type", "colorPicked",
             "color", formatted,
             "format", g_ColorPickerFormat,
-            "hex", Format("#{:06X}", cVal)
+            "hex", Format("#{:06X}", cVal),
+            "x", mx,
+            "y", my,
+            "target", target
         ))
         g_Wv.PostWebMessageAsString(pickMsg)
     }
@@ -1346,7 +1389,7 @@ ColorPickerCycleFormat(*) {
 }
 
 CloseColorPickerLoupe() {
-    global g_ColorPickerActive, g_ColorPickerLoupeGui, g_CpHMemDC, g_CpHMemBmp, g_CpHOldBmp
+    global g_ColorPickerActive, g_ColorPickerLoupeGui, g_CpHMemDC, g_CpHMemBmp, g_CpHOldBmp, g_ColorPickerTarget
 
     SetTimer(UpdateColorPickerLoupe, 0)
 
@@ -1368,6 +1411,7 @@ CloseColorPickerLoupe() {
         g_ColorPickerLoupeGui := 0
     }
     g_ColorPickerActive := false
+    g_ColorPickerTarget := ""
 }
 
 StartScreenOCR() {
@@ -1433,6 +1477,121 @@ StartScreenOCR() {
     } catch as err {
         LogMessage("OCR Error: " . err.Message)
     }
+}
+
+StartScreenRegionSelector(mode := "region") {
+    global g_Wv
+    CoordMode("Mouse", "Screen")
+
+    vx := SysGet(76), vy := SysGet(77), vw := SysGet(78), vh := SysGet(79)
+    if (vw <= 0) {
+        vx := 0, vy := 0, vw := A_ScreenWidth, vh := A_ScreenHeight
+    }
+    snipGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +LastFound +E0x00080000")
+    snipGui.BackColor := "000000"
+    WinSetTransparent(45, snipGui)
+    snipGui.Show("x" . vx . " y" . vy . " w" . vw . " h" . vh)
+
+    KeyWait("LButton", "D T10")
+    if (A_PriorKey = "Escape" || !GetKeyState("LButton", "P")) {
+        try snipGui.Destroy()
+        return
+    }
+
+    MouseGetPos(&x1, &y1)
+    boxGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale")
+    boxGui.BackColor := "d97706"
+    WinSetTransparent(80, boxGui)
+
+    while GetKeyState("LButton", "P") {
+        Sleep(15)
+        MouseGetPos(&cx, &cy)
+        bx := Min(x1, cx), by := Min(y1, cy)
+        bw := Abs(cx - x1), bh := Abs(cy - y1)
+        if (bw > 2 && bh > 2) {
+            boxGui.Show("x" . bx . " y" . by . " w" . bw . " h" . bh . " NoActivate")
+        }
+    }
+
+    MouseGetPos(&x2, &y2)
+    try snipGui.Destroy()
+    try boxGui.Destroy()
+
+    rx1 := Min(x1, x2), ry1 := Min(y1, y2)
+    rx2 := Max(x1, x2), ry2 := Max(y1, y2)
+    rw := rx2 - rx1, rh := ry2 - ry1
+
+    if (rw < 5 || rh < 5)
+        return
+
+    SoundBeep(1200, 40)
+
+    if (mode = "snip") {
+        snipDir := A_ScriptDir . "\ui\icons\snips"
+        if (!DirExist(snipDir)) {
+            try DirCreate(snipDir)
+        }
+        snipName := "snip_" . FormatTime(, "yyyyMMdd_HHmmss") . ".png"
+        fullPath := snipDir . "\" . snipName
+        success := CaptureScreenAreaToFile(rx1, ry1, rw, rh, fullPath)
+        if (success && g_Wv) {
+            g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                "type", "screenSnipSaved",
+                "path", fullPath,
+                "x1", rx1, "y1", ry1, "x2", rx2, "y2", ry2,
+                "width", rw, "height", rh
+            )))
+        }
+    } else {
+        if (g_Wv) {
+            g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                "type", "screenRegionSelected",
+                "x1", rx1, "y1", ry1, "x2", rx2, "y2", ry2
+            )))
+        }
+    }
+}
+
+CaptureScreenAreaToFile(x, y, w, h, outPngPath) {
+    if (w <= 0 || h <= 0)
+        return false
+
+    SplitPath(outPngPath, , &outDir)
+    if (outDir != "" && !DirExist(outDir)) {
+        try DirCreate(outDir)
+    }
+
+    hdcScreen := DllCall("GetDC", "ptr", 0, "ptr")
+    hdcMem := DllCall("CreateCompatibleDC", "ptr", hdcScreen, "ptr")
+    hBitmap := DllCall("CreateCompatibleBitmap", "ptr", hdcScreen, "int", w, "int", h, "ptr")
+    hOld := DllCall("SelectObject", "ptr", hdcMem, "ptr", hBitmap, "ptr")
+
+    DllCall("BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", w, "int", h, "ptr", hdcScreen, "int", x, "int", y, "uint", 0x00CC0020)
+
+    DllCall("LoadLibrary", "Str", "gdiplus.dll", "Ptr")
+    si := Buffer(A_PtrSize = 8 ? 24 : 16, 0)
+    NumPut("UInt", 1, si, 0)
+    token := 0
+    success := false
+    if (DllCall("gdiplus\GdiplusStartup", "Ptr*", &token, "Ptr", si.Ptr, "Ptr", 0) == 0) {
+        pBitmap := 0
+        if (DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "Ptr", hBitmap, "Ptr", 0, "Ptr*", &pBitmap) == 0) {
+            clsidPng := Buffer(16)
+            DllCall("ole32\CLSIDFromString", "Str", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "Ptr", clsidPng.Ptr)
+            if (DllCall("gdiplus\GdipSaveImageToFile", "Ptr", pBitmap, "Str", outPngPath, "Ptr", clsidPng.Ptr, "Ptr", 0) == 0) {
+                success := true
+            }
+            DllCall("gdiplus\GdipDisposeImage", "Ptr", pBitmap)
+        }
+        DllCall("gdiplus\GdiplusShutdown", "Ptr", token)
+    }
+
+    DllCall("SelectObject", "ptr", hdcMem, "ptr", hOld)
+    DllCall("DeleteObject", "ptr", hBitmap)
+    DllCall("DeleteDC", "ptr", hdcMem)
+    DllCall("ReleaseDC", "ptr", 0, "ptr", hdcScreen)
+
+    return success
 }
 
 SwitchVirtualDesktop(dir) {
@@ -2878,6 +3037,8 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
         }
         if (prof.Has("radialMenu"))
             g_Config["radialMenu"] := prof["radialMenu"]
+        if (prof.Has("screenScanner"))
+            g_Config["screenScanner"] := prof["screenScanner"]
     }
 
     ; Enforce any globally forced feature toggles across profiles
@@ -3495,37 +3656,147 @@ ExecuteFolderCreation(item) {
 ; ==============================================================================
 
 ApplyAutoClicker() {
-    global g_Config, g_ActiveHotkeys
+    global g_Config, g_ActiveHotkeys, g_AutoClickerRunning, g_IsEngineActive
 
     if (!g_Config.Has("autoClicker")) {
         return
     }
 
     ac := g_Config["autoClicker"]
-    if (!ac.Has("hotkey") || Trim(ac["hotkey"]) = "") {
+    if (ac.Has("enabled") && (!ac["enabled"] || ac["enabled"] = "0")) {
+        if (g_AutoClickerRunning) {
+            StopAutoClicker()
+        }
         return
     }
 
-    try {
-        hk := Trim(ac["hotkey"])
-        Hotkey(hk, (*) => ToggleAutoClicker(), "On")
-        g_ActiveHotkeys.Push(hk)
-    } catch as err {
-        LogMessage("AutoClicker hotkey error: " . err.Message)
+    HotIf()
+
+    ; 1. Master AutoClicker Hotkey (default F8)
+    if (ac.Has("hotkey") && Trim(ac["hotkey"]) != "") {
+        try {
+            hk := Trim(ac["hotkey"])
+            normHk := NormalizeHotkeyToAhk(hk)
+            if (normHk = "")
+                normHk := hk
+            safeHk := (InStr(normHk, "$") || InStr(normHk, "*")) ? normHk : "$" . normHk
+            Hotkey(safeHk, (*) => ToggleAutoClicker(), "On")
+            g_ActiveHotkeys.Push(safeHk)
+        } catch as err {
+            LogMessage("AutoClicker hotkey error: " . err.Message)
+        }
     }
+
+    ; 2. Register Hotkeys for Each Saved Mouse Recording Script
+    if (ac.Has("items") && IsObject(ac["items"])) {
+        for item in ac["items"] {
+            if (IsObject(item) && item.Has("trigger") && Trim(item["trigger"]) != "") {
+                isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1)
+                if (isEnabled && g_IsEngineActive) {
+                    try {
+                        RegisterSingleMouseScript(item)
+                    } catch as err {
+                        LogMessage("Mouse script hotkey error for " . item["trigger"] . ": " . err.Message)
+                    }
+                }
+            }
+        }
+    }
+}
+
+RegisterSingleMouseScript(item) {
+    global g_ActiveHotkeys
+    trig := Trim(item["trigger"])
+    if (trig = "")
+        return
+
+    ahkHk := NormalizeHotkeyToAhk(trig)
+    if (ahkHk = "")
+        ahkHk := trig
+
+    safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
+    HotIf()
+    Hotkey(safeHk, (*) => ExecuteMouseScript(item), "On")
+    g_ActiveHotkeys.Push(safeHk)
+}
+
+ExecuteMouseScript(item) {
+    global g_IsEngineActive, g_MousePlaybackActive
+
+    if (!g_IsEngineActive)
+        return
+
+    ; If playback is already active, pressing any mouse script hotkey acts as an immediate stop
+    if (g_MousePlaybackActive) {
+        StopMousePlayback()
+        return
+    }
+
+    if (!item.Has("events") || !IsObject(item["events"]) || item["events"].Length = 0)
+        return
+
+    events := item["events"]
+    spd := item.Has("speed") ? Float(item["speed"]) : 1.0
+    isInf := (item.Has("playbackInfinite") && (item["playbackInfinite"] = 1 || item["playbackInfinite"] = true))
+    loopCnt := isInf ? 0 : (item.Has("loop") ? Integer(item["loop"]) : 1)
+    origin := item.Has("origin") ? item["origin"] : "absolute"
+    clicksOnly := (item.Has("clicksOnly") && (item["clicksOnly"] = 1 || item["clicksOnly"] = true))
+    humanize := (item.Has("humanize") && (item["humanize"] = 1 || item["humanize"] = true))
+    emergencyStop := (item.Has("emergencyStop") && (item["emergencyStop"] = 1 || item["emergencyStop"] = true))
+    countdown := item.Has("countdown") ? Integer(item["countdown"]) : 0
+    sId := item.Has("id") ? item["id"] : ""
+
+    SetTimer(() => PlayRecordedMousePath(events, spd, loopCnt, origin, clicksOnly, humanize, emergencyStop, countdown, sId), -1)
 }
 
 ToggleAutoClicker() {
     global g_AutoClickerRunning, g_AutoClickerCount, g_Config, g_IsEngineActive
+    global g_MouseRecordActive, g_MousePlaybackActive, g_MouseRecordCountdownActive
 
     if (!g_IsEngineActive) {
         return
+    }
+
+    if (g_Config.Has("autoClicker")) {
+        ac := g_Config["autoClicker"]
+        if (ac.Has("enabled") && (!ac["enabled"] || ac["enabled"] = "0")) {
+            if (g_AutoClickerRunning)
+                StopAutoClicker()
+            if (g_MouseRecordActive)
+                StopMouseRecording()
+            if (g_MousePlaybackActive)
+                StopMousePlayback()
+            return
+        }
+
+        ; Check mode: Recorder vs Clicker (Default to recorder)
+        mode := (ac.Has("mode") && ac["mode"] != "") ? ac["mode"] : "recorder"
+        if (mode = "recorder") {
+            if (g_MouseRecordCountdownActive) {
+                g_MouseRecordCountdownActive := false
+                HideMouseOSD()
+                SoundBeep(450, 90)
+                NotifyWebMouseCountdown(false, 0)
+            } else if (g_MouseRecordActive) {
+                StopMouseRecording()
+            } else if (g_MousePlaybackActive) {
+                StopMousePlayback()
+            } else {
+                cd := ac.Has("recordCountdown") ? Integer(ac["recordCountdown"]) : 0
+                tech := ac.Has("recordTechnique") ? ac["recordTechnique"] : "polling"
+                rate := ac.Has("pollingRate") ? Integer(ac["pollingRate"]) : 20
+                recKeys := (!ac.Has("recordKeys") || ac["recordKeys"] = 1 || ac["recordKeys"] = true)
+                StartMouseRecordingWithCountdown(cd, tech, rate, recKeys)
+            }
+            return
+        }
     }
 
     g_AutoClickerRunning := !g_AutoClickerRunning
     g_AutoClickerCount := 0
 
     if (g_AutoClickerRunning) {
+        EnableEmergencyEscHotkey()
         cps := 20
         if (g_Config.Has("autoClicker") && g_Config["autoClicker"].Has("cps")) {
             cps := Max(1, Min(100, g_Config["autoClicker"]["cps"]))
@@ -3535,6 +3806,7 @@ ToggleAutoClicker() {
         SoundBeep(1100, 60)
     } else {
         SetTimer(DoAutoClick, 0)
+        DisableEmergencyEscHotkey()
         SoundBeep(550, 60)
     }
 
@@ -3545,6 +3817,7 @@ StopAutoClicker() {
     global g_AutoClickerRunning
     g_AutoClickerRunning := false
     SetTimer(DoAutoClick, 0)
+    DisableEmergencyEscHotkey()
     NotifyWebAutoClicker()
 }
 
@@ -3595,6 +3868,1227 @@ NotifyWebAutoClicker() {
                 "running", g_AutoClickerRunning
             ))
             g_Wv.PostWebMessageAsString(msg)
+        }
+    }
+}
+
+; ------------------------------------------------------------------------------
+; Mouse Movement Recording & Playback Engine (Dual Technique: Polling & Hook)
+; ------------------------------------------------------------------------------
+
+ShowMouseOSD(titleText, mainText := "", isSuccess := false, autoHideMs := 0) {
+    global g_MouseCountdownGui
+    try {
+        if (!g_MouseCountdownGui) {
+            g_MouseCountdownGui := Gui("+AlwaysOnTop -Caption +ToolWindow -DPIScale +E0x20")
+            g_MouseCountdownGui.BackColor := "101216"
+            g_MouseCountdownGui.MarginX := 24
+            g_MouseCountdownGui.MarginY := 14
+            g_MouseCountdownGui.SetFont("s10 c8E95A5 Bold", "Segoe UI")
+            g_MouseCountdownGui.Add("Text", "vTitle Center w260", titleText)
+            g_MouseCountdownGui.SetFont("s22 c00F5FF Bold", "Segoe UI")
+            g_MouseCountdownGui.Add("Text", "vMain Center w260 y+4", mainText)
+        } else {
+            g_MouseCountdownGui["Title"].Text := titleText
+            g_MouseCountdownGui["Main"].Text := mainText
+            if (isSuccess) {
+                g_MouseCountdownGui["Main"].Opt("c10B981")
+            } else {
+                g_MouseCountdownGui["Main"].Opt("c00F5FF")
+            }
+        }
+
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mX, &mY)
+        monCount := MonitorGetCount()
+        monIdx := 1
+        loop monCount {
+            MonitorGet(A_Index, &mL, &mT, &mR, &mB)
+            if (mX >= mL && mX < mR && mY >= mT && mY < mB) {
+                monIdx := A_Index
+                break
+            }
+        }
+        MonitorGetWorkArea(monIdx, &WL, &WT, &WR, &WB)
+        guiW := 300
+        guiH := 84
+        posX := WL + ((WR - WL - guiW) // 2)
+        posY := WT + 40
+
+        g_MouseCountdownGui.Show("x" . posX . " y" . posY . " w" . guiW . " h" . guiH . " NoActivate")
+
+        if (autoHideMs > 0) {
+            SetTimer(HideMouseOSD, -autoHideMs)
+        } else {
+            SetTimer(HideMouseOSD, 0)
+        }
+    }
+}
+
+HideMouseOSD() {
+    global g_MouseCountdownGui
+    try {
+        if (g_MouseCountdownGui) {
+            g_MouseCountdownGui.Hide()
+        }
+    }
+}
+
+NotifyWebMouseCountdown(isActive, remainingSeconds := 0) {
+    global g_Wv
+    if (g_Wv) {
+        try {
+            msg := JSON.stringify(Map(
+                "type", "mouseCountdownState",
+                "active", isActive,
+                "seconds", remainingSeconds
+            ))
+            g_Wv.PostWebMessageAsString(msg)
+        }
+    }
+}
+
+StartMouseRecordingWithCountdown(countdown := 0, tech := "polling", rate := 20, recKeys := true) {
+    global g_MouseRecordCountdownActive, g_MouseRecordActive, g_MousePlaybackActive
+
+    if (g_MouseRecordActive) {
+        StopMouseRecording()
+        return
+    }
+    if (g_MousePlaybackActive) {
+        StopMousePlayback()
+        return
+    }
+    if (g_MouseRecordCountdownActive) {
+        g_MouseRecordCountdownActive := false
+        HideMouseOSD()
+        SoundBeep(450, 90)
+        NotifyWebMouseCountdown(false, 0)
+        return
+    }
+
+    c := Integer(countdown)
+    if (c <= 0) {
+        StartMouseRecording(Map("technique", tech, "rate", rate, "recordKeys", recKeys))
+        return
+    }
+
+    g_MouseRecordCountdownActive := true
+    NotifyWebMouseCountdown(true, c)
+    EnableEmergencyEscHotkey()
+
+    while (c > 0 && g_MouseRecordCountdownActive) {
+        ShowMouseOSD("MOUSE RECORDING IN", c . "s")
+        SoundBeep(850, 90)
+        NotifyWebMouseCountdown(true, c)
+        loop 10 {
+            Sleep(100)
+            if (!g_MouseRecordCountdownActive) {
+                HideMouseOSD()
+                NotifyWebMouseCountdown(false, 0)
+                return
+            }
+        }
+        c--
+    }
+
+    if (!g_MouseRecordCountdownActive) {
+        HideMouseOSD()
+        NotifyWebMouseCountdown(false, 0)
+        return
+    }
+
+    g_MouseRecordCountdownActive := false
+    NotifyWebMouseCountdown(false, 0)
+    ShowMouseOSD("MOUSE RECORDER", "RECORDING STARTED!", true, 900)
+    SoundBeep(1300, 150)
+
+    StartMouseRecording(Map("technique", tech, "rate", rate, "recordKeys", recKeys))
+}
+
+StartMouseRecording(options := "") {
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordLastTime, g_MouseRecordLastX, g_MouseRecordLastY
+    global g_MouseRecordTechnique, g_MouseRecordPollingRate, g_Wv, g_IsEngineActive
+    global g_MouseRecordKeys, g_MouseKeyHook, g_MouseRecordWinHwnd, g_MouseRecordWinX, g_MouseRecordWinY
+
+    if (!g_IsEngineActive)
+        return
+
+    StopMouseRecording()
+    StopMousePlayback()
+
+    tech := "polling"
+    rate := 20
+    recKeys := true
+
+    if (IsObject(options)) {
+        if (options.Has("technique"))
+            tech := options["technique"]
+        if (options.Has("rate"))
+            rate := Max(5, Integer(options["rate"]))
+        if (options.Has("recordKeys"))
+            recKeys := (options["recordKeys"] = 1 || options["recordKeys"] = true)
+    } else {
+        global g_Config
+        if (g_Config.Has("autoClicker")) {
+            ac := g_Config["autoClicker"]
+            if (ac.Has("recordTechnique"))
+                tech := ac["recordTechnique"]
+            if (ac.Has("pollingRate"))
+                rate := Max(5, Integer(ac["pollingRate"]))
+            if (ac.Has("recordKeys"))
+                recKeys := (ac["recordKeys"] = 1 || ac["recordKeys"] = true)
+        }
+    }
+
+    g_MouseRecordTechnique := (tech = "hook") ? "hook" : "polling"
+    g_MouseRecordPollingRate := rate
+    g_MouseRecordKeys := recKeys
+    g_MouseRecordedEvents := []
+    g_MouseRecordActive := true
+    g_MouseRecordLastTime := A_TickCount
+    g_MouseRecordLastX := -1
+    g_MouseRecordLastY := -1
+
+    global g_MouseRecordBtnStates, g_MousePollLastL, g_MousePollLastR, g_MousePollLastM
+    g_MouseRecordBtnStates := Map()
+    g_MousePollLastL := GetKeyState("LButton", "P")
+    g_MousePollLastR := GetKeyState("RButton", "P")
+    g_MousePollLastM := GetKeyState("MButton", "P")
+
+    ; Capture active window for window-relative playback
+    try {
+        g_MouseRecordWinHwnd := WinActive("A")
+        if (g_MouseRecordWinHwnd)
+            WinGetPos(&g_MouseRecordWinX, &g_MouseRecordWinY, , , g_MouseRecordWinHwnd)
+    } catch {
+        g_MouseRecordWinHwnd := 0
+        g_MouseRecordWinX := 0
+        g_MouseRecordWinY := 0
+    }
+
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&initX, &initY)
+    g_MouseRecordLastX := initX
+    g_MouseRecordLastY := initY
+    g_MouseRecordedEvents.Push(Map("type", "move", "x", initX, "y", initY, "delay", 0))
+
+    ; Install mouse click capture across all techniques
+    InstallMouseClickCapture()
+
+    if (g_MouseRecordTechnique = "hook") {
+        StartMouseHookRecord()
+    } else {
+        StartMousePollingRecord(g_MouseRecordPollingRate)
+    }
+
+    if (g_MouseRecordKeys) {
+        try {
+            g_MouseKeyHook := InputHook("V I1")
+            g_MouseKeyHook.KeyOpt("{All}", "N")
+            g_MouseKeyHook.OnKeyDown := OnRecordedKeyDown
+            g_MouseKeyHook.OnKeyUp := OnRecordedKeyUp
+            g_MouseKeyHook.Start()
+        } catch {
+            g_MouseKeyHook := ""
+        }
+    }
+
+    EnableEmergencyEscHotkey()
+    SoundBeep(1200, 70)
+    NotifyWebMouseRecordState(true)
+}
+
+StopMouseRecording() {
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordTechnique, g_Wv, g_MouseKeyHook, g_MainGui, g_MouseRecordCountdownActive
+
+    if (g_MouseRecordCountdownActive) {
+        g_MouseRecordCountdownActive := false
+        HideMouseOSD()
+        NotifyWebMouseCountdown(false, 0)
+        SoundBeep(450, 90)
+    }
+
+    if (!g_MouseRecordActive)
+        return
+
+    g_MouseRecordActive := false
+    HideMouseOSD()
+    DisableEmergencyEscHotkey()
+    RemoveMouseClickCapture()
+
+    if (g_MouseKeyHook) {
+        try g_MouseKeyHook.Stop()
+        g_MouseKeyHook := ""
+    }
+
+    if (g_MouseRecordTechnique = "hook") {
+        StopMouseHookRecord()
+    } else {
+        StopMousePollingRecord()
+    }
+
+    ; Clean up stray stop clicks if the user clicked the stop button in the UI
+    if (g_MainGui) {
+        try {
+            WinGetPos(&gx, &gy, &gw, &gh, g_MainGui.Hwnd)
+            while (g_MouseRecordedEvents.Length > 0) {
+                lastEv := g_MouseRecordedEvents[g_MouseRecordedEvents.Length]
+                if (IsObject(lastEv) && lastEv.Has("type") && lastEv["type"] = "click") {
+                    cx := lastEv.Has("x") ? lastEv["x"] : -1
+                    cy := lastEv.Has("y") ? lastEv["y"] : -1
+                    if (cx >= gx && cx <= gx + gw && cy >= gy && cy <= gy + gh) {
+                        g_MouseRecordedEvents.Pop()
+                        continue
+                    }
+                }
+                break
+            }
+        }
+    }
+
+    ; If any button was left in "Down" state at the end of recording, synthesize the "Up" release
+    global g_MouseRecordBtnStates
+    if (IsSet(g_MouseRecordBtnStates) && IsObject(g_MouseRecordBtnStates)) {
+        for btn, st in g_MouseRecordBtnStates {
+            if (st = "Down") {
+                CoordMode("Mouse", "Screen")
+                MouseGetPos(&upX, &upY)
+                g_MouseRecordedEvents.Push(Map("type", "click", "btn", btn, "action", "Up", "x", upX, "y", upY, "delay", 10))
+            }
+        }
+        g_MouseRecordBtnStates := Map()
+    }
+
+    SoundBeep(700, 70)
+    NotifyWebMouseRecordState(false)
+
+    if (g_Wv) {
+        try {
+            msg := JSON.stringify(Map(
+                "type", "mouseRecordedPath",
+                "events", g_MouseRecordedEvents
+            ))
+            g_Wv.PostWebMessageAsString(msg)
+        }
+    }
+}
+
+OnRecordedKeyDown(ih, vk, sc) {
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordLastTime
+    if (!g_MouseRecordActive)
+        return
+    kName := GetKeyName(Format("vk{:x}sc{:x}", vk, sc))
+    if (kName = "" || kName = "Escape" || kName = "Esc")
+        return
+    tNow := A_TickCount
+    delta := Max(1, tNow - g_MouseRecordLastTime)
+    g_MouseRecordedEvents.Push(Map("type", "key", "key", kName, "action", "Down", "delay", delta))
+    g_MouseRecordLastTime := tNow
+}
+
+OnRecordedKeyUp(ih, vk, sc) {
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordLastTime
+    if (!g_MouseRecordActive)
+        return
+    kName := GetKeyName(Format("vk{:x}sc{:x}", vk, sc))
+    if (kName = "" || kName = "Escape" || kName = "Esc")
+        return
+    tNow := A_TickCount
+    delta := Max(1, tNow - g_MouseRecordLastTime)
+    g_MouseRecordedEvents.Push(Map("type", "key", "key", kName, "action", "Up", "delay", delta))
+    g_MouseRecordLastTime := tNow
+}
+
+; --- Technique 1: High-Frequency Polling ---
+StartMousePollingRecord(rate := 20) {
+    SetTimer(OnMousePollTick, rate)
+}
+
+StopMousePollingRecord() {
+    SetTimer(OnMousePollTick, 0)
+}
+
+OnMousePollTick() {
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordLastTime, g_MouseRecordLastX, g_MouseRecordLastY
+    global g_MousePollLastL, g_MousePollLastR, g_MousePollLastM
+    if (!g_MouseRecordActive) {
+        SetTimer(OnMousePollTick, 0)
+        return
+    }
+
+    ; 1. Poll physical button states to reliably capture click-and-hold across all windows
+    curL := GetKeyState("LButton", "P")
+    if (curL != g_MousePollLastL) {
+        g_MousePollLastL := curL
+        RecordMouseClickAction("Left", curL ? "Down" : "Up")
+    }
+    curR := GetKeyState("RButton", "P")
+    if (curR != g_MousePollLastR) {
+        g_MousePollLastR := curR
+        RecordMouseClickAction("Right", curR ? "Down" : "Up")
+    }
+    curM := GetKeyState("MButton", "P")
+    if (curM != g_MousePollLastM) {
+        g_MousePollLastM := curM
+        RecordMouseClickAction("Middle", curM ? "Down" : "Up")
+    }
+
+    ; 2. Poll cursor position
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&x, &y)
+    if (x != g_MouseRecordLastX || y != g_MouseRecordLastY) {
+        tNow := A_TickCount
+        delta := Max(1, tNow - g_MouseRecordLastTime)
+        g_MouseRecordedEvents.Push(Map("type", "move", "x", x, "y", y, "delay", delta))
+        g_MouseRecordLastX := x
+        g_MouseRecordLastY := y
+        g_MouseRecordLastTime := tNow
+    }
+}
+
+InstallMouseClickCapture() {
+    global g_ClickHotkeysActive
+    if (g_ClickHotkeysActive)
+        return
+    try {
+        HotIf() ; Clear any active #HotIf criteria so hotkeys are 100% global!
+        Hotkey("~*LButton", OnRecordedLButtonDown, "On")
+        Hotkey("~*LButton Up", OnRecordedLButtonUp, "On")
+        Hotkey("~*RButton", OnRecordedRButtonDown, "On")
+        Hotkey("~*RButton Up", OnRecordedRButtonUp, "On")
+        Hotkey("~*MButton", OnRecordedMButtonDown, "On")
+        Hotkey("~*MButton Up", OnRecordedMButtonUp, "On")
+        Hotkey("~*XButton1", OnRecordedXButton1Down, "On")
+        Hotkey("~*XButton1 Up", OnRecordedXButton1Up, "On")
+        Hotkey("~*XButton2", OnRecordedXButton2Down, "On")
+        Hotkey("~*XButton2 Up", OnRecordedXButton2Up, "On")
+        Hotkey("~*WheelUp", OnRecordedWheelUp, "On")
+        Hotkey("~*WheelDown", OnRecordedWheelDown, "On")
+        g_ClickHotkeysActive := true
+    }
+}
+
+RemoveMouseClickCapture() {
+    global g_ClickHotkeysActive
+    if (g_ClickHotkeysActive) {
+        try {
+            HotIf()
+            Hotkey("~*LButton", "Off")
+            Hotkey("~*LButton Up", "Off")
+            Hotkey("~*RButton", "Off")
+            Hotkey("~*RButton Up", "Off")
+            Hotkey("~*MButton", "Off")
+            Hotkey("~*MButton Up", "Off")
+            Hotkey("~*XButton1", "Off")
+            Hotkey("~*XButton1 Up", "Off")
+            Hotkey("~*XButton2", "Off")
+            Hotkey("~*XButton2 Up", "Off")
+            Hotkey("~*WheelUp", "Off")
+            Hotkey("~*WheelDown", "Off")
+        }
+        g_ClickHotkeysActive := false
+    }
+}
+
+OnRecordedLButtonDown(*) => RecordMouseClickAction("Left", "Down")
+OnRecordedLButtonUp(*)   => RecordMouseClickAction("Left", "Up")
+OnRecordedRButtonDown(*) => RecordMouseClickAction("Right", "Down")
+OnRecordedRButtonUp(*)   => RecordMouseClickAction("Right", "Up")
+OnRecordedMButtonDown(*) => RecordMouseClickAction("Middle", "Down")
+OnRecordedMButtonUp(*)   => RecordMouseClickAction("Middle", "Up")
+OnRecordedXButton1Down(*) => RecordMouseClickAction("XButton1", "Down")
+OnRecordedXButton1Up(*)   => RecordMouseClickAction("XButton1", "Up")
+OnRecordedXButton2Down(*) => RecordMouseClickAction("XButton2", "Down")
+OnRecordedXButton2Up(*)   => RecordMouseClickAction("XButton2", "Up")
+OnRecordedWheelUp(*)     => RecordMouseClickAction("WheelUp", "Click")
+OnRecordedWheelDown(*)   => RecordMouseClickAction("WheelDown", "Click")
+
+RecordMouseClickAction(btn, act) {
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordLastTime, g_MouseRecordLastX, g_MouseRecordLastY
+    global g_MouseRecordBtnStates
+    if (!g_MouseRecordActive)
+        return
+
+    if (!IsSet(g_MouseRecordBtnStates) || !IsObject(g_MouseRecordBtnStates))
+        g_MouseRecordBtnStates := Map()
+
+    ; Avoid recording redundant duplicate Down or Up for the same button
+    if (act = "Down" || act = "Up") {
+        if (g_MouseRecordBtnStates.Has(btn) && g_MouseRecordBtnStates[btn] = act)
+            return
+        g_MouseRecordBtnStates[btn] := act
+    }
+
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&x, &y)
+    tNow := A_TickCount
+    delta := Max(1, tNow - g_MouseRecordLastTime)
+    g_MouseRecordedEvents.Push(Map("type", "click", "btn", btn, "action", act, "x", x, "y", y, "delay", delta))
+    g_MouseRecordLastX := x
+    g_MouseRecordLastY := y
+    g_MouseRecordLastTime := tNow
+}
+
+; --- Technique 2: Low-Level Windows Hook (WH_MOUSE_LL) ---
+StartMouseHookRecord() {
+    global g_MouseHookHandle, g_MouseHookCallback
+    if (g_MouseHookHandle)
+        StopMouseHookRecord()
+    g_MouseHookCallback := CallbackCreate(LowLevelMouseProc, "Fast", 3)
+    hMod := DllCall("GetModuleHandle", "Ptr", 0, "Ptr")
+    g_MouseHookHandle := DllCall("SetWindowsHookEx", "Int", 14, "Ptr", g_MouseHookCallback, "Ptr", hMod, "UInt", 0, "Ptr")
+}
+
+StopMouseHookRecord() {
+    global g_MouseHookHandle, g_MouseHookCallback
+    if (g_MouseHookHandle) {
+        DllCall("UnhookWindowsHookEx", "Ptr", g_MouseHookHandle)
+        g_MouseHookHandle := 0
+    }
+    if (g_MouseHookCallback) {
+        CallbackFree(g_MouseHookCallback)
+        g_MouseHookCallback := 0
+    }
+}
+
+LowLevelMouseProc(nCode, wParam, lParam) {
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordLastTime, g_MouseRecordLastX, g_MouseRecordLastY
+    if (nCode >= 0 && g_MouseRecordActive) {
+        ; 0x0200 = WM_MOUSEMOVE
+        if (wParam = 0x0200) {
+            x := NumGet(lParam, 0, "Int")
+            y := NumGet(lParam, 4, "Int")
+            if (x != g_MouseRecordLastX || y != g_MouseRecordLastY) {
+                tNow := A_TickCount
+                delta := Max(1, tNow - g_MouseRecordLastTime)
+                g_MouseRecordedEvents.Push(Map("type", "move", "x", x, "y", y, "delay", delta))
+                g_MouseRecordLastX := x
+                g_MouseRecordLastY := y
+                g_MouseRecordLastTime := tNow
+            }
+        } else if (wParam = 0x0201) { ; WM_LBUTTONDOWN
+            RecordMouseClickAction("Left", "Down")
+        } else if (wParam = 0x0202) { ; WM_LBUTTONUP
+            RecordMouseClickAction("Left", "Up")
+        } else if (wParam = 0x0204) { ; WM_RBUTTONDOWN
+            RecordMouseClickAction("Right", "Down")
+        } else if (wParam = 0x0205) { ; WM_RBUTTONUP
+            RecordMouseClickAction("Right", "Up")
+        } else if (wParam = 0x0207) { ; WM_MBUTTONDOWN
+            RecordMouseClickAction("Middle", "Down")
+        } else if (wParam = 0x0208) { ; WM_MBUTTONUP
+            RecordMouseClickAction("Middle", "Up")
+        } else if (wParam = 0x020A) { ; WM_MOUSEWHEEL
+            mouseData := NumGet(lParam, 8, "UInt")
+            wheelDelta := (mouseData >> 16) & 0xFFFF
+            if (wheelDelta > 0x7FFF)
+                RecordMouseClickAction("WheelDown", "Click")
+            else
+                RecordMouseClickAction("WheelUp", "Click")
+        } else if (wParam = 0x020B) { ; WM_XBUTTONDOWN
+            mouseData := NumGet(lParam, 8, "UInt")
+            xBtn := (((mouseData >> 16) = 1) ? "XButton1" : "XButton2")
+            RecordMouseClickAction(xBtn, "Down")
+        } else if (wParam = 0x020C) { ; WM_XBUTTONUP
+            mouseData := NumGet(lParam, 8, "UInt")
+            xBtn := (((mouseData >> 16) = 1) ? "XButton1" : "XButton2")
+            RecordMouseClickAction(xBtn, "Up")
+        }
+    }
+    return DllCall("CallNextHookEx", "Ptr", 0, "Int", nCode, "Ptr", wParam, "Ptr", lParam, "Ptr")
+}
+
+; --- Playback Engine & Emergency Stop ---
+ResponsivePlaybackSleep(ms) {
+    global g_MousePlaybackStopReq
+    if (ms <= 0 || g_MousePlaybackStopReq)
+        return
+    if (ms <= 15) {
+        Sleep(ms)
+        return
+    }
+    endTick := A_TickCount + ms
+    while (A_TickCount < endTick && !g_MousePlaybackStopReq) {
+        remain := endTick - A_TickCount
+        Sleep(Min(15, remain))
+    }
+}
+
+EnableEmergencyEscHotkey() {
+    global g_EmergencyEscActive
+    if (!g_EmergencyEscActive) {
+        try {
+            Hotkey("*Esc", OnMouseEmergencyStopHotkeyPressed, "On")
+            g_EmergencyEscActive := true
+        }
+    }
+}
+
+DisableEmergencyEscHotkey() {
+    global g_EmergencyEscActive, g_MousePlaybackActive, g_MouseRecordActive, g_AutoClickerRunning, g_MouseRecordCountdownActive
+    if (!g_MousePlaybackActive && !g_MouseRecordActive && !g_AutoClickerRunning && !g_MouseRecordCountdownActive) {
+        if (g_EmergencyEscActive) {
+            try {
+                Hotkey("*Esc", "Off")
+                g_EmergencyEscActive := false
+            }
+        }
+    }
+}
+
+OnMouseEmergencyStopHotkeyPressed(*) {
+    global g_MousePlaybackActive, g_MouseRecordActive, g_AutoClickerRunning, g_MouseRecordCountdownActive
+    stopped := false
+    if (g_MouseRecordCountdownActive) {
+        g_MouseRecordCountdownActive := false
+        HideMouseOSD()
+        NotifyWebMouseCountdown(false, 0)
+        stopped := true
+    }
+    if (g_MousePlaybackActive) {
+        StopMousePlayback()
+        stopped := true
+    }
+    if (g_MouseRecordActive) {
+        StopMouseRecording()
+        stopped := true
+    }
+    if (g_AutoClickerRunning) {
+        StopAutoClicker()
+        stopped := true
+    }
+    if (stopped)
+        SoundBeep(650, 90)
+}
+
+PlayRecordedMousePath(events, speed := 1.0, loopCount := 1, originMode := "absolute", clicksOnly := false, humanize := false, emergencyStop := false, countdown := 0, scriptId := "") {
+    global g_MousePlaybackActive, g_MousePlaybackStopReq, g_MouseRecordWinX, g_MouseRecordWinY, g_MousePlaybackScriptId
+    if (!IsObject(events) || events.Length = 0 || g_MousePlaybackActive)
+        return
+
+    g_MousePlaybackActive := true
+    g_MousePlaybackScriptId := scriptId
+    g_MousePlaybackStopReq := false
+    EnableEmergencyEscHotkey()
+    NotifyWebMousePlayback(true, scriptId)
+
+    ; Playback countdown with On-Screen Display if configured
+    if (countdown > 0) {
+        c := countdown
+        while (c > 0 && !g_MousePlaybackStopReq) {
+            ShowMouseOSD("MOUSE PLAYBACK IN", c . "s")
+            SoundBeep(850, 90)
+            loop 10 {
+                Sleep(100)
+                if (g_MousePlaybackStopReq) {
+                    HideMouseOSD()
+                    SoundBeep(450, 90)
+                    return
+                }
+            }
+            c--
+        }
+        if (g_MousePlaybackStopReq) {
+            HideMouseOSD()
+            return
+        }
+        ShowMouseOSD("MOUSE PLAYBACK", "PLAYBACK STARTED!", true, 800)
+        SoundBeep(1300, 120)
+    }
+
+    ; Elevate Windows multimedia timer resolution to 1ms for sub-millisecond precision playback
+    DllCall("winmm\timeBeginPeriod", "UInt", 1)
+
+    ; CRITICAL: Disable AutoHotkey's internal 10ms post-move/post-click sleep.
+    ; Without this, AutoHotkey's hook architecture forces a 10-15ms sleep after EVERY MouseMove/Click,
+    ; completely destroying high-speed playback (e.g. 50x taking 16s instead of 0.2s)!
+    prevMouseDelay := A_MouseDelay
+    prevDefaultMouseSpeed := A_DefaultMouseSpeed
+    prevKeyDelay := A_KeyDelay
+    SetMouseDelay(-1)
+    SetDefaultMouseSpeed(0)
+    SetKeyDelay(-1, -1)
+
+    speedMultiplier := (speed > 0) ? Float(speed) : 1.0
+    CoordMode("Mouse", "Screen")
+
+    isRelative := (originMode = "relative")
+    isWindow := (originMode = "window")
+    originBaseX := 0
+    originBaseY := 0
+    firstRecX := 0
+    firstRecY := 0
+
+    if (isRelative || isWindow) {
+        MouseGetPos(&originBaseX, &originBaseY)
+        for ev in events {
+            if (IsObject(ev) && ev.Has("x") && ev.Has("y")) {
+                firstRecX := Integer(ev["x"])
+                firstRecY := Integer(ev["y"])
+                break
+            }
+        }
+    }
+
+    lastSetX := -1
+    lastSetY := -1
+    heldButtons := Map("Left", false, "Right", false, "Middle", false, "XButton1", false, "XButton2", false)
+
+    try {
+        ; Countdown with audible beeps if configured
+        if (countdown > 0) {
+            c := countdown
+            while (c > 0 && !g_MousePlaybackStopReq) {
+                SoundBeep(800, 100)
+                ResponsivePlaybackSleep(900)
+                c--
+            }
+            if (g_MousePlaybackStopReq)
+                return
+            SoundBeep(1200, 150)
+        }
+
+        currentLoop := 0
+        delayAccum := 0.0
+
+        while ((currentLoop < loopCount || loopCount = 0) && !g_MousePlaybackStopReq) {
+            ; In relative mode on subsequent loops, refresh base position
+            if (isRelative && currentLoop > 0) {
+                MouseGetPos(&originBaseX, &originBaseY)
+            }
+
+            ; In window mode, refresh active window position
+            curWinX := 0
+            curWinY := 0
+            if (isWindow) {
+                try {
+                    WinGetPos(&curWinX, &curWinY, , , "A")
+                } catch {
+                    curWinX := 0
+                    curWinY := 0
+                }
+            }
+
+            delayAccum := 0.0
+            for ev in events {
+                if (g_MousePlaybackStopReq)
+                    break 2
+                if (!IsObject(ev))
+                    continue
+
+                t := ev.Has("type") ? ev["type"] : "move"
+
+                ; Emergency Hand-Move Stop detection: check periodically to avoid Win32 syscall flood on ultra-high speed (50x)
+                if (emergencyStop && lastSetX >= 0 && lastSetY >= 0 && (delayAccum >= 1.0 || (A_Index & 7) = 0)) {
+                    MouseGetPos(&physX, &physY)
+                    distSq := (physX - lastSetX)**2 + (physY - lastSetY)**2
+                    if (distSq > 400) { ; > 20 pixels physical move
+                        SoundBeep(600, 120)
+                        break 2
+                    }
+                }
+
+                ; Skip movement travel events if Clicks-Only Instant Warp mode is active, UNLESS a button is currently held down (drag)
+                isAnyHeld := (heldButtons["Left"] || heldButtons["Right"] || heldButtons["Middle"] || heldButtons["XButton1"] || heldButtons["XButton2"])
+                if (clicksOnly && t = "move" && !isAnyHeld)
+                    continue
+
+                if (t = "move") {
+                    x := ev.Has("x") ? Integer(ev["x"]) : 0
+                    y := ev.Has("y") ? Integer(ev["y"]) : 0
+
+                    if (humanize) {
+                        x += Random(-1, 1)
+                        y += Random(-1, 1)
+                    }
+
+                    if (isRelative) {
+                        targetX := originBaseX + (x - firstRecX)
+                        targetY := originBaseY + (y - firstRecY)
+                    } else if (isWindow) {
+                        targetX := curWinX + (x - g_MouseRecordWinX)
+                        targetY := curWinY + (y - g_MouseRecordWinY)
+                    } else {
+                        targetX := x
+                        targetY := y
+                    }
+
+                    ; MouseMove generates the native Windows input events (WM_MOUSEMOVE with MK_LBUTTON / MK_RBUTTON) so drags and holds work in all windows, drawing programs, and games!
+                    MouseMove(targetX, targetY, 0)
+                    DllCall("SetCursorPos", "Int", targetX, "Int", targetY)
+                    lastSetX := targetX
+                    lastSetY := targetY
+
+                } else if (t = "click") {
+                    ; Move cursor to click position first
+                    if (ev.Has("x") && ev.Has("y")) {
+                        cx := Integer(ev["x"])
+                        cy := Integer(ev["y"])
+                        if (isRelative) {
+                            cx := originBaseX + (cx - firstRecX)
+                            cy := originBaseY + (cy - firstRecY)
+                        } else if (isWindow) {
+                            cx := curWinX + (cx - g_MouseRecordWinX)
+                            cy := curWinY + (cy - g_MouseRecordWinY)
+                        }
+                        MouseMove(cx, cy, 0)
+                        DllCall("SetCursorPos", "Int", cx, "Int", cy)
+                        lastSetX := cx
+                        lastSetY := cy
+                    }
+
+                    btn := ev.Has("btn") ? ev["btn"] : "Left"
+                    act := ev.Has("action") ? ev["action"] : "Click"
+                    if (btn = "WheelUp") {
+                        Click("WheelUp")
+                    } else if (btn = "WheelDown") {
+                        Click("WheelDown")
+                    } else {
+                        clickBtn := (btn = "Right") ? "Right" : ((btn = "Middle") ? "Middle" : ((btn = "XButton1") ? "X1" : ((btn = "XButton2") ? "X2" : "Left")))
+                        if (act = "Down") {
+                            Click("Down " . clickBtn)
+                            heldButtons[btn] := true
+                        } else if (act = "Up") {
+                            Click("Up " . clickBtn)
+                            heldButtons[btn] := false
+                        } else {
+                            Click(clickBtn)
+                        }
+                    }
+                } else if (t = "key") {
+                    k := ev.Has("key") ? ev["key"] : ""
+                    act := ev.Has("action") ? ev["action"] : "Down"
+                    if (k != "") {
+                        SendEvent("{" . k . " " . act . "}")
+                    }
+                }
+
+                ; Calculate precise speed-scaled delay using fractional accumulator
+                del := ev.Has("delay") ? Float(ev["delay"]) : 10.0
+                scaledDelay := del / speedMultiplier
+                if (humanize && scaledDelay > 4.0) {
+                    scaledDelay *= (1.0 + Random(-15, 15) / 100.0)
+                }
+
+                delayAccum += scaledDelay
+                if (delayAccum >= 1.0) {
+                    msToSleep := Integer(delayAccum)
+                    delayAccum -= msToSleep
+                    ResponsivePlaybackSleep(msToSleep)
+                    if (g_MousePlaybackStopReq)
+                        break 2
+                }
+            }
+            currentLoop++
+        }
+    } finally {
+        ; Restore Windows multimedia timer resolution and AHK delays
+        DllCall("winmm\timeEndPeriod", "UInt", 1)
+        try SetMouseDelay(prevMouseDelay)
+        try SetDefaultMouseSpeed(prevDefaultMouseSpeed)
+        try SetKeyDelay(prevKeyDelay)
+
+        ; Safety release any buttons that were held down during playback
+        try {
+            if (heldButtons["Left"] && GetKeyState("LButton"))
+                Click("Up Left")
+            if (heldButtons["Right"] && GetKeyState("RButton"))
+                Click("Up Right")
+            if (heldButtons["Middle"] && GetKeyState("MButton"))
+                Click("Up Middle")
+            if (heldButtons["XButton1"] && GetKeyState("XButton1"))
+                Click("Up X1")
+            if (heldButtons["XButton2"] && GetKeyState("XButton2"))
+                Click("Up X2")
+        }
+        g_MousePlaybackActive := false
+        g_MousePlaybackScriptId := ""
+        g_MousePlaybackStopReq := false
+        DisableEmergencyEscHotkey()
+        NotifyWebMousePlayback(false, "")
+    }
+}
+
+StopMousePlayback() {
+    global g_MousePlaybackActive, g_MousePlaybackStopReq, g_MousePlaybackScriptId
+    if (!g_MousePlaybackActive)
+        return
+
+    g_MousePlaybackStopReq := true
+    g_MousePlaybackActive := false
+    g_MousePlaybackScriptId := ""
+    HideMouseOSD()
+    NotifyWebMousePlayback(false, "")
+    SoundBeep(650, 80)
+    DisableEmergencyEscHotkey()
+}
+
+NotifyWebMouseRecordState(isRecording) {
+    global g_Wv
+    if (g_Wv) {
+        try {
+            msg := JSON.stringify(Map(
+                "type", "mouseRecordingState",
+                "recording", isRecording
+            ))
+            g_Wv.PostWebMessageAsString(msg)
+        }
+    }
+}
+
+NotifyWebMousePlayback(isPlaying, scriptId := "") {
+    global g_Wv
+    if (g_Wv) {
+        try {
+            msg := JSON.stringify(Map(
+                "type", "mousePlaybackState",
+                "playing", isPlaying,
+                "scriptId", scriptId
+            ))
+            g_Wv.PostWebMessageAsString(msg)
+        }
+    }
+}
+
+; ==============================================================================
+; Screen Scanner & Pattern Detection Module
+; ==============================================================================
+
+ApplyScreenScanner() {
+    global g_Config, g_ScreenScannerActive, g_IsEngineActive
+
+    StopScreenScanner()
+
+    if (!g_IsEngineActive)
+        return
+
+    if (!g_Config.Has("screenScanner"))
+        return
+
+    ss := g_Config["screenScanner"]
+    if (ss.Has("enabled") && (!ss["enabled"] || ss["enabled"] = "0"))
+        return
+
+    if (!ss.Has("items") || !IsObject(ss["items"]) || ss["items"].Length = 0)
+        return
+
+    hasEnabled := false
+    for item in ss["items"] {
+        if (IsObject(item) && (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1)) {
+            hasEnabled := true
+            break
+        }
+    }
+
+    if (!hasEnabled)
+        return
+
+    rate := ss.Has("scanRate") ? Max(30, Integer(ss["scanRate"])) : 150
+    g_ScreenScannerActive := true
+    SetTimer(CheckScreenScannerRules, rate)
+}
+
+StopScreenScanner() {
+    global g_ScreenScannerActive
+    g_ScreenScannerActive := false
+    try SetTimer(CheckScreenScannerRules, 0)
+}
+
+CheckScreenScannerRules() {
+    global g_Config, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
+
+    if (!g_ScreenScannerActive || !g_Config.Has("screenScanner"))
+        return
+
+    ss := g_Config["screenScanner"]
+    if (!ss.Has("items") || !IsObject(ss["items"]))
+        return
+
+    nowTick := A_TickCount
+
+    for item in ss["items"] {
+        if (!IsObject(item))
+            continue
+
+        isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1)
+        if (!isEnabled)
+            continue
+
+        itemId := item.Has("id") ? item["id"] : ("ss-" . A_Index)
+
+        foundX := 0, foundY := 0
+        isFound := ExecuteScreenScannerDetection(item, &foundX, &foundY)
+
+        wasFound := g_ScreenScannerLastFoundState.Has(itemId) ? g_ScreenScannerLastFoundState[itemId] : false
+        g_ScreenScannerLastFoundState[itemId] := isFound
+
+        condition := item.Has("condition") ? item["condition"] : "appear"
+        repeatRule := item.Has("repeatRule") ? item["repeatRule"] : "debounce"
+        debounceMs := item.Has("debounceMs") ? Integer(item["debounceMs"]) : 2000
+        lastTrig := g_ScreenScannerLastTriggerTime.Has(itemId) ? g_ScreenScannerLastTriggerTime[itemId] : 0
+
+        shouldTrigger := false
+
+        if (condition = "appear") {
+            if (isFound) {
+                if (repeatRule = "continuous") {
+                    if (nowTick - lastTrig >= 100)
+                        shouldTrigger := true
+                } else if (repeatRule = "debounce") {
+                    if (!wasFound || (nowTick - lastTrig >= debounceMs))
+                        shouldTrigger := true
+                } else if (repeatRule = "once") {
+                    shouldTrigger := true
+                }
+            }
+        } else if (condition = "disappear") {
+            if (wasFound && !isFound) {
+                if (repeatRule = "continuous") {
+                    if (nowTick - lastTrig >= 100)
+                        shouldTrigger := true
+                } else if (repeatRule = "debounce") {
+                    if (nowTick - lastTrig >= debounceMs)
+                        shouldTrigger := true
+                } else if (repeatRule = "once") {
+                    shouldTrigger := true
+                }
+            }
+        }
+
+        if (shouldTrigger) {
+            g_ScreenScannerLastTriggerTime[itemId] := nowTick
+            FireScreenScannerAction(item, foundX, foundY)
+
+            if (repeatRule = "once") {
+                item["enabled"] := false
+                SaveConfigToFile()
+                if (g_Wv) {
+                    try {
+                        g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                            "type", "screenScannerItemDisabled",
+                            "id", itemId
+                        )))
+                    }
+                }
+            }
+        }
+    }
+}
+
+ExecuteScreenScannerDetection(item, &foundX, &foundY) {
+    foundX := 0
+    foundY := 0
+
+    mode := item.Has("mode") ? item["mode"] : "image"
+    region := item.Has("region") ? item["region"] : "fullscreen"
+
+    x1 := 0, y1 := 0, x2 := A_ScreenWidth, y2 := A_ScreenHeight
+    coordModeType := "Screen"
+
+    if (region = "activeWindow") {
+        try {
+            activeHwnd := WinActive("A")
+            if (activeHwnd) {
+                WinGetPos(&wx, &wy, &ww, &wh, "ahk_id " . activeHwnd)
+                x1 := wx, y1 := wy, x2 := wx + ww, y2 := wy + wh
+            }
+        }
+    } else if (region = "custom") {
+        if (item.Has("regionBox") && IsObject(item["regionBox"])) {
+            box := item["regionBox"]
+            x1 := box.Has("x1") ? Integer(box["x1"]) : 0
+            y1 := box.Has("y1") ? Integer(box["y1"]) : 0
+            x2 := box.Has("x2") ? Integer(box["x2"]) : A_ScreenWidth
+            y2 := box.Has("y2") ? Integer(box["y2"]) : A_ScreenHeight
+        }
+    }
+
+    if (x2 <= x1)
+        x2 := x1 + 1
+    if (y2 <= y1)
+        y2 := y1 + 1
+
+    CoordMode("Pixel", coordModeType)
+    CoordMode("Mouse", coordModeType)
+
+    if (mode = "image") {
+        imgPath := item.Has("imagePath") ? Trim(item["imagePath"]) : ""
+        if (imgPath = "" || !FileExist(imgPath))
+            return false
+
+        variation := item.Has("imageVariation") ? Integer(item["imageVariation"]) : 30
+        trans := item.Has("imageTrans") ? Trim(item["imageTrans"]) : ""
+
+        optStr := "*" . variation
+        if (trans != "")
+            optStr .= " *Trans" . trans
+
+        try {
+            outX := "", outY := ""
+            if (ImageSearch(&outX, &outY, x1, y1, x2, y2, optStr . " " . imgPath)) {
+                foundX := outX
+                foundY := outY
+                return true
+            }
+        }
+        return false
+
+    } else if (mode = "pixel") {
+        colorStr := item.Has("pixelColor") ? Trim(item["pixelColor"]) : "#FF0000"
+        colorHex := ParseColorToHex(colorStr)
+        variation := item.Has("pixelVariation") ? Integer(item["pixelVariation"]) : 15
+
+        try {
+            outX := "", outY := ""
+            if (PixelSearch(&outX, &outY, x1, y1, x2, y2, colorHex, variation)) {
+                foundX := outX
+                foundY := outY
+                return true
+            }
+        }
+        return false
+
+    } else if (mode = "point") {
+        ptX := item.Has("pointX") ? Integer(item["pointX"]) : 0
+        ptY := item.Has("pointY") ? Integer(item["pointY"]) : 0
+        expectedColor := item.Has("pointColor") ? Trim(item["pointColor"]) : "#00FF00"
+        variation := item.Has("pixelVariation") ? Integer(item["pixelVariation"]) : 15
+
+        try {
+            currentColor := PixelGetColor(ptX, ptY, "RGB")
+            if (CompareHexColorsWithTolerance(currentColor, expectedColor, variation)) {
+                foundX := ptX
+                foundY := ptY
+                return true
+            }
+        }
+        return false
+    }
+
+    return false
+}
+
+ParseColorToHex(colorStr) {
+    clean := StrReplace(colorStr, "#", "")
+    clean := StrReplace(clean, "0x", "")
+    clean := StrReplace(clean, "0X", "")
+    try {
+        return Integer("0x" . clean)
+    }
+    return 0
+}
+
+CompareHexColorsWithTolerance(actualColorIntOrHex, targetColorStr, tolerance) {
+    actInt := IsInteger(actualColorIntOrHex) ? actualColorIntOrHex : ParseColorToHex(actualColorIntOrHex)
+    tgtInt := ParseColorToHex(targetColorStr)
+
+    r1 := (actInt >> 16) & 0xFF, g1 := (actInt >> 8) & 0xFF, b1 := actInt & 0xFF
+    r2 := (tgtInt >> 16) & 0xFF, g2 := (tgtInt >> 8) & 0xFF, b2 := tgtInt & 0xFF
+
+    return (Abs(r1 - r2) <= tolerance && Abs(g1 - g2) <= tolerance && Abs(b1 - b2) <= tolerance)
+}
+
+FireScreenScannerAction(item, foundX, foundY) {
+    global g_Wv
+
+    actionType := item.Has("actionType") ? item["actionType"] : "click"
+    ruleName := item.Has("name") ? item["name"] : "Screen Trigger"
+
+    if (!item.Has("soundAlert") || item["soundAlert"] = true || item["soundAlert"] = 1) {
+        SoundBeep(1200, 80)
+    }
+
+    if (!item.Has("osdAlert") || item["osdAlert"] = true || item["osdAlert"] = 1) {
+        ShowMouseOSD("SCREEN SCANNER", ruleName . " (Matched)", true, 1200)
+    }
+
+    if (actionType = "click") {
+        clickBtn := item.Has("clickButton") ? item["clickButton"] : "Left"
+        offX := item.Has("clickOffsetX") ? Integer(item["clickOffsetX"]) : 0
+        offY := item.Has("clickOffsetY") ? Integer(item["clickOffsetY"]) : 0
+
+        targetX := foundX + offX
+        targetY := foundY + offY
+
+        CoordMode("Mouse", "Screen")
+        MouseMove(targetX, targetY, 2)
+
+        if (clickBtn = "Left") {
+            Click("Left")
+        } else if (clickBtn = "Right") {
+            Click("Right")
+        } else if (clickBtn = "Double") {
+            Click("Left 2")
+        } else if (clickBtn = "Middle") {
+            Click("Middle")
+        }
+
+    } else if (actionType = "mouseScript") {
+        mScriptId := item.Has("mouseScriptId") ? item["mouseScriptId"] : ""
+        if (mScriptId != "") {
+            ExecuteSavedMouseScriptById(mScriptId)
+        }
+
+    } else if (actionType = "macro") {
+        macroId := item.Has("macroId") ? item["macroId"] : ""
+        if (macroId != "") {
+            ExecuteMacroById(macroId)
+        }
+
+    } else if (actionType = "key") {
+        keyStr := item.Has("keyToSend") ? Trim(item["keyToSend"]) : ""
+        if (keyStr != "") {
+            SendInput(keyStr)
+        }
+
+    } else if (actionType = "system") {
+        sysAct := item.Has("systemAction") ? item["systemAction"] : "beep"
+        if (sysAct = "sleep") {
+            TriggerSleepOrHibernate()
+        } else if (sysAct = "mute") {
+            SoundSetMute(-1)
+        } else if (sysAct = "beep") {
+            SoundBeep(1500, 200)
+        }
+    }
+
+    if (g_Wv) {
+        try {
+            g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                "type", "screenScannerTriggered",
+                "id", item.Has("id") ? item["id"] : "",
+                "name", ruleName,
+                "x", foundX,
+                "y", foundY,
+                "action", actionType
+            )))
+        }
+    }
+}
+
+ExecuteSavedMouseScriptById(sId) {
+    global g_Config
+    if (!g_Config.Has("autoClicker") || !g_Config["autoClicker"].Has("items"))
+        return
+    for item in g_Config["autoClicker"]["items"] {
+        if (IsObject(item) && item.Has("id") && item["id"] = sId) {
+            ExecuteMouseScript(item)
+            return
+        }
+    }
+}
+
+ExecuteMacroById(macroId) {
+    global g_Config
+    if (!g_Config.Has("macroRecorder") || !g_Config["macroRecorder"].Has("items"))
+        return
+    for item in g_Config["macroRecorder"]["items"] {
+        if (IsObject(item) && item.Has("id") && item["id"] = macroId) {
+            if (item.Has("steps") && IsObject(item["steps"])) {
+                SetTimer(() => PlayMacroSteps(item["steps"]), -1)
+            }
+            return
         }
     }
 }
@@ -4444,6 +5938,32 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
             case "toggleAutoClicker":
                 ToggleAutoClicker()
 
+            case "startMouseRecording":
+                opts := msg.Has("options") ? msg["options"] : msg
+                cd := opts.Has("countdown") ? Integer(opts["countdown"]) : 0
+                tech := opts.Has("technique") ? opts["technique"] : "polling"
+                rate := opts.Has("rate") ? Integer(opts["rate"]) : 20
+                recKeys := (!opts.Has("recordKeys") || opts["recordKeys"] = true || opts["recordKeys"] = 1)
+                StartMouseRecordingWithCountdown(cd, tech, rate, recKeys)
+
+            case "stopMouseRecording":
+                StopMouseRecording()
+
+            case "playRecordedMouse":
+                events := msg.Has("events") ? msg["events"] : []
+                spd := msg.Has("speed") ? Float(msg["speed"]) : 1.0
+                loopCnt := msg.Has("loop") ? Integer(msg["loop"]) : 1
+                origin := msg.Has("origin") ? msg["origin"] : "absolute"
+                clicksOnly := (msg.Has("clicksOnly") && (msg["clicksOnly"] = 1 || msg["clicksOnly"] = true))
+                humanize := (msg.Has("humanize") && (msg["humanize"] = 1 || msg["humanize"] = true))
+                emergencyStop := (msg.Has("emergencyStop") && (msg["emergencyStop"] = 1 || msg["emergencyStop"] = true))
+                countdown := msg.Has("countdown") ? Integer(msg["countdown"]) : 0
+                sId := msg.Has("scriptId") ? msg["scriptId"] : (msg.Has("id") ? msg["id"] : "")
+                SetTimer(() => PlayRecordedMousePath(events, spd, loopCnt, origin, clicksOnly, humanize, emergencyStop, countdown, sId), -1)
+
+            case "stopMousePlayback":
+                StopMousePlayback()
+
             case "triggerSleep":
                 TriggerSleepOrHibernate()
 
@@ -4615,6 +6135,54 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                 } catch as err {
                     LogMessage("browseProfileApp error: " . err.Message)
                 }
+
+            case "testScreenScan":
+                if (msg.Has("item") && IsObject(msg["item"])) {
+                    itemObj := msg["item"]
+                    fX := 0, fY := 0
+                    t0 := A_TickCount
+                    found := ExecuteScreenScannerDetection(itemObj, &fX, &fY)
+                    tElapsed := A_TickCount - t0
+                    if (g_Wv) {
+                        try {
+                            g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                                "type", "screenScanTestResult",
+                                "found", found ? 1 : 0,
+                                "x", fX,
+                                "y", fY,
+                                "elapsedMs", tElapsed,
+                                "mode", itemObj.Has("mode") ? itemObj["mode"] : "image"
+                            )))
+                        }
+                    }
+                }
+
+            case "browseImageForScanner":
+                try {
+                    selectedFile := FileSelect(1, , "Select Target Template Image",
+                        "Images (*.png; *.bmp; *.jpg; *.jpeg; *.gif)|All Files (*.*)")
+                    if (selectedFile != "" && g_Wv) {
+                        try {
+                            g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                                "type", "screenScannerImageSelected",
+                                "path", selectedFile
+                            )))
+                        }
+                    }
+                } catch as err {
+                    LogMessage("browseImageForScanner error: " . err.Message)
+                }
+
+            case "pickScreenColorForScanner":
+                global g_ColorPickerTarget
+                g_ColorPickerTarget := msg.Has("target") ? msg["target"] : "screenScannerPixel"
+                StartColorPicker()
+
+            case "startScreenSnip":
+                SetTimer(() => StartScreenRegionSelector("snip"), -1)
+
+            case "startScreenRegionSelect":
+                SetTimer(() => StartScreenRegionSelector("region"), -1)
         }
     } catch as err {
         LogMessage("WebMessage dispatch error: " . err.Message)

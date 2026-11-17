@@ -63,6 +63,7 @@
   },
   "autoClicker": {
     "enabled": 0,
+    "mode": "recorder",
     "hotkey": "F8",
     "button": "Left",
     "clickType": "Single",
@@ -70,6 +71,11 @@
   },
   "macroRecorder": {
     "enabled": 1,
+    "items": []
+  },
+  "screenScanner": {
+    "enabled": 1,
+    "scanRate": 150,
     "items": []
   },
   "theme": {
