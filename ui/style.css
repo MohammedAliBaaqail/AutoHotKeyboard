@@ -6670,22 +6670,17 @@ body.window-maximized .resize-handle {
    Screen Scanner & Visual Triggers Panel
    ========================================================================== */
 .ss-panel-container {
-  max-width: 1100px;
-  margin: 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: 100%;
   box-sizing: border-box;
 }
 
 .ss-columns-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
   grid-template-columns: 1fr 1fr;
   gap: 14px;
-  align-items: start;
   align-items: stretch;
   width: 100%;
   box-sizing: border-box;
@@ -6695,4 +6690,80 @@ body.window-maximized .resize-handle {
   .ss-columns-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Active / Running Screen Scanner Rule Card */
+.shortcut-card.is-running {
+  border: 2px solid var(--accent-primary) !important;
+  box-shadow: 0 0 16px rgba(217, 119, 6, 0.45), var(--raised-card) !important;
+  background: var(--surface-color) !important;
+  transition: all 0.25s ease;
+}
+
+.shortcut-card.is-running .wm-icon-badge {
+  background: var(--accent-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 0 10px rgba(217, 119, 6, 0.5) !important;
+  animation: pulse-border 1.2s infinite;
+}
+
+.shortcut-card.is-match-success {
+  border: 2px solid #10b981 !important;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.45), var(--raised-card) !important;
+}
+
+.shortcut-card.is-match-success .wm-icon-badge {
+  background: #10b981 !important;
+  color: #fff !important;
+  animation: pulse-border 1s infinite;
+}
+
+.ss-running-tag {
+  color: #fff !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.4px !important;
+  box-shadow: 0 0 8px rgba(217, 119, 6, 0.4) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px !important;
+}
+
+.ss-running-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  display: inline-block;
+  animation: blink-dot 0.7s infinite alternate;
+}
+
+@keyframes blink-dot {
+  from { opacity: 0.25; }
+  to { opacity: 1; }
+}
+
+/* Engine Active Indicator */
+.ss-active-engine-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.ss-radar-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  display: inline-block;
+  box-shadow: 0 0 6px #10b981;
+  animation: radar-sweep 1.2s infinite ease-out;
+}
+
+@keyframes radar-sweep {
+  0% { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1.1); opacity: 0.9; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.9); opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }

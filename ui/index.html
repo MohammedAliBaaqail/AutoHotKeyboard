@@ -2497,23 +2497,23 @@
                 <span class="hint-tag" id="mrStatusHint">Ready - Press F8 anywhere or click Record to trace mouse
                   movement.</span>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Saved Mouse Movement Scripts List -->
-        <div class="list-section" id="mrListSection">
-          <div class="list-header">
-            <div class="list-header-left">
-              <span class="section-label">Saved Mouse Scripts</span>
-              <span class="section-count" id="mrCountBadge">0</span>
+              <!-- Saved Mouse Movement Scripts List (Only in Recorder mode) -->
+              <div class="list-section" id="mrListSection" style="margin-top:14px;">
+                <div class="list-header">
+                  <div class="list-header-left">
+                    <span class="section-label">Saved Mouse Scripts</span>
+                    <span class="section-count" id="mrCountBadge">0</span>
+                  </div>
+                  <div class="search-filter-box" style="margin-left:auto; margin-right:12px;">
+                    <input type="text" id="mrSearchFilter" placeholder="Filter mouse scripts..." autocomplete="off" />
+                  </div>
+                  <span class="hint-tag">Each script triggers globally via its assigned hotkey</span>
+                </div>
+                <div class="shortcuts-list" id="mrListContainer"></div>
+              </div>
             </div>
-            <div class="search-filter-box" style="margin-left:auto; margin-right:12px;">
-              <input type="text" id="mrSearchFilter" placeholder="Filter mouse scripts..." autocomplete="off" />
-            </div>
-            <span class="hint-tag">Each script triggers globally via its assigned hotkey</span>
           </div>
-          <div class="shortcuts-list" id="mrListContainer"></div>
         </div>
       </section>
 
@@ -2664,555 +2664,446 @@
       <!-- ====================================================================
            7. SCREEN SCANNER & VISUAL TRIGGERS PANEL
            ==================================================================== -->
-      <section class="module-panel" id="panel-screenScanner">
-        <div class="ss-panel-container"
-          style="max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; width: 100%;">
-          <div class="ss-panel-container">
-            <!-- Master Switch Header Card -->
-            <div class="mg-column-header ac-module-header">
-              <div class="mg-header-meta">
-                <div class="mg-icon-circle">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
-                    <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
-                    <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M12 9v6"></path>
-                    <path d="M9 12h6"></path>
-                  </svg>
-                </div>
-                <div class="mg-title-group">
-                  <h3 class="mg-col-title">Screen Scanner & Visual Triggers</h3>
-                  <span class="mg-col-subtitle">Real-time pattern recognition, image search, and pixel color trigger
-                    automation</span>
-                </div>
+            <section class="module-panel" id="panel-screenScanner">
+        <div class="ss-panel-container">
+
+          <!-- Master Switch Header Card -->
+          <div class="mg-column-header ac-module-header">
+            <div class="mg-header-meta">
+              <div class="mg-icon-circle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                  <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                  <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M12 9v6"></path>
+                  <path d="M9 12h6"></path>
+                </svg>
               </div>
-              <div class="toggle-wrapper" title="Enable / Disable Screen Scanner">
-                <input class="toggle-checkbox" type="checkbox" id="ssMasterSwitch" checked>
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
+              <div class="mg-title-group">
+                <h3 class="mg-col-title">Screen Scanner & Visual Triggers</h3>
+                <span class="mg-col-subtitle">Real-time pattern recognition, image search, and pixel color trigger automation</span>
               </div>
             </div>
+            <div class="toggle-wrapper" title="Enable / Disable Screen Scanner">
+              <input class="toggle-checkbox" type="checkbox" id="ssMasterSwitch" checked>
+              <div class="toggle-container">
+                <div class="toggle-button"></div>
+              </div>
+            </div>
+          </div>
 
-            <!-- Main Configuration 2-Column Responsive Grid -->
-            <div class="ss-columns-grid"
-              style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 14px; align-items: start;">
-              <div class="ss-columns-grid">
+          <!-- Main Configuration 2-Column Responsive Grid -->
+          <div class="ss-columns-grid">
 
-                <!-- LEFT COLUMN: TARGET DEFINITION -->
-                <div style="display: flex; flex-direction: column; gap: 14px;">
+            <!-- LEFT COLUMN: TARGET DEFINITION -->
+            <div style="display: flex; flex-direction: column; gap: 14px;">
 
-                  <!-- Card 1: Trigger Name & Detection Method -->
-                  <div class="ac-setting-card" style="padding: 16px 18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                      <span class="setting-title">Visual Trigger Setup</span>
-                      <span class="hint-tag" id="ssEngineStatusHint">Autonomous</span>
-                    </div>
-
-                    <div class="inputs-row" style="margin-bottom:12px;">
-                      <div class="inset-input-box" style="flex:1;">
-                        <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                          stroke-width="2">
-                          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z">
-                          </path>
-                          <line x1="7" y1="7" x2="7.01" y2="7"></line>
-                        </svg>
-                        <input type="text" id="ssInputName" placeholder="Trigger Name (e.g. Auto-Accept, Skip Ad)"
-                          autocomplete="off" spellcheck="false" />
-                      </div>
-                    </div>
-
-                    <!-- Detection Method Selector -->
-                    <div style="display:flex; flex-direction:column; gap:6px;">
-                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Detection
-                        Method</span>
-                      <div class="ac-pill-selector" id="ssModeSelector" style="width:100%;">
-                        <button class="ac-pill-btn active" data-mode="image" id="ssBtnModeImage">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"
-                            height="13" style="margin-right:5px;">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                            <polyline points="21 15 16 10 5 21"></polyline>
-                          </svg>
-                          Image Search
-                        </button>
-                        <button class="ac-pill-btn" data-mode="pixel" id="ssBtnModePixel">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"
-                            height="13" style="margin-right:5px;">
-                            <path d="m15 11-1 9"></path>
-                            <path d="m19 11-4-7"></path>
-                            <path d="M2 11h20"></path>
-                            <path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8c.9 0 1.8-.7 2-1.6l1.6-7.4"></path>
-                          </svg>
-                          Pixel Area
-                        </button>
-                        <button class="ac-pill-btn" data-mode="point" id="ssBtnModePoint">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"
-                            height="13" style="margin-right:5px;">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="22" y1="12" x2="18" y2="12"></line>
-                            <line x1="6" y1="12" x2="2" y2="12"></line>
-                            <line x1="12" y1="6" x2="12" y2="2"></line>
-                            <line x1="12" y1="22" x2="12" y2="18"></line>
-                          </svg>
-                          Exact Pixel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Card 2: Method-Specific Target Settings -->
-                  <!-- SECTION A: Image Search Mode -->
-                  <div class="ac-setting-card" id="ssSectionImage" style="padding:16px 18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                      <span class="setting-title">Target Image Template</span>
-                      <span class="hint-tag">PNG, BMP, JPG</span>
-                    </div>
-                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
-                      <div class="inset-input-box" style="flex:1;">
-                        <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                          stroke-width="2">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        <input type="text" id="ssInputImagePath" placeholder="Image File Path..." autocomplete="off"
-                          spellcheck="false" />
-                      </div>
-                      <button class="neumorphic-btn btn-chip" id="ssBtnBrowseImage" title="Browse for image file"
-                        style="padding:0 12px; height:34px;">
-                        <span>Browse</span>
-                      </button>
-                      <button class="neumorphic-btn btn-chip" id="ssBtnSnipImage"
-                        title="Crop & Snip image directly from screen"
-                        style="color:var(--accent); padding:0 12px; height:34px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"
-                          height="13" style="margin-right:4px;">
-                          <circle cx="6" cy="6" r="3"></circle>
-                          <circle cx="6" cy="18" r="3"></circle>
-                          <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
-                          <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
-                        </svg>
-                        <span>Snip</span>
-                      </button>
-                    </div>
-
-                    <!-- Preview & Image Parameters -->
-                    <div style="display:flex; gap:14px; align-items:center;">
-                      <div id="ssImagePreviewBox"
-                        style="width:48px; height:48px; border-radius:var(--radius-btn); background:var(--bg-inset); border:1px solid var(--border-soft); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
-                        <span style="font-size:9px; color:var(--text-muted); text-align:center;">No Image</span>
-                      </div>
-                      <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                          <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Shade Tolerance
-                            (*n)</span>
-                          <span class="slider-value-badge" id="ssImageVariationVal"
-                            style="padding:1px 6px; font-size:11px;">30</span>
-                        </div>
-                        <input type="range" id="ssImageVariation" min="0" max="100" value="30"
-                          class="neumorphic-slider" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- SECTION B: Pixel Area Search Mode -->
-                  <div class="ac-setting-card hidden-field" id="ssSectionPixel" style="padding:16px 18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                      <span class="setting-title">Target Pixel Color Area</span>
-                      <span class="hint-tag">RGB Hex</span>
-                    </div>
-                    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
-                      <div class="inset-input-box" style="flex:1;">
-                        <input type="text" id="ssInputPixelColor" placeholder="#FF0000" value="#FF0000"
-                          autocomplete="off" spellcheck="false" />
-                      </div>
-                      <div id="ssPixelChip"
-                        style="width:34px; height:34px; border-radius:var(--radius-btn); background:#FF0000; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;">
-                      </div>
-                      <button class="neumorphic-btn btn-chip" id="ssBtnPickColor"
-                        title="Pick color directly from screen using loupe" style="height:34px; padding:0 12px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13"
-                          height="13" style="margin-right:4px;">
-                          <path d="m2 22 1-1h3l9-9"></path>
-                          <path d="M3 21v-3l9-9"></path>
-                          <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9"></path>
-                        </svg>
-                        <span>Pick Color</span>
-                      </button>
-                    </div>
-                    <div style="display:flex; flex-direction:column; gap:4px;">
-                      <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Shade
-                          Tolerance</span>
-                        <span class="slider-value-badge" id="ssPixelVariationVal"
-                          style="padding:1px 6px; font-size:11px;">15</span>
-                      </div>
-                      <input type="range" id="ssPixelVariation" min="0" max="100" value="15"
-                        class="neumorphic-slider" />
-                    </div>
-                  </div>
-
-                  <!-- SECTION C: Single Pixel Watch Mode -->
-                  <div class="ac-setting-card hidden-field" id="ssSectionPoint" style="padding:16px 18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                      <span class="setting-title">Exact Pixel Watcher</span>
-                      <span class="hint-tag">Sub-millisecond</span>
-                    </div>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
-                      <div style="display:flex; align-items:center; gap:5px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X:</span>
-                        <div class="inset-input-box" style="width:76px; height:34px; padding:0 6px;">
-                          <input type="number" id="ssPointX" placeholder="960" value="960"
-                            style="text-align:center; font-weight:700;" />
-                        </div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:5px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y:</span>
-                        <div class="inset-input-box" style="width:76px; height:34px; padding:0 6px;">
-                          <input type="number" id="ssPointY" placeholder="540" value="540"
-                            style="text-align:center; font-weight:700;" />
-                        </div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:5px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Color:</span>
-                        <div class="inset-input-box" style="width:95px; height:34px; padding:0 6px;">
-                          <input type="text" id="ssInputPointColor" placeholder="#00FF00" value="#00FF00"
-                            style="text-align:center; font-weight:700;" />
-                        </div>
-                        <div id="ssPointChip"
-                          style="width:30px; height:30px; border-radius:var(--radius-btn); background:#00FF00; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;">
-                        </div>
-                      </div>
-                    </div>
-                    <button class="neumorphic-btn btn-chip" id="ssBtnPickPoint"
-                      title="Click anywhere on screen to grab both coordinates and color"
-                      style="height:34px; width:100%;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"
-                        style="margin-right:4px;">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
-                      </svg>
-                      <span>Pick Pixel & Coordinates from Screen</span>
-                    </button>
-                  </div>
-
-                  <!-- Card 3: Search Bounding Region -->
-                  <div class="ac-setting-card" style="padding:16px 18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                      <span class="setting-title">Search Bounding Region</span>
-                      <span class="hint-tag">Bounds</span>
-                    </div>
-                    <div class="ac-pill-selector" id="ssRegionSelector" style="width:100%; margin-bottom:10px;">
-                      <button class="ac-pill-btn active" data-reg="fullscreen">Entire Screen</button>
-                      <button class="ac-pill-btn" data-reg="activeWindow">Active Window</button>
-                      <button class="ac-pill-btn" data-reg="custom">Custom Box</button>
-                    </div>
-                    <div class="hidden-field" id="ssCustomRegionBox"
-                      style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                      <div style="display:flex; align-items:center; gap:4px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X1:</span>
-                        <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                          <input type="number" id="ssBoxX1" placeholder="0" value="0"
-                            style="text-align:center; font-weight:700;" />
-                        </div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:4px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y1:</span>
-                        <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                          <input type="number" id="ssBoxY1" placeholder="0" value="0"
-                            style="text-align:center; font-weight:700;" />
-                        </div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:4px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X2:</span>
-                        <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                          <input type="number" id="ssBoxX2" placeholder="1920" value="1920"
-                            style="text-align:center; font-weight:700;" />
-                        </div>
-                      </div>
-                      <div style="display:flex; align-items:center; gap:4px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y2:</span>
-                        <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                          <input type="number" id="ssBoxY2" placeholder="1080" value="1080"
-                            style="text-align:center; font-weight:700;" />
-                        </div>
-                      </div>
-                      <button class="neumorphic-btn btn-chip" id="ssBtnSelectArea"
-                        title="Drag rectangle on screen to set coordinates" style="height:32px; padding:0 10px;">
-                        <span>Draw Box</span>
-                      </button>
-                    </div>
-                  </div>
-
+              <!-- Card 1: Trigger Name & Detection Method -->
+              <div class="ac-setting-card" style="padding: 16px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <span class="setting-title">Visual Trigger Setup</span>
+                  <span class="hint-tag" id="ssEngineStatusHint">Autonomous</span>
                 </div>
 
-                <!-- RIGHT COLUMN: ACTION, TIMING & CONTROLS -->
-                <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div class="inputs-row" style="margin-bottom:12px;">
+                  <div class="inset-input-box" style="flex:1;">
+                    <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                      <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                    <input type="text" id="ssInputName" placeholder="Trigger Name (e.g. Auto-Accept, Skip Ad)" autocomplete="off" spellcheck="false" />
+                  </div>
+                </div>
 
-                  <!-- Card 4: Action on Match -->
-                  <div class="ac-setting-card" style="padding:16px 18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                      <span class="setting-title">Action When Detected</span>
-                      <span class="hint-tag">Execute</span>
-                    </div>
-                    <div class="ac-pill-selector" id="ssActionSelector"
-                      style="width:100%; margin-bottom:12px; flex-wrap:wrap;">
-                      <button class="ac-pill-btn active" data-act="click">Click</button>
-                      <button class="ac-pill-btn" data-act="mouseScript">Mouse Script</button>
-                      <button class="ac-pill-btn" data-act="macro">Macro</button>
-                      <button class="ac-pill-btn" data-act="key">Key Combo</button>
-                      <button class="ac-pill-btn" data-act="system">System</button>
-                    </div>
+                <!-- Detection Method Selector -->
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Detection Method</span>
+                  <div class="ac-pill-selector" id="ssModeSelector" style="width:100%;">
+                    <button class="ac-pill-btn active" data-mode="image" id="ssBtnModeImage">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:5px;">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                      Image Search
+                    </button>
+                    <button class="ac-pill-btn" data-mode="pixel" id="ssBtnModePixel">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:5px;">
+                        <path d="m15 11-1 9"></path>
+                        <path d="m19 11-4-7"></path>
+                        <path d="M2 11h20"></path>
+                        <path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8c.9 0 1.8-.7 2-1.6l1.6-7.4"></path>
+                      </svg>
+                      Pixel Area
+                    </button>
+                    <button class="ac-pill-btn" data-mode="point" id="ssBtnModePoint">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:5px;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="22" y1="12" x2="18" y2="12"></line>
+                        <line x1="6" y1="12" x2="2" y2="12"></line>
+                        <line x1="12" y1="6" x2="12" y2="2"></line>
+                        <line x1="12" y1="22" x2="12" y2="18"></line>
+                      </svg>
+                      Exact Pixel
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-                    <!-- Action Details: Click -->
-                    <div id="ssActionDetailClick" style="display:flex; flex-direction:column; gap:10px;">
-                      <div style="display:flex; align-items:center; gap:8px;">
-                        <span
-                          style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Button:</span>
-                        <div class="ac-pill-selector" id="ssClickBtnSelector" style="flex:1;">
-                          <button class="ac-pill-btn active" data-btn="Left">Left</button>
-                          <button class="ac-pill-btn" data-btn="Double">Double</button>
-                          <button class="ac-pill-btn" data-btn="Right">Right</button>
-                          <button class="ac-pill-btn" data-btn="Middle">Middle</button>
-                          <button class="ac-pill-btn" data-btn="None">Hover</button>
-                        </div>
+              <!-- Card 2: Method-Specific Target Settings -->
+              <!-- SECTION A: Image Search Mode -->
+              <div class="ac-setting-card" id="ssSectionImage" style="padding:16px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <span class="setting-title">Target Image Template</span>
+                  <span class="hint-tag">PNG, BMP, JPG</span>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+                  <div class="inset-input-box" style="flex:1;">
+                    <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <input type="text" id="ssInputImagePath" placeholder="Image File Path..." autocomplete="off" spellcheck="false" />
+                  </div>
+                  <button class="neumorphic-btn btn-chip" id="ssBtnBrowseImage" title="Browse for image file" style="padding:0 12px; height:34px;">
+                    <span>Browse</span>
+                  </button>
+                  <button class="neumorphic-btn btn-chip" id="ssBtnSnipImage" title="Crop & Snip image directly from screen" style="color:var(--accent); padding:0 12px; height:34px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:4px;">
+                      <circle cx="6" cy="6" r="3"></circle>
+                      <circle cx="6" cy="18" r="3"></circle>
+                      <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+                      <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+                    </svg>
+                    <span>Snip</span>
+                  </button>
+                </div>
+
+                <!-- Preview & Image Parameters -->
+                <div style="display:flex; gap:14px; align-items:center;">
+                  <div id="ssImagePreviewBox" style="width:48px; height:48px; border-radius:var(--radius-btn); background:var(--bg-inset); border:1px solid var(--border-soft); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+                    <span style="font-size:9px; color:var(--text-muted); text-align:center;">No Image</span>
+                  </div>
+                  <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Shade Tolerance (*n)</span>
+                      <span class="slider-value-badge" id="ssImageVariationVal" style="padding:1px 6px; font-size:11px;">30</span>
+                    </div>
+                    <input type="range" id="ssImageVariation" min="0" max="100" value="30" class="neumorphic-slider" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECTION B: Pixel Area Search Mode -->
+              <div class="ac-setting-card hidden-field" id="ssSectionPixel" style="padding:16px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <span class="setting-title">Target Pixel Color Area</span>
+                  <span class="hint-tag">RGB Hex</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
+                  <div class="inset-input-box" style="flex:1;">
+                    <input type="text" id="ssInputPixelColor" placeholder="#FF0000" value="#FF0000" autocomplete="off" spellcheck="false" />
+                  </div>
+                  <div id="ssPixelChip" style="width:34px; height:34px; border-radius:var(--radius-btn); background:#FF0000; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;"></div>
+                  <button class="neumorphic-btn btn-chip" id="ssBtnPickColor" title="Pick color directly from screen using loupe" style="height:34px; padding:0 12px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:4px;">
+                      <path d="m2 22 1-1h3l9-9"></path>
+                      <path d="M3 21v-3l9-9"></path>
+                      <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9"></path>
+                    </svg>
+                    <span>Pick Color</span>
+                  </button>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Shade Tolerance</span>
+                    <span class="slider-value-badge" id="ssPixelVariationVal" style="padding:1px 6px; font-size:11px;">15</span>
+                  </div>
+                  <input type="range" id="ssPixelVariation" min="0" max="100" value="15" class="neumorphic-slider" />
+                </div>
+              </div>
+
+              <!-- SECTION C: Single Pixel Watch Mode -->
+              <div class="ac-setting-card hidden-field" id="ssSectionPoint" style="padding:16px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <span class="setting-title">Exact Pixel Watcher</span>
+                  <span class="hint-tag">Sub-millisecond</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X:</span>
+                    <div class="inset-input-box" style="width:76px; height:34px; padding:0 6px;">
+                      <input type="number" id="ssPointX" placeholder="960" value="960" style="text-align:center; font-weight:700;" />
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y:</span>
+                    <div class="inset-input-box" style="width:76px; height:34px; padding:0 6px;">
+                      <input type="number" id="ssPointY" placeholder="540" value="540" style="text-align:center; font-weight:700;" />
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:5px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Color:</span>
+                    <div class="inset-input-box" style="width:95px; height:34px; padding:0 6px;">
+                      <input type="text" id="ssInputPointColor" placeholder="#00FF00" value="#00FF00" style="text-align:center; font-weight:700;" />
+                    </div>
+                    <div id="ssPointChip" style="width:30px; height:30px; border-radius:var(--radius-btn); background:#00FF00; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;"></div>
+                  </div>
+                </div>
+                <button class="neumorphic-btn btn-chip" id="ssBtnPickPoint" title="Click anywhere on screen to grab both coordinates and color" style="height:34px; width:100%;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:4px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+                  </svg>
+                  <span>Pick Pixel & Coordinates from Screen</span>
+                </button>
+              </div>
+
+              <!-- Card 3: Search Bounding Region -->
+              <div class="ac-setting-card" style="padding:16px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <span class="setting-title">Search Bounding Region</span>
+                  <span class="hint-tag">Bounds</span>
+                </div>
+                <div class="ac-pill-selector" id="ssRegionSelector" style="width:100%; margin-bottom:10px;">
+                  <button class="ac-pill-btn active" data-reg="fullscreen">Entire Screen</button>
+                  <button class="ac-pill-btn" data-reg="activeWindow">Active Window</button>
+                  <button class="ac-pill-btn" data-reg="custom">Custom Box</button>
+                </div>
+                <div class="hidden-field" id="ssCustomRegionBox" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X1:</span>
+                    <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
+                      <input type="number" id="ssBoxX1" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y1:</span>
+                    <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
+                      <input type="number" id="ssBoxY1" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X2:</span>
+                    <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
+                      <input type="number" id="ssBoxX2" placeholder="1920" value="1920" style="text-align:center; font-weight:700;" />
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y2:</span>
+                    <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
+                      <input type="number" id="ssBoxY2" placeholder="1080" value="1080" style="text-align:center; font-weight:700;" />
+                    </div>
+                  </div>
+                  <button class="neumorphic-btn btn-chip" id="ssBtnSelectArea" title="Drag rectangle on screen to set coordinates" style="height:32px; padding:0 10px;">
+                    <span>Draw Box</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: ACTION, TIMING & CONTROLS -->
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+
+              <!-- Card 4: Action on Match -->
+              <div class="ac-setting-card" style="padding:16px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <span class="setting-title">Action When Detected</span>
+                  <span class="hint-tag">Execute</span>
+                </div>
+                <div class="ac-pill-selector" id="ssActionSelector" style="width:100%; margin-bottom:12px; flex-wrap:wrap;">
+                  <button class="ac-pill-btn active" data-act="click">Click</button>
+                  <button class="ac-pill-btn" data-act="mouseScript">Mouse Script</button>
+                  <button class="ac-pill-btn" data-act="macro">Macro</button>
+                  <button class="ac-pill-btn" data-act="key">Key Combo</button>
+                  <button class="ac-pill-btn" data-act="system">System</button>
+                </div>
+
+                <!-- Action Details: Click -->
+                <div id="ssActionDetailClick" style="display:flex; flex-direction:column; gap:10px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Button:</span>
+                    <div class="ac-pill-selector" id="ssClickBtnSelector" style="flex:1;">
+                      <button class="ac-pill-btn active" data-btn="Left">Left</button>
+                      <button class="ac-pill-btn" data-btn="Double">Double</button>
+                      <button class="ac-pill-btn" data-btn="Right">Right</button>
+                      <button class="ac-pill-btn" data-btn="Middle">Middle</button>
+                      <button class="ac-pill-btn" data-btn="None">Hover</button>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:16px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Offset X:</span>
+                      <div class="inset-input-box" style="width:72px; height:32px; padding:0 6px;">
+                        <input type="number" id="ssClickOffsetX" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
                       </div>
-                      <div style="display:flex; align-items:center; gap:16px;">
-                        <div style="display:flex; align-items:center; gap:6px;">
-                          <span style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Offset
-                            X:</span>
-                          <div class="inset-input-box" style="width:72px; height:32px; padding:0 6px;">
-                            <input type="number" id="ssClickOffsetX" placeholder="0" value="0"
-                              style="text-align:center; font-weight:700;" />
-                            <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-                              <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:240px;">
-                                <span
-                                  style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Button:</span>
-                                <div class="ac-pill-selector" id="ssClickBtnSelector" style="flex:1;">
-                                  <button class="ac-pill-btn active" data-btn="Left">Left</button>
-                                  <button class="ac-pill-btn" data-btn="Double">Double</button>
-                                  <button class="ac-pill-btn" data-btn="Right">Right</button>
-                                  <button class="ac-pill-btn" data-btn="Middle">Middle</button>
-                                  <button class="ac-pill-btn" data-btn="None">Hover</button>
-                                </div>
-                                <span style="font-size:10px; color:var(--text-muted);">px</span>
-                              </div>
-                              <div style="display:flex; align-items:center; gap:6px;">
-                                <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Offset
-                                  Y:</span>
-                                <div class="inset-input-box" style="width:72px; height:32px; padding:0 6px;">
-                                  <input type="number" id="ssClickOffsetY" placeholder="0" value="0"
-                                    style="text-align:center; font-weight:700;" />
-                                  <div style="display:flex; align-items:center; gap:12px;">
-                                    <div style="display:flex; align-items:center; gap:6px;">
-                                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Offset
-                                        X:</span>
-                                      <div class="inset-input-box" style="width:68px; height:32px; padding:0 6px;">
-                                        <input type="number" id="ssClickOffsetX" placeholder="0" value="0"
-                                          style="text-align:center; font-weight:700;" />
-                                      </div>
-                                      <span style="font-size:10px; color:var(--text-muted);">px</span>
-                                    </div>
-                                    <span style="font-size:10px; color:var(--text-muted);">px</span>
-                                    <div style="display:flex; align-items:center; gap:6px;">
-                                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Offset
-                                        Y:</span>
-                                      <div class="inset-input-box" style="width:68px; height:32px; padding:0 6px;">
-                                        <input type="number" id="ssClickOffsetY" placeholder="0" value="0"
-                                          style="text-align:center; font-weight:700;" />
-                                      </div>
-                                      <span style="font-size:10px; color:var(--text-muted);">px</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                      <span style="font-size:10px; color:var(--text-muted);">px</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Offset Y:</span>
+                      <div class="inset-input-box" style="width:72px; height:32px; padding:0 6px;">
+                        <input type="number" id="ssClickOffsetY" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
+                      </div>
+                      <span style="font-size:10px; color:var(--text-muted);">px</span>
+                    </div>
+                  </div>
+                </div>
 
-                              <!-- Action Details: Mouse Script -->
-                              <div class="hidden-field" id="ssActionDetailMouseScript"
-                                style="display:flex; gap:10px; align-items:center;">
-                                <span
-                                  style="font-size:11px; font-weight:600; color:var(--text-secondary);">Script:</span>
-                                <div class="custom-select-wrapper" style="flex:1;">
-                                  <select id="ssSelectMouseScript" class="custom-select"></select>
-                                </div>
-                              </div>
+                <!-- Action Details: Mouse Script -->
+                <div class="hidden-field" id="ssActionDetailMouseScript" style="display:flex; gap:10px; align-items:center;">
+                  <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Script:</span>
+                  <div class="custom-select-wrapper" style="flex:1;">
+                    <select id="ssSelectMouseScript" class="custom-select"></select>
+                  </div>
+                </div>
 
-                              <!-- Action Details: Macro -->
-                              <div class="hidden-field" id="ssActionDetailMacro"
-                                style="display:flex; gap:10px; align-items:center;">
-                                <span
-                                  style="font-size:11px; font-weight:600; color:var(--text-secondary);">Macro:</span>
-                                <div class="custom-select-wrapper" style="flex:1;">
-                                  <select id="ssSelectMacro" class="custom-select"></select>
-                                </div>
-                              </div>
+                <!-- Action Details: Macro -->
+                <div class="hidden-field" id="ssActionDetailMacro" style="display:flex; gap:10px; align-items:center;">
+                  <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Macro:</span>
+                  <div class="custom-select-wrapper" style="flex:1;">
+                    <select id="ssSelectMacro" class="custom-select"></select>
+                  </div>
+                </div>
 
-                              <!-- Action Details: Key -->
-                              <div class="hidden-field" id="ssActionDetailKey"
-                                style="display:flex; gap:10px; align-items:center;">
-                                <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Keys:</span>
-                                <div class="inset-input-box" style="flex:1;">
-                                  <input type="text" id="ssInputKey" placeholder="e.g. {Enter}, ^s, {Space}" />
-                                </div>
-                              </div>
+                <!-- Action Details: Key -->
+                <div class="hidden-field" id="ssActionDetailKey" style="display:flex; gap:10px; align-items:center;">
+                  <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Keys:</span>
+                  <div class="inset-input-box" style="flex:1;">
+                    <input type="text" id="ssInputKey" placeholder="e.g. {Enter}, ^s, {Space}" />
+                  </div>
+                </div>
 
-                              <!-- Action Details: System -->
-                              <div class="hidden-field" id="ssActionDetailSystem"
-                                style="display:flex; gap:10px; align-items:center;">
-                                <span
-                                  style="font-size:11px; font-weight:600; color:var(--text-secondary);">Action:</span>
-                                <div class="custom-select-wrapper" style="flex:1;">
-                                  <select id="ssSelectSystemAction" class="custom-select">
-                                    <option value="beep">Play Sound Alert</option>
-                                    <option value="osd">On-Screen Alert Only</option>
-                                    <option value="sleep">Put PC to Sleep</option>
-                                    <option value="mute">Mute System Audio</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </div>
+                <!-- Action Details: System -->
+                <div class="hidden-field" id="ssActionDetailSystem" style="display:flex; gap:10px; align-items:center;">
+                  <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Action:</span>
+                  <div class="custom-select-wrapper" style="flex:1;">
+                    <select id="ssSelectSystemAction" class="custom-select">
+                      <option value="beep">Play Sound Alert</option>
+                      <option value="osd">On-Screen Alert Only</option>
+                      <option value="sleep">Put PC to Sleep</option>
+                      <option value="mute">Mute System Audio</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
 
-                            <!-- Card 5: Timing, Frequency & Execution Rules -->
-                            <div class="ac-setting-card" style="padding:16px 18px;">
-                              <div
-                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                                <span class="setting-title">Timing & Execution Rules</span>
-                                <span class="hint-tag">Throttle</span>
-                              </div>
-                              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
-                                <div
-                                  style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:12px;">
-                                  <!-- Scan Interval -->
-                                  <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Poll
-                                      Rate</span>
-                                    <div class="ac-pill-selector" id="ssScanRateSelector" style="width:100%;">
-                                      <button class="ac-pill-btn" data-rate="50">50ms</button>
-                                      <button class="ac-pill-btn active" data-rate="150">150ms</button>
-                                      <button class="ac-pill-btn" data-rate="300">300ms</button>
-                                    </div>
-                                  </div>
+              <!-- Card 5: Timing, Frequency & Execution Rules -->
+              <div class="ac-setting-card" style="padding:16px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                  <span class="setting-title">Timing & Execution Rules</span>
+                  <span class="hint-tag">Throttle</span>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:12px;">
+                  <!-- Scan Interval -->
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Poll Rate</span>
+                    <div class="ac-pill-selector" id="ssScanRateSelector" style="width:100%;">
+                      <button class="ac-pill-btn" data-rate="50">50ms</button>
+                      <button class="ac-pill-btn active" data-rate="150">150ms</button>
+                      <button class="ac-pill-btn" data-rate="300">300ms</button>
+                    </div>
+                  </div>
 
-                                  <!-- Condition -->
-                                  <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <span
-                                      style="font-size:10px; font-weight:600; color:var(--text-secondary);">Event</span>
-                                    <div class="ac-pill-selector" id="ssConditionSelector" style="width:100%;">
-                                      <button class="ac-pill-btn active" data-cond="appear">Appears</button>
-                                      <button class="ac-pill-btn" data-cond="disappear">Disappears</button>
-                                    </div>
-                                  </div>
+                  <!-- Condition -->
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Event</span>
+                    <div class="ac-pill-selector" id="ssConditionSelector" style="width:100%;">
+                      <button class="ac-pill-btn active" data-cond="appear">Appears</button>
+                      <button class="ac-pill-btn" data-cond="disappear">Disappears</button>
+                    </div>
+                  </div>
 
-                                  <!-- Repeat Rule -->
-                                  <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Repeat
-                                      Mode</span>
-                                    <div class="ac-pill-selector" id="ssRepeatSelector" style="width:100%;">
-                                      <button class="ac-pill-btn active" data-rep="debounce">Cooldown</button>
-                                      <button class="ac-pill-btn" data-rep="continuous">Continuous</button>
-                                      <button class="ac-pill-btn" data-rep="once">Once</button>
-                                    </div>
-                                  </div>
+                  <!-- Repeat Rule -->
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Repeat Mode</span>
+                    <div class="ac-pill-selector" id="ssRepeatSelector" style="width:100%;">
+                      <button class="ac-pill-btn active" data-rep="debounce">Cooldown</button>
+                      <button class="ac-pill-btn" data-rep="continuous">Continuous</button>
+                      <button class="ac-pill-btn" data-rep="once">Once</button>
+                    </div>
+                  </div>
 
-                                  <!-- Cooldown Delay -->
-                                  <div style="display:flex; flex-direction:column; gap:4px;">
-                                    <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Cooldown
-                                      Delay</span>
-                                    <div style="display:flex; align-items:center; gap:4px;">
-                                      <div class="inset-input-box" style="flex:1; height:32px; padding:0 6px;">
-                                        <input type="number" id="ssDebounceInput" min="0.1" max="60" step="0.5"
-                                          value="2.0" style="text-align:center; font-weight:700;" />
-                                      </div>
-                                      <span style="font-size:10px; color:var(--text-muted);">sec</span>
-                                    </div>
-                                  </div>
-                                </div>
+                  <!-- Cooldown Delay -->
+                  <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Cooldown Delay</span>
+                    <div style="display:flex; align-items:center; gap:4px;">
+                      <div class="inset-input-box" style="flex:1; height:32px; padding:0 6px;">
+                        <input type="number" id="ssDebounceInput" min="0.1" max="60" step="0.5" value="2.0" style="text-align:center; font-weight:700;" />
+                      </div>
+                      <span style="font-size:10px; color:var(--text-muted);">sec</span>
+                    </div>
+                  </div>
+                </div>
 
-                                <!-- Alert Toggles -->
-                                <div
-                                  style="display:flex; gap:16px; align-items:center; padding-top:10px; border-top:1px solid var(--border-soft);">
-                                  <div style="display:flex; align-items:center; gap:6px;">
-                                    <div class="toggle-wrapper">
-                                      <input class="toggle-checkbox" type="checkbox" id="ssOptSound" checked>
-                                      <div class="toggle-container">
-                                        <div class="toggle-button"></div>
-                                      </div>
-                                    </div>
-                                    <span style="font-size:11px; font-weight:600;">Beep</span>
-                                  </div>
-                                  <div style="display:flex; align-items:center; gap:6px;">
-                                    <div class="toggle-wrapper">
-                                      <input class="toggle-checkbox" type="checkbox" id="ssOptOsd" checked>
-                                      <div class="toggle-container">
-                                        <div class="toggle-button"></div>
-                                      </div>
-                                    </div>
-                                    <span style="font-size:11px; font-weight:600;">On-Screen HUD</span>
-                                  </div>
-                                </div>
-                              </div>
+                <!-- Alert Toggles -->
+                <div style="display:flex; gap:16px; align-items:center; padding-top:10px; border-top:1px solid var(--border-soft);">
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <div class="toggle-wrapper">
+                      <input class="toggle-checkbox" type="checkbox" id="ssOptSound" checked>
+                      <div class="toggle-container">
+                        <div class="toggle-button"></div>
+                      </div>
+                    </div>
+                    <span style="font-size:11px; font-weight:600;">Beep</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <div class="toggle-wrapper">
+                      <input class="toggle-checkbox" type="checkbox" id="ssOptOsd" checked>
+                      <div class="toggle-container">
+                        <div class="toggle-button"></div>
+                      </div>
+                    </div>
+                    <span style="font-size:11px; font-weight:600;">On-Screen HUD</span>
+                  </div>
+                </div>
+              </div>
 
-                              <!-- Card 6: Action Buttons -->
-                              <div style="display:flex; gap:10px; align-items:center;">
-                                <button class="neumorphic-btn btn-go" id="ssBtnAddTrigger"
-                                  style="flex:2; height:42px; font-size:12px; font-weight:700;">
-                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                                    width="15" height="15" style="margin-right:6px;">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                  </svg>
-                                  <span>ADD VISUAL TRIGGER</span>
-                                </button>
-                                <button class="neumorphic-btn btn-chip" id="ssBtnTestScan"
-                                  style="flex:1; height:42px; font-size:11px; font-weight:600; color:var(--accent);">
-                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14"
-                                    height="14" style="margin-right:5px;">
-                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                  </svg>
-                                  <span>TEST SCAN</span>
-                                </button>
-                              </div>
+              <!-- Card 6: Action Buttons -->
+              <div style="display:flex; gap:10px; align-items:center;">
+                <button class="neumorphic-btn btn-go" id="ssBtnAddTrigger" style="flex:2; height:42px; font-size:12px; font-weight:700;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15" style="margin-right:6px;">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  <span>ADD VISUAL TRIGGER</span>
+                </button>
+                <button class="neumorphic-btn btn-chip" id="ssBtnTestScan" style="flex:1; height:42px; font-size:11px; font-weight:600; color:var(--accent);">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:5px;">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  <span>TEST SCAN</span>
+                </button>
+              </div>
 
-                            </div>
+            </div>
 
-                          </div>
+          </div>
 
-                          <!-- Active Visual Triggers List Section -->
-                          <div class="list-section" style="margin-top:12px;">
-                            <div class="list-header">
-                              <div class="list-header-left">
-                                <div class="list-section" style="margin-top:12px; width:100%;">
-                                  <div class="list-header"
-                                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <div class="list-header-left" style="display:flex; align-items:center; gap:8px;">
-                                      <span class="section-label">Configured Visual Triggers</span>
-                                      <span class="section-count" id="ssCountBadge">0</span>
-                                    </div>
-                                    <div class="inset-input-box search-box" style="width:200px; height:32px;">
-                                      <input type="text" id="ssSearchFilter" placeholder="Filter triggers..."
-                                        autocomplete="off" spellcheck="false" />
-                                      <div class="inset-input-box search-box" style="width:240px; height:34px;">
-                                        <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none"
-                                          stroke="currentColor" stroke-width="2"
-                                          style="width:14px; height:14px; margin-left:8px;">
-                                          <circle cx="11" cy="11" r="8"></circle>
-                                          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                                        </svg>
-                                        <input type="text" id="ssSearchFilter" placeholder="Filter triggers..."
-                                          autocomplete="off" spellcheck="false" style="padding-left:4px;" />
-                                      </div>
-                                    </div>
-                                    <div class="shortcuts-list" id="ssListContainer"></div>
-                                    <div class="shortcuts-list" id="ssListContainer" style="width:100%;"></div>
-                                  </div>
+          <!-- Active Visual Triggers List Section -->
+          <div class="list-section" style="margin-top:4px; width:100%;">
+            <div class="list-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <div class="list-header-left" style="display:flex; align-items:center; gap:8px;">
+                <span class="section-label">Configured Visual Triggers</span>
+                <span class="section-count" id="ssCountBadge">0</span>
+              </div>
+              <div class="inset-input-box search-box" style="width:240px; height:34px;">
+                <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; margin-left:8px;">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="ssSearchFilter" placeholder="Filter triggers..." autocomplete="off" spellcheck="false" style="padding-left:4px;" />
+              </div>
+            </div>
+            <div class="shortcuts-list" id="ssListContainer" style="width:100%;"></div>
+          </div>
 
-                                </div>
+        </div>
       </section>
 
-  </div>
-  </section>
+  
 
   </main>
 

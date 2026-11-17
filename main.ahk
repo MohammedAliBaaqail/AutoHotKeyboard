@@ -5055,13 +5055,19 @@ FireScreenScannerAction(item, foundX, foundY) {
 
     if (g_Wv) {
         try {
+            mScriptId := item.Has("mouseScriptId") ? item["mouseScriptId"] : ""
+            macroId := item.Has("macroId") ? item["macroId"] : ""
+            dMs := (actionType = "mouseScript") ? 0 : (item.Has("debounceMs") ? Integer(item["debounceMs"]) : 2000)
             g_Wv.PostWebMessageAsString(JSON.stringify(Map(
                 "type", "screenScannerTriggered",
                 "id", item.Has("id") ? item["id"] : "",
                 "name", ruleName,
                 "x", foundX,
                 "y", foundY,
-                "action", actionType
+                "action", actionType,
+                "mouseScriptId", mScriptId,
+                "macroId", macroId,
+                "durationMs", dMs
             )))
         }
     }
@@ -6147,6 +6153,7 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                         try {
                             g_Wv.PostWebMessageAsString(JSON.stringify(Map(
                                 "type", "screenScanTestResult",
+                                "id", itemObj.Has("id") ? itemObj["id"] : "",
                                 "found", found ? 1 : 0,
                                 "x", fX,
                                 "y", fY,

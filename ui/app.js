@@ -406,6 +406,7 @@
   const mrSearchFilter = document.getElementById('mrSearchFilter');
   const mrListContainer = document.getElementById('mrListContainer');
   let mousePlaybackScriptId = '';
+  let activeRunningScreenTriggers = new Map(); // id -> { name, action, mouseScriptId, macroId, startTime, timer }
 
   // Helper: Post message to AutoHotkey host with resilient offline queue
   let ahkMsgQueue = [];
@@ -2324,6 +2325,9 @@
     }
     if (acRecorderSection) {
       acRecorderSection.classList.toggle('hidden-field', mode !== 'recorder');
+    }
+    if (mrListSection) {
+      mrListSection.classList.toggle('hidden-field', mode !== 'recorder');
     }
 
     // Clicker UI
@@ -6576,8 +6580,17 @@
     filteredItems.forEach((item) => {
       const isEnabled = (item.enabled !== false && item.enabled !== 0);
       const isPlaying = (mousePlaybackActive && mousePlaybackScriptId === item.id);
+      
+      let scannerRunName = '';
+      for (const [sId, info] of activeRunningScreenTriggers.entries()) {
+        if (info.action === 'mouseScript' && info.mouseScriptId === item.id) {
+          scannerRunName = info.name || 'Screen Trigger';
+          break;
+        }
+      }
+
       const card = document.createElement('div');
-      card.className = `shortcut-card mr-card ${isEnabled ? '' : 'is-disabled'}`;
+      card.className = `shortcut-card mr-card ${isEnabled ? '' : 'is-disabled'} ${isPlaying ? 'is-running' : ''}`;
       card.dataset.id = item.id;
       card.dataset.module = 'autoClicker';
 
@@ -6602,6 +6615,15 @@
       const displayTrig = item.trigger ? formatKeyDisplay(item.trigger) : 'None (Click to set)';
       const profileBadgesHtml = renderItemProfileBadges('autoClicker', item.id);
 
+      let runningBadgeHtml = '';
+      if (isPlaying) {
+        if (scannerRunName) {
+          runningBadgeHtml = `<span class="mr-meta-tag ss-running-tag" style="background:#ef4444;"><span class="ss-running-dot"></span> RUNNING (Screen Trigger: ${escapeHtml(scannerRunName)})</span>`;
+        } else {
+          runningBadgeHtml = `<span class="mr-meta-tag ss-running-tag" style="background:#10b981;"><span class="ss-running-dot"></span> PLAYING NOW</span>`;
+        }
+      }
+
       card.innerHTML = `
         <div class="mr-card-info">
           <div class="wm-icon-badge ${isPlaying ? 'is-playing' : ''} ${isEnabled ? '' : 'is-disabled'}" style="width:36px;height:36px;border-radius:var(--radius-btn);">
@@ -6613,6 +6635,7 @@
           <div class="mr-card-text">
             <div class="mr-card-top">
               <span class="mr-title" title="Click to rename">${escapeHtml(item.name || 'Mouse Path')}</span>
+              ${runningBadgeHtml}
               <span class="wm-hotkey-badge mr-hotkey-badge ${isEnabled ? '' : 'is-disabled'}" title="Click to change shortcut (Current: ${escapeHtml(displayTrig)})">${escapeHtml(displayTrig)}</span>
             </div>
             <div class="mr-card-meta">
@@ -8182,6 +8205,28 @@
     }
   }
 
+  function updateScreenScannerEngineStatus() {
+    const hint = document.getElementById('ssEngineStatusHint');
+    if (!hint) return;
+    const isEnabled = (state.config && state.config.screenScanner && (state.config.screenScanner.enabled !== 0 && state.config.screenScanner.enabled !== false));
+    if (!isEnabled) {
+      hint.className = 'hint-tag';
+      hint.textContent = 'Engine Suspended';
+      return;
+    }
+    if (activeRunningScreenTriggers && activeRunningScreenTriggers.size > 0) {
+      const first = activeRunningScreenTriggers.values().next().value;
+      hint.className = 'hint-tag ss-active-engine-badge';
+      hint.style.color = 'var(--accent-primary)';
+      hint.innerHTML = `<span class="ss-running-dot" style="background:var(--accent-primary);"></span> ACTIVE: ${escapeHtml(first.name || 'Trigger')}`;
+    } else {
+      const rate = (state.config && state.config.screenScanner && state.config.screenScanner.scanRate) || 150;
+      hint.className = 'hint-tag ss-active-engine-badge is-scanning';
+      hint.style.color = '#10b981';
+      hint.innerHTML = `<span class="ss-radar-dot"></span> SCANNING ACTIVE (${rate}ms)`;
+    }
+  }
+
   function renderScreenScanner() {
     if (!state.config) return;
     if (!state.config.screenScanner) {
@@ -8193,6 +8238,7 @@
       masterSwitch.checked = (state.config.screenScanner.enabled !== 0 && state.config.screenScanner.enabled !== false);
     }
 
+    updateScreenScannerEngineStatus();
     populateScannerActionDropdowns();
     renderScreenScannerList();
   }
@@ -8224,8 +8270,12 @@
     }
 
     filtered.forEach((item) => {
+      const isRunning = activeRunningScreenTriggers.has(item.id);
+      const runInfo = isRunning ? activeRunningScreenTriggers.get(item.id) : null;
+      const isEnabled = (item.enabled !== 0 && item.enabled !== false);
+
       const card = document.createElement('div');
-      card.className = 'shortcut-card' + (item.enabled === 0 || item.enabled === false ? ' is-disabled' : '');
+      card.className = 'shortcut-card' + (!isEnabled ? ' is-disabled' : '') + (isRunning ? ' is-running' : '');
       card.dataset.id = item.id;
       card.style.display = 'flex';
       card.style.alignItems = 'center';
@@ -8249,17 +8299,48 @@
 
       // Action label
       let actionLabel = 'Mouse Click';
-      if (item.actionType === 'mouseScript') actionLabel = 'Play Mouse Path';
-      else if (item.actionType === 'macro') actionLabel = 'Play Macro';
-      else if (item.actionType === 'key') actionLabel = `Send Key: ${item.keyToSend || '{Key}'}`;
-      else if (item.actionType === 'system') actionLabel = `System: ${item.systemAction || 'Alert'}`;
+      let targetSubName = '';
+      if (item.actionType === 'mouseScript') {
+        actionLabel = 'Play Mouse Path';
+        if (state.config.autoClicker && Array.isArray(state.config.autoClicker.items)) {
+          const foundMs = state.config.autoClicker.items.find(x => x.id === item.mouseScriptId);
+          if (foundMs && foundMs.name) targetSubName = foundMs.name;
+        }
+      } else if (item.actionType === 'macro') {
+        actionLabel = 'Play Macro';
+        if (state.config.macroRecorder && Array.isArray(state.config.macroRecorder.items)) {
+          const foundM = state.config.macroRecorder.items.find(x => x.id === item.macroId);
+          if (foundM && foundM.name) targetSubName = foundM.name;
+        }
+      } else if (item.actionType === 'key') {
+        actionLabel = `Send Key: ${item.keyToSend || '{Key}'}`;
+      } else if (item.actionType === 'system') {
+        actionLabel = `System: ${item.systemAction || 'Alert'}`;
+      }
 
       const condLabel = item.condition === 'disappear' ? 'When Disappears' : 'When Appears';
       const repeatLabel = item.repeatRule === 'continuous' ? 'Continuous' : (item.repeatRule === 'once' ? 'Run Once' : `Cooldown ${((item.debounceMs || 2000) / 1000).toFixed(1)}s`);
 
+      let runningBadgeHtml = '';
+      if (isRunning) {
+        let runText = 'RUNNING NOW';
+        if (item.actionType === 'mouseScript') {
+          runText = `RUNNING SCRIPT: ${targetSubName || 'Mouse Path'}`;
+        } else if (item.actionType === 'macro') {
+          runText = `RUNNING MACRO: ${targetSubName || 'Macro'}`;
+        } else if (item.actionType === 'click') {
+          runText = `EXECUTING ${item.clickButton || 'Left'} Click`;
+        } else if (item.actionType === 'key') {
+          runText = `SENDING ${item.keyToSend || 'Key'}`;
+        } else if (item.actionType === 'system') {
+          runText = `SYSTEM ${item.systemAction || 'Action'}`;
+        }
+        runningBadgeHtml = `<span class="mr-meta-tag ss-running-tag" style="background:#10b981;"><span class="ss-running-dot"></span> ${escapeHtml(runText)}</span>`;
+      }
+
       card.innerHTML = `
         <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
-          <div class="wm-icon-badge" style="background:var(--surface-color); color:var(--accent); border:1px solid var(--border-soft); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-btn); flex-shrink:0;">
+          <div class="wm-icon-badge ${isRunning ? 'is-playing' : ''}" style="background:var(--surface-color); color:var(--accent); border:1px solid var(--border-soft); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-btn); flex-shrink:0;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
               <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
@@ -8270,23 +8351,24 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${item.name || 'Visual Trigger'}</span>
+              <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${escapeHtml(item.name || 'Visual Trigger')}</span>
+              ${runningBadgeHtml}
             </div>
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-              <span class="mr-meta-tag" style="color:${modeColor}; font-weight:700;">${modeLabel}</span>
-              <span class="mr-meta-tag">${item.region || 'fullscreen'}</span>
-              <span class="mr-meta-tag" style="color:#d97706;">${condLabel}</span>
-              <span class="mr-meta-tag" style="color:#8b5cf6;">${actionLabel}</span>
-              <span class="mr-meta-tag">${repeatLabel}</span>
+              <span class="mr-meta-tag" style="color:${modeColor}; font-weight:700;">${escapeHtml(modeLabel)}</span>
+              <span class="mr-meta-tag">${escapeHtml(item.region || 'fullscreen')}</span>
+              <span class="mr-meta-tag" style="color:#d97706;">${escapeHtml(condLabel)}</span>
+              <span class="mr-meta-tag" style="color:#8b5cf6;">${escapeHtml(actionLabel)}</span>
+              <span class="mr-meta-tag">${escapeHtml(repeatLabel)}</span>
             </div>
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
-          <button class="neumorphic-btn btn-chip btn-test-ss-item" title="Test scan this trigger now" style="padding:4px 10px; font-size:11px;">
+          <button class="neumorphic-btn btn-chip btn-test-ss-item ${isRunning ? 'running' : ''}" title="${isRunning ? 'Currently executing' : 'Test scan this trigger now'}" style="padding:4px 10px; font-size:11px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;">
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
-            <span>Test</span>
+            <span>${isRunning ? 'Running...' : 'Test'}</span>
           </button>
           <div class="toggle-wrapper" title="Toggle trigger active/inactive">
             <input class="toggle-checkbox ss-item-toggle" type="checkbox" ${item.enabled !== 0 && item.enabled !== false ? 'checked' : ''} />
@@ -8306,8 +8388,18 @@
       if (btnTest) {
         btnTest.addEventListener('click', (e) => {
           e.stopPropagation();
+          card.classList.add('is-running');
+          btnTest.innerHTML = '<span>Scanning...</span>';
+          btnTest.disabled = true;
           sendToAhk('testScreenScan', { item: item });
           showToast(`Testing trigger "${item.name}"...`, 'info');
+          setTimeout(() => {
+            btnTest.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>Test</span>`;
+            btnTest.disabled = false;
+            if (!activeRunningScreenTriggers.has(item.id)) {
+              card.classList.remove('is-running');
+            }
+          }, 1400);
         });
       }
 
@@ -11866,7 +11958,17 @@
         mousePlaybackActive = Boolean(msg.playing);
         mousePlaybackScriptId = msg.scriptId || '';
         updateMouseRecorderUI();
+        if (!mousePlaybackActive) {
+          for (const [sId, info] of activeRunningScreenTriggers.entries()) {
+            if (info.action === 'mouseScript') {
+              if (info.timer) clearTimeout(info.timer);
+              activeRunningScreenTriggers.delete(sId);
+            }
+          }
+        }
         renderMouseScriptsList();
+        renderScreenScannerList();
+        updateScreenScannerEngineStatus();
         updateMseModalPlaybackState(mousePlaybackActive);
       } else if (msg.type === 'mouseRecordedPath') {
         mouseRecordingActive = false;
@@ -11994,6 +12096,15 @@
       } else if (msg.type === 'screenScanTestResult') {
         const btn = document.getElementById('ssBtnTestScan');
         if (btn) btn.disabled = false;
+        if (msg.id) {
+          const card = document.querySelector(`.shortcut-card[data-id="${msg.id}"]`);
+          if (card) {
+            if (msg.found) {
+              card.classList.add('is-match-success');
+              setTimeout(() => card.classList.remove('is-match-success'), 2000);
+            }
+          }
+        }
         if (msg.found) {
           showToast(`Match FOUND at (${msg.x}, ${msg.y}) in ${msg.elapsedMs}ms!`, 'success');
         } else {
@@ -12024,7 +12135,43 @@
         if (bY2) bY2.value = msg.y2;
         showToast(`Bounding Box: [${msg.x1}, ${msg.y1}] to [${msg.x2}, ${msg.y2}]`, 'info');
       } else if (msg.type === 'screenScannerTriggered') {
-        showToast(`Visual Trigger Fired: ${msg.name || 'Screen Scanner'}`, 'info');
+        const id = msg.id;
+        const mouseScriptId = msg.mouseScriptId || '';
+        const macroId = msg.macroId || '';
+        const duration = msg.durationMs || 2500;
+
+        if (id) {
+          if (activeRunningScreenTriggers.has(id)) {
+            const prev = activeRunningScreenTriggers.get(id);
+            if (prev.timer) clearTimeout(prev.timer);
+          }
+
+          let timer = null;
+          if (msg.action !== 'mouseScript') {
+            timer = setTimeout(() => {
+              activeRunningScreenTriggers.delete(id);
+              renderScreenScannerList();
+              renderMouseScriptsList();
+              updateScreenScannerEngineStatus();
+              updateGlobalIndicators();
+            }, Math.min(Math.max(duration, 1500), 5000));
+          }
+
+          activeRunningScreenTriggers.set(id, {
+            name: msg.name,
+            action: msg.action,
+            mouseScriptId: mouseScriptId,
+            macroId: macroId,
+            startTime: Date.now(),
+            timer: timer
+          });
+        }
+
+        renderScreenScannerList();
+        renderMouseScriptsList();
+        updateScreenScannerEngineStatus();
+        updateGlobalIndicators();
+        showToast(`Visual Trigger Running: ${msg.name || 'Screen Scanner'} (${msg.action})`, 'success');
       } else if (msg.type === 'screenScannerItemDisabled') {
         if (state.config && state.config.screenScanner && Array.isArray(state.config.screenScanner.items)) {
           const itm = state.config.screenScanner.items.find(x => x.id === msg.id);
