@@ -2,7 +2,7 @@
 
 AutoHotKeyboard is an advanced Windows automation suite and desktop productivity utility. It combines **AutoHotkey v2** as the low-level automation engine with **Microsoft Edge WebView2** for a hardware-accelerated, tactile Neumorphic (Soft UI) interface.
 
-![AutoHotKeyboard Overview](docs/screenshots/overview.png)
+
 
 ---
 
