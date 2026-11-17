@@ -357,6 +357,14 @@
   let editingFcId = null;
 
   // Auto Clicker Elements
+  // Auto Clicker & Mouse Recorder Elements
+  const acMasterSwitch = document.getElementById('acMasterSwitch');
+  const acContainer = document.querySelector('#panel-autoClicker .ac-container');
+  const acHotkeyBox = document.getElementById('acHotkeyBox');
+  const acHotkeyLabel = document.getElementById('acHotkeyLabel');
+  const mrHotkeyBox = document.getElementById('mrHotkeyBox');
+  const mrHotkeyLabel = document.getElementById('mrHotkeyLabel');
+  const mrRecordCountdownSelector = document.getElementById('mrRecordCountdownSelector');
   const acButtonSelector = document.getElementById('acButtonSelector');
   const acTypeSelector = document.getElementById('acTypeSelector');
   const acCpsSlider = document.getElementById('acCpsSlider');
@@ -364,6 +372,40 @@
   const acToggleBtn = document.getElementById('acToggleBtn');
   const acToggleBtnText = document.getElementById('acToggleBtnText');
   const acStatusHint = document.getElementById('acStatusHint');
+  const mouseModeSelector = document.getElementById('mouseModeSelector');
+  const acClickerSection = document.getElementById('acClickerSection');
+  const acRecorderSection = document.getElementById('acRecorderSection');
+  const techniquePolling = document.getElementById('techniquePolling');
+  const techniqueHook = document.getElementById('techniqueHook');
+  const mrActiveTechniqueTag = document.getElementById('mrActiveTechniqueTag');
+  const mrPollingRateSelector = document.getElementById('mrPollingRateSelector');
+  const mrPlaybackSpeedSelector = document.getElementById('mrPlaybackSpeedSelector');
+  const mrOriginSelector = document.getElementById('mrOriginSelector');
+  const mrRepeatInfinite = document.getElementById('mrRepeatInfinite');
+  const mrRepeatCountInput = document.getElementById('mrRepeatCountInput');
+  const mrRepeatBox = document.getElementById('mrRepeatBox');
+  const mrLoopSelector = document.getElementById('mrLoopSelector');
+  const mrStatPoints = document.getElementById('mrStatPoints');
+  const mrStatDuration = document.getElementById('mrStatDuration');
+  const mrStatClicks = document.getElementById('mrStatClicks');
+  const mrStatKeys = document.getElementById('mrStatKeys');
+  const mrOptClicksOnly = document.getElementById('mrOptClicksOnly');
+  const mrOptHumanize = document.getElementById('mrOptHumanize');
+  const mrOptBezier = document.getElementById('mrOptBezier');
+  const mrOptEmergencyStop = document.getElementById('mrOptEmergencyStop');
+  const mrOptRecordKeys = document.getElementById('mrOptRecordKeys');
+  const mrCountdownSelector = document.getElementById('mrCountdownSelector');
+  const mrRecordBtn = document.getElementById('mrRecordBtn');
+  const mrRecordBtnText = document.getElementById('mrRecordBtnText');
+  const mrPlayBtn = document.getElementById('mrPlayBtn');
+  const mrPlayBtnText = document.getElementById('mrPlayBtnText');
+  const mrClearBtn = document.getElementById('mrClearBtn');
+  const mrStatusHint = document.getElementById('mrStatusHint');
+  const mrListSection = document.getElementById('mrListSection');
+  const mrCountBadge = document.getElementById('mrCountBadge');
+  const mrSearchFilter = document.getElementById('mrSearchFilter');
+  const mrListContainer = document.getElementById('mrListContainer');
+  let mousePlaybackScriptId = '';
 
   // Helper: Post message to AutoHotkey host with resilient offline queue
   let ahkMsgQueue = [];
@@ -515,7 +557,7 @@
     // Ensure all items across all modules in all profiles have an enabled property
     Object.keys(cfg.profiles).forEach(pName => {
       const p = cfg.profiles[pName];
-      ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'].forEach(m => {
+      ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder', 'autoClicker'].forEach(m => {
         if (p[m] && Array.isArray(p[m].items)) {
           p[m].items.forEach(item => {
             if (typeof item.enabled === 'undefined') {
@@ -540,6 +582,79 @@
     cfg.mouseGestures = activeProf.mouseGestures;
     cfg.radialMenu = activeProf.radialMenu;
     cfg.autoClicker = activeProf.autoClicker;
+    applyForcedItemStates();
+  }
+
+  function applyForcedItemStates() {
+    if (!state.config || !state.config.profiles) return;
+    if (!state.config.forcedItemStates) state.config.forcedItemStates = {};
+    const forcedStates = state.config.forcedItemStates;
+    const profiles = state.config.profiles;
+    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder', 'autoClicker'];
+
+    listModules.forEach(mod => {
+      // 1. Collect forced items into forcedStates if not already tracked
+      if (state.config[mod] && Array.isArray(state.config[mod].items)) {
+        state.config[mod].items.forEach(item => {
+          if (item && item.id && (item.forcedAllProfiles || item.allProfiles)) {
+            if (typeof forcedStates[item.id] === 'undefined') {
+              forcedStates[item.id] = (item.enabled === 0 || item.enabled === false) ? 0 : 1;
+            }
+          }
+        });
+      }
+      Object.keys(profiles).forEach(pName => {
+        const prof = profiles[pName];
+        if (prof && prof[mod] && Array.isArray(prof[mod].items)) {
+          prof[mod].items.forEach(item => {
+            if (item && item.id && (item.forcedAllProfiles || item.allProfiles)) {
+              if (typeof forcedStates[item.id] === 'undefined') {
+                forcedStates[item.id] = (item.enabled === 0 || item.enabled === false) ? 0 : 1;
+              }
+            }
+          });
+        }
+      });
+
+      // 2. Enforce canonical forcedStates on active module and all profiles
+      Object.keys(forcedStates).forEach(itemId => {
+        const canonicalEnabled = forcedStates[itemId];
+
+        // Active module items
+        if (state.config[mod] && Array.isArray(state.config[mod].items)) {
+          const mem = state.config[mod].items.find(i => i && i.id === itemId);
+          if (mem) {
+            mem.enabled = canonicalEnabled;
+            mem.forcedAllProfiles = true;
+          }
+        }
+
+        // All profiles
+        Object.keys(profiles).forEach(pName => {
+          const prof = profiles[pName];
+          if (!prof) return;
+          if (!prof[mod]) prof[mod] = { enabled: 1, items: [] };
+          if (!Array.isArray(prof[mod].items)) prof[mod].items = [];
+
+          let targetItem = prof[mod].items.find(i => i && i.id === itemId);
+          if (targetItem) {
+            targetItem.enabled = canonicalEnabled;
+            targetItem.forcedAllProfiles = true;
+          }
+        });
+      });
+    });
+  }
+
+  function onItemToggleStateChanged(moduleName, item, isChecked) {
+    if (!item) return;
+    item.enabled = isChecked ? 1 : 0;
+    const isForced = item.forcedAllProfiles || item.allProfiles || (state.config.forcedItemStates && (item.id in state.config.forcedItemStates));
+    if (isForced) {
+      if (!state.config.forcedItemStates) state.config.forcedItemStates = {};
+      state.config.forcedItemStates[item.id] = isChecked ? 1 : 0;
+      applyForcedItemStates();
+    }
   }
 
   function saveCurrentProfileState() {
@@ -557,8 +672,10 @@
       windowManager: JSON.parse(JSON.stringify(state.config.windowManager || {})),
       mouseGestures: JSON.parse(JSON.stringify(state.config.mouseGestures || {})),
       radialMenu: JSON.parse(JSON.stringify(state.config.radialMenu || {})),
-      autoClicker: JSON.parse(JSON.stringify(state.config.autoClicker || {}))
+      autoClicker: JSON.parse(JSON.stringify(state.config.autoClicker || {})),
+      screenScanner: JSON.parse(JSON.stringify(state.config.screenScanner || { enabled: 1, scanRate: 150, items: [] }))
     };
+    applyForcedItemStates();
   }
 
   function getProfileIconHtml(pName, prof) {
@@ -630,9 +747,19 @@
 
     let isForcedAll = false;
     const curProf = profiles[currentProf];
+    let isCurrentEnabled = true;
     if (curProf && curProf[moduleName] && Array.isArray(curProf[moduleName].items)) {
       const it = curProf[moduleName].items.find(i => i.id === itemId);
-      if (it && (it.forcedAllProfiles || it.allProfiles)) isForcedAll = true;
+      if (it) {
+        if (it.forcedAllProfiles || it.allProfiles) isForcedAll = true;
+        if (it.enabled === 0 || it.enabled === false) isCurrentEnabled = false;
+      }
+    }
+    if (state.config.forcedItemStates && (itemId in state.config.forcedItemStates)) {
+      isForcedAll = true;
+      if (state.config.forcedItemStates[itemId] === 0 || state.config.forcedItemStates[itemId] === false) {
+        isCurrentEnabled = false;
+      }
     }
 
     // Find all profiles where this item is enabled
@@ -648,12 +775,17 @@
       }
     });
 
-    if (activeProfiles.length === 0) return '';
-
     // If forced on all profiles: ONLY SHOW ONE ICON, NOT ALL PROFILES ICON!
     if (isForcedAll || (totalProfCount > 1 && activeProfiles.length === totalProfCount)) {
-      return `<div class="item-profiles-badges is-forced-all" data-count="1" data-forced-all="true" data-module="${escapeHtml(moduleName)}" data-id="${escapeHtml(itemId)}"><div class="item-profile-badge is-all-profiles is-current" title="Forced on All Profiles (${activeProfiles.length}/${totalProfCount}) • Right-click to manage" data-forced-all="true" data-module="${escapeHtml(moduleName)}" data-id="${escapeHtml(itemId)}"><svg class="profile-badge-svg all-profiles-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></div></div>`;
+      const isItemActive = isCurrentEnabled && activeProfiles.length > 0;
+      const statusClass = isItemActive ? 'is-active is-current' : 'is-disabled';
+      const statusTitle = isItemActive
+        ? `Forced on All Profiles (${activeProfiles.length}/${totalProfCount}) • Right-click to manage`
+        : `Forced on All Profiles (Disabled) • Right-click to manage`;
+      return `<div class="item-profiles-badges is-forced-all ${isItemActive ? '' : 'is-disabled'}" data-count="1" data-forced-all="true" data-module="${escapeHtml(moduleName)}" data-id="${escapeHtml(itemId)}"><div class="item-profile-badge is-all-profiles ${statusClass}" title="${escapeHtml(statusTitle)}" data-forced-all="true" data-module="${escapeHtml(moduleName)}" data-id="${escapeHtml(itemId)}"><svg class="profile-badge-svg all-profiles-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></div></div>`;
     }
+
+    if (activeProfiles.length === 0) return '';
 
     const badgesHtml = activeProfiles.map(pName => {
       const prof = profiles[pName] || {};
@@ -1089,6 +1221,9 @@
     state.config.mouseGestures = prof.mouseGestures || {};
     state.config.radialMenu = prof.radialMenu || {};
     state.config.autoClicker = prof.autoClicker || {};
+    state.config.screenScanner = prof.screenScanner || { enabled: 1, scanRate: 150, items: [] };
+
+    applyForcedItemStates();
 
     // 1. Immediately update global active indicators so count badge refreshes instantaneously
     updateGlobalIndicators();
@@ -1105,6 +1240,7 @@
       ['renderFolderCreator', renderFolderCreator],
       ['renderMacroRecorder', renderMacroRecorder],
       ['updateAutoClickerUI', updateAutoClickerUI],
+      ['renderScreenScanner', renderScreenScanner],
       ['refreshAllActionSelects', refreshAllActionSelects],
       ['updateAllFeatureProfileBadges', updateAllFeatureProfileBadges]
     ];
@@ -1291,7 +1427,7 @@
     if (!prof) return 0;
 
     let count = 0;
-    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'];
+    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder', 'screenScanner'];
     listModules.forEach(mod => {
       const m = prof[mod] || (state.config && state.config[mod]);
       if (m && Array.isArray(m.items)) {
@@ -1351,7 +1487,7 @@
 
     let totalActive = 0;
 
-    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'];
+    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder', 'screenScanner'];
     listModules.forEach(mod => {
       snapshot.listModules[mod] = [];
       if (prof[mod] && Array.isArray(prof[mod].items)) {
@@ -1443,7 +1579,7 @@
     const targetProf = state.config.profiles[targetProfileName];
     let pastedCount = 0;
 
-    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder'];
+    const listModules = ['textExpander', 'keyRemapper', 'appLauncher', 'folderCreator', 'macroRecorder', 'screenScanner'];
     listModules.forEach(mod => {
       const sourceActiveItems = (clipboard.listModules && clipboard.listModules[mod]) || [];
       if (!targetProf[mod]) {
@@ -1576,6 +1712,7 @@
       btnSwitch.classList.toggle('is-disabled', isCur);
     }
 
+    menu.style.display = 'flex';
     menu.classList.add('is-visible');
     const menuW = 270;
     const menuH = 190;
@@ -1980,7 +2117,13 @@
       const { moduleName, itemId } = info;
       const targetItem = info.item;
       targetItem.forcedAllProfiles = newForcedState;
-      if (newForcedState) targetItem.enabled = 1;
+      if (!state.config.forcedItemStates) state.config.forcedItemStates = {};
+      if (newForcedState) {
+        targetItem.enabled = 1;
+        state.config.forcedItemStates[itemId] = 1;
+      } else {
+        delete state.config.forcedItemStates[itemId];
+      }
 
       Object.keys(profiles).forEach(pName => {
         const p = profiles[pName];
@@ -2168,6 +2311,22 @@
 
   function updateAutoClickerUI() {
     const ac = (state.config && state.config.autoClicker) || {};
+
+    // Mode: Recorder vs Clicker (Default to recorder)
+    const mode = ac.mode || 'recorder';
+    if (mouseModeSelector) {
+      mouseModeSelector.querySelectorAll('.mouse-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+    }
+    if (acClickerSection) {
+      acClickerSection.classList.toggle('hidden-field', mode !== 'clicker');
+    }
+    if (acRecorderSection) {
+      acRecorderSection.classList.toggle('hidden-field', mode !== 'recorder');
+    }
+
+    // Clicker UI
     if (acCpsSlider) {
       acCpsSlider.value = ac.cps || 20;
       if (acCpsValue) acCpsValue.textContent = `${ac.cps || 20} CPS`;
@@ -2183,8 +2342,169 @@
         btn.classList.toggle('active', btn.dataset.val === ac.clickType);
       });
     }
-    if (acHotkeyInput) {
-      acHotkeyInput.value = ac.hotkey || 'F8';
+
+    // Recorder UI
+    const tech = ac.recordTechnique || 'polling';
+    if (techniquePolling) techniquePolling.classList.toggle('active', tech === 'polling');
+    if (techniqueHook) techniqueHook.classList.toggle('active', tech === 'hook');
+    if (mrActiveTechniqueTag) {
+      mrActiveTechniqueTag.textContent = (tech === 'hook') ? 'Low-Level Hook' : 'High-Frequency Polling';
+    }
+
+    const pollingRate = ac.pollingRate || 20;
+    if (mrPollingRateSelector) {
+      mrPollingRateSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.val, 10) === pollingRate);
+      });
+    }
+
+    const pbSpeed = ac.playbackSpeed !== undefined ? parseFloat(ac.playbackSpeed) : 1.0;
+    if (mrPlaybackSpeedSelector) {
+      mrPlaybackSpeedSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', parseFloat(btn.dataset.val) === pbSpeed);
+      });
+    }
+    const mrPlaybackSpeedDisplay = document.getElementById('mrPlaybackSpeedDisplay');
+    if (mrPlaybackSpeedDisplay) mrPlaybackSpeedDisplay.textContent = `${pbSpeed}x`;
+    const mrPlaybackSpeedInput = document.getElementById('mrPlaybackSpeedInput');
+    if (mrPlaybackSpeedInput) mrPlaybackSpeedInput.value = pbSpeed;
+
+    const originMode = ac.originMode || 'absolute';
+    if (mrOriginSelector) {
+      mrOriginSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.val === originMode);
+      });
+    }
+
+    const isInfinite = Boolean(ac.playbackInfinite);
+    const repeatCount = (ac.playbackRepeatCount !== undefined) ? parseInt(ac.playbackRepeatCount, 10) : ((ac.playbackLoop !== undefined && ac.playbackLoop > 0) ? parseInt(ac.playbackLoop, 10) : 1);
+    if (mrRepeatInfinite) {
+      mrRepeatInfinite.checked = isInfinite;
+    }
+    if (mrRepeatCountInput) {
+      mrRepeatCountInput.value = isInfinite ? '' : (repeatCount > 0 ? repeatCount : 1);
+      mrRepeatCountInput.disabled = isInfinite;
+      mrRepeatCountInput.placeholder = isInfinite ? '∞ Infinite' : '1';
+    }
+
+    if (mrRepeatBox) {
+      mrRepeatBox.style.opacity = isInfinite ? '0.5' : '1';
+    }
+
+    // Advanced Playback Modifiers
+    if (mrOptClicksOnly) mrOptClicksOnly.checked = Boolean(ac.clicksOnly);
+    if (mrOptHumanize) mrOptHumanize.checked = Boolean(ac.humanize);
+    if (mrOptBezier) mrOptBezier.checked = Boolean(ac.bezier);
+    if (mrOptEmergencyStop) mrOptEmergencyStop.checked = (ac.emergencyStop !== undefined) ? Boolean(ac.emergencyStop) : true;
+    if (mrOptRecordKeys) mrOptRecordKeys.checked = (ac.recordKeys !== undefined) ? Boolean(ac.recordKeys) : true;
+
+    const countdown = (ac.countdown !== undefined) ? parseInt(ac.countdown, 10) : 0;
+    if (mrCountdownSelector) {
+      mrCountdownSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.val, 10) === countdown);
+      });
+    }
+
+    updateMouseRecorderStats();
+
+    // Hotkey & Master Switch
+    const hk = (ac.hotkey && String(ac.hotkey).trim() !== '') ? String(ac.hotkey).trim() : 'F8';
+    if (acHotkeyLabel) {
+      acHotkeyLabel.textContent = formatKeyDisplay(hk);
+    }
+    if (acHotkeyBox) {
+      acHotkeyBox.title = `Click to record shortcut (Current: ${formatKeyDisplay(hk)})`;
+    }
+    if (mrHotkeyLabel) {
+      mrHotkeyLabel.textContent = formatKeyDisplay(hk);
+    }
+    if (mrHotkeyBox) {
+      mrHotkeyBox.title = `Click to record shortcut (Current: ${formatKeyDisplay(hk)})`;
+    }
+    if (mrRecordCountdownSelector) {
+      const cd = String(ac.recordCountdown || 0);
+      mrRecordCountdownSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.val === cd);
+      });
+    }
+    const isEnabled = (ac.enabled === 1 || ac.enabled === true);
+    if (acMasterSwitch) {
+      acMasterSwitch.checked = isEnabled;
+    }
+    if (acContainer) {
+      acContainer.classList.toggle('is-disabled', !isEnabled);
+    }
+    updateAutoClickerUi(state.autoClickerRunning);
+    updateMouseRecorderUI();
+  }
+
+  function updateMouseRecorderStats(customEvents) {
+    const ac = (state.config && state.config.autoClicker) || {};
+    const events = Array.isArray(customEvents)
+      ? customEvents
+      : (Array.isArray(ac.recordedPath) && ac.recordedPath.length > 0
+        ? ac.recordedPath
+        : (ac.items && ac.items[0] && Array.isArray(ac.items[0].events) ? ac.items[0].events : []));
+    let points = 0;
+    let clicks = 0;
+    let keys = 0;
+    let totalDelay = 0;
+
+    for (const ev of events) {
+      if (ev.type === 'move') {
+        points++;
+      } else if (ev.type === 'click') {
+        if (ev.action === 'Down' || ev.action === 'Click') clicks++;
+      } else if (ev.type === 'key') {
+        if (ev.action === 'Down') keys++;
+      }
+      totalDelay += (ev.delay || 0);
+    }
+
+    if (mrStatPoints) mrStatPoints.textContent = points;
+    if (mrStatDuration) mrStatDuration.textContent = `${(totalDelay / 1000).toFixed(1)}s`;
+    if (mrStatClicks) mrStatClicks.textContent = clicks;
+    if (mrStatKeys) mrStatKeys.textContent = keys;
+  }
+
+  let mouseRecordingActive = false;
+  let mousePlaybackActive = false;
+  let mouseCountdownActive = false;
+  let mouseCountdownSeconds = 0;
+
+  function updateMouseRecorderUI() {
+    const ac = (state.config && state.config.autoClicker) || {};
+    const hk = (ac.hotkey && String(ac.hotkey).trim() !== '') ? String(ac.hotkey).trim() : 'F8';
+    const hkDisplay = formatKeyDisplay(hk);
+
+    if (mrRecordBtn) {
+      mrRecordBtn.classList.toggle('running', mouseRecordingActive || mouseCountdownActive);
+    }
+    if (mrRecordBtnText) {
+      if (mouseCountdownActive) {
+        mrRecordBtnText.textContent = `STARTING IN ${mouseCountdownSeconds}s (ESC)`;
+      } else if (mouseRecordingActive) {
+        mrRecordBtnText.textContent = `STOP RECORDING (${hkDisplay} / ESC)`;
+      } else {
+        mrRecordBtnText.textContent = `RECORD PATH (${hkDisplay})`;
+      }
+    }
+    if (mrPlayBtn) {
+      mrPlayBtn.classList.toggle('running', mousePlaybackActive);
+    }
+    if (mrPlayBtnText) {
+      mrPlayBtnText.textContent = mousePlaybackActive ? 'STOP PLAYING (ESC)' : 'PLAY BACK';
+    }
+    if (mrStatusHint) {
+      if (mouseCountdownActive) {
+        mrStatusHint.textContent = `Starting mouse recording in ${mouseCountdownSeconds}s... Press ESC or ${hkDisplay} to cancel.`;
+      } else if (mouseRecordingActive) {
+        mrStatusHint.textContent = `Recording mouse movement... Press ${hkDisplay} or ESC anywhere to stop.`;
+      } else if (mousePlaybackActive) {
+        mrStatusHint.textContent = `Playing back recorded path... Press ${hkDisplay} or ESC anywhere to stop.`;
+      } else {
+        mrStatusHint.textContent = `Ready - Press ${hkDisplay} anywhere or click Record Path to record mouse movement.`;
+      }
     }
   }
 
@@ -2622,6 +2942,14 @@
         refreshAllActionSelects();
       }
     }
+    if (tabName === 'autoClicker') {
+      updateAutoClickerUI();
+      renderMouseScriptsList();
+    }
+    if (tabName === 'screenScanner') {
+      renderScreenScanner();
+      populateScannerActionDropdowns();
+    }
     if (activeBtn) {
       activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
@@ -2745,7 +3073,7 @@
       const badge = card.querySelector('.trigger-badge');
       sw.addEventListener('change', () => {
         const isChecked = sw.checked;
-        item.enabled = isChecked ? 1 : 0;
+        onItemToggleStateChanged('textExpander', item, isChecked);
         card.classList.toggle('is-disabled', !isChecked);
         if (badge) badge.classList.toggle('is-disabled', !isChecked);
         syncConfig();
@@ -3074,11 +3402,11 @@
             if (badge) badge.classList.remove('is-disabled');
           }
         } else {
-          item.enabled = 0;
           card.classList.add('is-disabled');
           if (badge) badge.classList.add('is-disabled');
         }
 
+        onItemToggleStateChanged('keyRemapper', item, isChecked);
         syncConfig();
         updateCardProfileBadges(card, 'keyRemapper', item.id);
         updateGlobalIndicators();
@@ -3367,6 +3695,9 @@
   let activeRecordingCleanup = null;
 
   function stopActiveBadgeRecording(restore = true) {
+    if (typeof stopAcRecording === 'function') {
+      stopAcRecording(restore);
+    }
     if (activeRecordingCleanup) {
       activeRecordingCleanup(restore);
       activeRecordingCleanup = null;
@@ -5100,7 +5431,7 @@
       const badge = card.querySelector('.trigger-badge');
       sw.addEventListener('change', () => {
         const isChecked = sw.checked;
-        item.enabled = isChecked ? 1 : 0;
+        onItemToggleStateChanged('appLauncher', item, isChecked);
         card.classList.toggle('is-disabled', !isChecked);
         if (badge) badge.classList.toggle('is-disabled', !isChecked);
         syncConfig();
@@ -5421,7 +5752,7 @@
       const badge = card.querySelector('.trigger-badge');
       sw.addEventListener('change', () => {
         const isChecked = sw.checked;
-        item.enabled = isChecked ? 1 : 0;
+        onItemToggleStateChanged('folderCreator', item, isChecked);
         card.classList.toggle('is-disabled', !isChecked);
         if (badge) badge.classList.toggle('is-disabled', !isChecked);
         syncConfig();
@@ -5616,61 +5947,1406 @@
   // Module 5: Auto Clicker
   // ============================================================================
 
+  let activeAcRecording = false;
+  let activeAcTargetBox = null;
+
+  function stopAcRecording(restore = true) {
+    if (activeAcRecording && activeAcTargetBox && typeof activeAcTargetBox._cancelAcRecording === 'function') {
+      activeAcTargetBox._cancelAcRecording(restore);
+    }
+  }
+
+  function setupAutoClickerHotkeyRecorder() {
+    const bindBox = (boxEl, labelEl) => {
+      if (!boxEl || boxEl.dataset.bound) return;
+      boxEl.dataset.bound = 'true';
+
+      boxEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        if (activeAcRecording) {
+          stopAcRecording(true);
+          return;
+        }
+
+        if (typeof stopActiveBadgeRecording === 'function') {
+          stopActiveBadgeRecording(true);
+        }
+
+        const ac = (state.config && state.config.autoClicker) || {};
+        const originalHk = (ac.hotkey && String(ac.hotkey).trim() !== '') ? String(ac.hotkey).trim() : 'F8';
+
+        activeAcRecording = true;
+        activeAcTargetBox = boxEl;
+        boxEl.classList.add('is-recording');
+        if (labelEl) labelEl.textContent = 'Press key...';
+
+        let pendingMod = null;
+
+        function onKeyDown(evt) {
+          evt.preventDefault();
+          evt.stopPropagation();
+
+          if (evt.key === 'Escape') {
+            cleanup(true);
+            showToast('Shortcut change cancelled');
+            return;
+          }
+
+          const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+          const parts = [];
+          if (evt.ctrlKey) parts.push('Ctrl');
+          if (evt.altKey) parts.push('Alt');
+          if (evt.shiftKey) parts.push('Shift');
+          if (evt.metaKey) parts.push('Win');
+
+          if (isModifier) {
+            pendingMod = (evt.key === 'Control') ? 'Ctrl' : ((evt.key === 'Shift') ? 'Shift' : ((evt.key === 'Alt') ? 'Alt' : 'Win'));
+            if (labelEl) labelEl.textContent = parts.join(' + ') + ' + ...';
+            return;
+          }
+
+          pendingMod = null;
+
+          let key = evt.key;
+          if (evt.code && evt.code.startsWith('Key')) {
+            key = evt.code.slice(3).toUpperCase();
+          } else if (evt.code && evt.code.startsWith('Digit')) {
+            key = evt.code.slice(5);
+          } else if (evt.code && evt.code.startsWith('Numpad')) {
+            key = evt.code;
+          } else if (key === ' ') {
+            key = 'Space';
+          } else if (key === 'ArrowUp') {
+            key = 'Up';
+          } else if (key === 'ArrowDown') {
+            key = 'Down';
+          } else if (key === 'ArrowLeft') {
+            key = 'Left';
+          } else if (key === 'ArrowRight') {
+            key = 'Right';
+          } else if (key === 'PageUp') {
+            key = 'PgUp';
+          } else if (key === 'PageDown') {
+            key = 'PgDn';
+          } else if (evt.code === 'Minus') {
+            key = '-';
+          } else if (evt.code === 'Equal') {
+            key = '=';
+          } else if (evt.code === 'BracketLeft') {
+            key = '[';
+          } else if (evt.code === 'BracketRight') {
+            key = ']';
+          } else if (evt.code === 'Backslash') {
+            key = '\\';
+          } else if (evt.code === 'Semicolon') {
+            key = ';';
+          } else if (evt.code === 'Quote') {
+            key = "'";
+          } else if (evt.code === 'Backquote') {
+            key = '`';
+          } else if (evt.code === 'Comma') {
+            key = ',';
+          } else if (evt.code === 'Period') {
+            key = '.';
+          } else if (evt.code === 'Slash') {
+            key = '/';
+          } else if (key.length === 1) {
+            key = key.toUpperCase();
+          }
+
+          if (!parts.includes(key)) {
+            parts.push(key);
+          }
+
+          const combo = parts.join(' + ');
+          const ahkHk = comboToAhk(combo);
+
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.hotkey = ahkHk;
+
+          cleanup(false);
+          saveCurrentProfileState();
+          syncConfig();
+          updateAutoClickerUI();
+          showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+        }
+
+        function onKeyUp(evt) {
+          if (pendingMod) {
+            const combo = pendingMod;
+            const ahkHk = comboToAhk(combo);
+            if (!state.config.autoClicker) state.config.autoClicker = {};
+            state.config.autoClicker.hotkey = ahkHk;
+            cleanup(false);
+            saveCurrentProfileState();
+            syncConfig();
+            updateAutoClickerUI();
+            showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+            pendingMod = null;
+          }
+        }
+
+        function onDocClick(evt) {
+          if (!boxEl.contains(evt.target)) {
+            cleanup(true);
+          }
+        }
+
+        function cleanup(restore) {
+          activeAcRecording = false;
+          activeAcTargetBox = null;
+          boxEl.classList.remove('is-recording');
+          window.removeEventListener('keydown', onKeyDown, true);
+          window.removeEventListener('keyup', onKeyUp, true);
+          document.removeEventListener('click', onDocClick, true);
+          boxEl._cancelAcRecording = null;
+          if (restore) {
+            const curAc = (state.config && state.config.autoClicker) || {};
+            const curHk = curAc.hotkey || 'F8';
+            if (labelEl) labelEl.textContent = formatKeyDisplay(curHk);
+          }
+        }
+
+        boxEl._cancelAcRecording = cleanup;
+
+        window.addEventListener('keydown', onKeyDown, true);
+        window.addEventListener('keyup', onKeyUp, true);
+        setTimeout(() => {
+          document.addEventListener('click', onDocClick, true);
+        }, 50);
+      });
+    };
+
+    bindBox(acHotkeyBox, acHotkeyLabel);
+    bindBox(mrHotkeyBox, mrHotkeyLabel);
+  }
+
   function initAutoClicker() {
-    const ac = state.config.autoClicker;
-    acCpsSlider.value = ac.cps || 20;
-    acCpsValue.textContent = `${ac.cps || 20} CPS`;
-    updateSliderProgress(acCpsSlider);
+    // Master Switch listener
+    if (acMasterSwitch && !acMasterSwitch.dataset.bound) {
+      acMasterSwitch.dataset.bound = 'true';
+      acMasterSwitch.addEventListener('change', () => {
+        const isEnabled = acMasterSwitch.checked ? 1 : 0;
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.enabled = isEnabled;
+        if (state.config.profiles && state.config.profiles[state.config.activeProfile]) {
+          if (!state.config.profiles[state.config.activeProfile].autoClicker) {
+            state.config.profiles[state.config.activeProfile].autoClicker = {};
+          }
+          state.config.profiles[state.config.activeProfile].autoClicker.enabled = isEnabled;
+        }
+        if (acContainer) acContainer.classList.toggle('is-disabled', !isEnabled);
+        if (!isEnabled) {
+          if (state.autoClickerRunning) sendToAhk('toggleAutoClicker');
+          if (mouseRecordingActive) sendToAhk('stopMouseRecording');
+          if (mousePlaybackActive) sendToAhk('stopMousePlayback');
+        }
+        saveCurrentProfileState();
+        syncConfig();
+        updateGlobalIndicators();
+        updateAllFeatureProfileBadges();
+        showToast(isEnabled ? 'Mouse Automation enabled' : 'Mouse Automation disabled');
+      });
+    }
+
+    // Function Mode Switcher: Clicker vs Recorder
+    if (mouseModeSelector && !mouseModeSelector.dataset.bound) {
+      mouseModeSelector.dataset.bound = 'true';
+      mouseModeSelector.querySelectorAll('.mouse-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const mode = btn.dataset.mode;
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.mode = mode;
+          saveCurrentProfileState();
+          syncConfig();
+          updateAutoClickerUI();
+        });
+      });
+    }
+
+    // Hotkey recorder
+    setupAutoClickerHotkeyRecorder();
 
     // Button selector
-    acButtonSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.val === ac.button);
-      btn.addEventListener('click', () => {
-        acButtonSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.config.autoClicker.button = btn.dataset.val;
-        syncConfig();
+    if (acButtonSelector && !acButtonSelector.dataset.bound) {
+      acButtonSelector.dataset.bound = 'true';
+      acButtonSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          acButtonSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.button = btn.dataset.val;
+          saveCurrentProfileState();
+          syncConfig();
+        });
       });
-    });
+    }
 
     // Click Type selector
-    acTypeSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.val === ac.clickType);
-      btn.addEventListener('click', () => {
-        acTypeSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.config.autoClicker.clickType = btn.dataset.val;
-        syncConfig();
+    if (acTypeSelector && !acTypeSelector.dataset.bound) {
+      acTypeSelector.dataset.bound = 'true';
+      acTypeSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          acTypeSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.clickType = btn.dataset.val;
+          saveCurrentProfileState();
+          syncConfig();
+        });
       });
-    });
+    }
 
     // CPS slider
-    acCpsSlider.addEventListener('input', () => {
-      acCpsValue.textContent = `${acCpsSlider.value} CPS`;
-      updateSliderProgress(acCpsSlider);
-    });
-
-    acCpsSlider.addEventListener('change', () => {
-      state.config.autoClicker.cps = parseInt(acCpsSlider.value, 10);
-      updateSliderProgress(acCpsSlider);
-      syncConfig();
-    });
+    if (acCpsSlider && !acCpsSlider.dataset.bound) {
+      acCpsSlider.dataset.bound = 'true';
+      acCpsSlider.addEventListener('input', () => {
+        if (acCpsValue) acCpsValue.textContent = `${acCpsSlider.value} CPS`;
+        updateSliderProgress(acCpsSlider);
+      });
+      acCpsSlider.addEventListener('change', () => {
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.cps = parseInt(acCpsSlider.value, 10);
+        updateSliderProgress(acCpsSlider);
+        saveCurrentProfileState();
+        syncConfig();
+      });
+    }
 
     // Toggle Button
-    acToggleBtn.addEventListener('click', () => {
-      sendToAhk('toggleAutoClicker');
+    if (acToggleBtn && !acToggleBtn.dataset.bound) {
+      acToggleBtn.dataset.bound = 'true';
+      acToggleBtn.addEventListener('click', () => {
+        sendToAhk('toggleAutoClicker');
+      });
+    }
+
+    // Technique Selector (Polling vs Hook)
+    if (techniquePolling && !techniquePolling.dataset.bound) {
+      techniquePolling.dataset.bound = 'true';
+      techniquePolling.addEventListener('click', () => {
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.recordTechnique = 'polling';
+        saveCurrentProfileState();
+        syncConfig();
+        updateAutoClickerUI();
+        showToast('Capture technique: High-Frequency Polling (Timer)');
+      });
+    }
+
+    if (techniqueHook && !techniqueHook.dataset.bound) {
+      techniqueHook.dataset.bound = 'true';
+      techniqueHook.addEventListener('click', () => {
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.recordTechnique = 'hook';
+        saveCurrentProfileState();
+        syncConfig();
+        updateAutoClickerUI();
+        showToast('Capture technique: Low-Level Windows Hook (WH_MOUSE_LL)');
+      });
+    }
+
+    // Polling Rate Selector
+    if (mrPollingRateSelector && !mrPollingRateSelector.dataset.bound) {
+      mrPollingRateSelector.dataset.bound = 'true';
+      mrPollingRateSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.pollingRate = parseInt(btn.dataset.val, 10);
+          saveCurrentProfileState();
+          syncConfig();
+          updateAutoClickerUI();
+        });
+      });
+    }
+
+    // Playback Speed Selector & Custom Input
+    if (mrPlaybackSpeedSelector && !mrPlaybackSpeedSelector.dataset.bound) {
+      mrPlaybackSpeedSelector.dataset.bound = 'true';
+      mrPlaybackSpeedSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.playbackSpeed = parseFloat(btn.dataset.val);
+          saveCurrentProfileState();
+          syncConfig();
+          updateAutoClickerUI();
+        });
+      });
+    }
+
+    const mrPlaybackSpeedInput = document.getElementById('mrPlaybackSpeedInput');
+    if (mrPlaybackSpeedInput && !mrPlaybackSpeedInput.dataset.bound) {
+      mrPlaybackSpeedInput.dataset.bound = 'true';
+      mrPlaybackSpeedInput.addEventListener('change', () => {
+        let val = parseFloat(mrPlaybackSpeedInput.value);
+        if (isNaN(val) || val <= 0) val = 1.0;
+        if (val > 100.0) val = 100.0;
+        mrPlaybackSpeedInput.value = val;
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.playbackSpeed = val;
+        saveCurrentProfileState();
+        syncConfig();
+        updateAutoClickerUI();
+      });
+    }
+
+    // Starting Point Selector (Original vs Relative)
+    if (mrOriginSelector && !mrOriginSelector.dataset.bound) {
+      mrOriginSelector.dataset.bound = 'true';
+      mrOriginSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.originMode = btn.dataset.val;
+          saveCurrentProfileState();
+          syncConfig();
+          updateAutoClickerUI();
+          showToast(btn.dataset.val === 'relative' ? 'Playback: Relative to current mouse position' : 'Playback: Original screen position');
+        });
+      });
+    }
+
+    // Infinite Loop Toggle
+    if (mrRepeatInfinite && !mrRepeatInfinite.dataset.bound) {
+      mrRepeatInfinite.dataset.bound = 'true';
+      mrRepeatInfinite.addEventListener('change', () => {
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.playbackInfinite = mrRepeatInfinite.checked ? 1 : 0;
+        state.config.autoClicker.playbackLoop = mrRepeatInfinite.checked ? 0 : (parseInt(mrRepeatCountInput.value, 10) || 1);
+        saveCurrentProfileState();
+        syncConfig();
+        updateAutoClickerUI();
+        showToast(mrRepeatInfinite.checked ? 'Looping set to: Infinite' : 'Looping set to: Repeat count');
+      });
+    }
+
+    // Repeat Count Input
+    if (mrRepeatCountInput && !mrRepeatCountInput.dataset.bound) {
+      mrRepeatCountInput.dataset.bound = 'true';
+      const onRepeatChange = () => {
+        const val = Math.max(1, parseInt(mrRepeatCountInput.value, 10) || 1);
+        mrRepeatCountInput.value = val;
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.playbackRepeatCount = val;
+        if (!state.config.autoClicker.playbackInfinite) {
+          state.config.autoClicker.playbackLoop = val;
+        }
+        saveCurrentProfileState();
+        syncConfig();
+      };
+      mrRepeatCountInput.addEventListener('change', onRepeatChange);
+      mrRepeatCountInput.addEventListener('blur', onRepeatChange);
+    }
+
+    // Advanced Modifiers Toggles
+    [
+      [mrOptClicksOnly, 'clicksOnly', 'Clicks-Only Warp'],
+      [mrOptHumanize, 'humanize', 'Humanizer & Jitter'],
+      [mrOptBezier, 'bezier', 'Bezier Smoothing'],
+      [mrOptEmergencyStop, 'emergencyStop', 'Emergency Stop on Mouse Move'],
+      [mrOptRecordKeys, 'recordKeys', 'Record Keyboard Keys']
+    ].forEach(([el, prop, label]) => {
+      if (el && !el.dataset.bound) {
+        el.dataset.bound = 'true';
+        el.addEventListener('change', () => {
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker[prop] = el.checked ? 1 : 0;
+          saveCurrentProfileState();
+          syncConfig();
+          showToast(`${label}: ${el.checked ? 'Enabled' : 'Disabled'}`);
+        });
+      }
     });
 
-    updateAutoClickerUi(state.autoClickerRunning);
+    // Countdown Selector (Playback)
+    if (mrCountdownSelector && !mrCountdownSelector.dataset.bound) {
+      mrCountdownSelector.dataset.bound = 'true';
+      mrCountdownSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.countdown = parseInt(btn.dataset.val, 10);
+          saveCurrentProfileState();
+          syncConfig();
+          updateAutoClickerUI();
+        });
+      });
+    }
+
+    // Pre-Recording Countdown Timer Selector
+    if (mrRecordCountdownSelector && !mrRecordCountdownSelector.dataset.bound) {
+      mrRecordCountdownSelector.dataset.bound = 'true';
+      mrRecordCountdownSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!state.config.autoClicker) state.config.autoClicker = {};
+          state.config.autoClicker.recordCountdown = parseInt(btn.dataset.val, 10) || 0;
+          saveCurrentProfileState();
+          syncConfig();
+          updateAutoClickerUI();
+          showToast(`Pre-recording timer set to: ${btn.textContent}`);
+        });
+      });
+    }
+
+    // Record Mouse Path Button
+    if (mrRecordBtn && !mrRecordBtn.dataset.bound) {
+      mrRecordBtn.dataset.bound = 'true';
+      mrRecordBtn.addEventListener('click', () => {
+        if (mouseRecordingActive || mouseCountdownActive) {
+          sendToAhk('stopMouseRecording');
+        } else {
+          const ac = (state.config && state.config.autoClicker) || {};
+          sendToAhk('startMouseRecording', {
+            countdown: parseInt(ac.recordCountdown || 0, 10),
+            technique: ac.recordTechnique || 'polling',
+            rate: ac.pollingRate || 20,
+            recordKeys: (ac.recordKeys !== undefined) ? Boolean(ac.recordKeys) : true
+          });
+        }
+      });
+    }
+
+    // Playback Mouse Path Button
+    if (mrPlayBtn && !mrPlayBtn.dataset.bound) {
+      mrPlayBtn.dataset.bound = 'true';
+      mrPlayBtn.addEventListener('click', () => {
+        if (mousePlaybackActive) {
+          sendToAhk('stopMousePlayback');
+        } else {
+          const ac = (state.config && state.config.autoClicker) || {};
+          const events = Array.isArray(ac.recordedPath) ? ac.recordedPath : [];
+          if (events.length === 0) {
+            showToast('No recorded mouse path to play back');
+            return;
+          }
+          const isInf = Boolean(ac.playbackInfinite);
+          const loopCount = isInf ? 0 : Math.max(1, parseInt(ac.playbackRepeatCount || ac.playbackLoop, 10) || 1);
+          sendToAhk('playRecordedMouse', {
+            events: events,
+            speed: ac.playbackSpeed || 1.0,
+            loop: loopCount,
+            origin: ac.originMode || 'absolute',
+            clicksOnly: Boolean(ac.clicksOnly),
+            humanize: Boolean(ac.humanize),
+            bezier: Boolean(ac.bezier),
+            emergencyStop: (ac.emergencyStop !== undefined) ? Boolean(ac.emergencyStop) : true,
+            countdown: (ac.countdown !== undefined) ? parseInt(ac.countdown, 10) : 0
+          });
+        }
+      });
+    }
+
+    // Global ESC key listener to stop mouse playback or recording immediately, or close edit modal
+    if (!window.mrEscBound) {
+      window.mrEscBound = true;
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const mseModal = document.getElementById('mouseScriptEditModal');
+          if (mseModal && !mseModal.classList.contains('hidden-field') && (!activeRecordingBadge || activeRecordingBadge.id !== 'mseHotkeyBadge')) {
+            closeMouseScriptEditModal();
+          }
+          if (mousePlaybackActive) {
+            sendToAhk('stopMousePlayback');
+          }
+          if (mouseRecordingActive) {
+            sendToAhk('stopMouseRecording');
+          }
+        }
+      });
+    }
+
+    // Clear Path Button
+    if (mrClearBtn && !mrClearBtn.dataset.bound) {
+      mrClearBtn.dataset.bound = 'true';
+      mrClearBtn.addEventListener('click', () => {
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        state.config.autoClicker.recordedPath = [];
+        saveCurrentProfileState();
+        syncConfig();
+        updateMouseRecorderStats();
+        updateMouseRecorderUI();
+        showToast('Recorded mouse path cleared');
+      });
+    }
+
+    // Mouse Scripts Search Filter
+    if (mrSearchFilter && !mrSearchFilter.dataset.bound) {
+      mrSearchFilter.dataset.bound = 'true';
+      mrSearchFilter.addEventListener('input', () => {
+        renderMouseScriptsList();
+      });
+    }
+
+    renderMouseScriptsList();
+    updateAutoClickerUI();
+  }
+
+  function getNextMouseShortcut(existingItems = []) {
+    if (!Array.isArray(existingItems)) return 'Ctrl + Alt + F1';
+
+    const usedSlots = new Set();
+    existingItems.forEach(it => {
+      if (!it || !it.trigger) return;
+      const trig = String(it.trigger).trim().toLowerCase();
+      const m = trig.match(/f([1-9]|1[0-2])\b/i);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        if (num >= 1 && num <= 12) {
+          usedSlots.add(num);
+        }
+      }
+    });
+
+    for (let i = 1; i <= 12; i++) {
+      if (!usedSlots.has(i)) {
+        return `Ctrl + Alt + F${i}`;
+      }
+    }
+
+    return '';
+  }
+
+  function renderMouseScriptsList() {
+    if (!mrListContainer) return;
+    mrListContainer.innerHTML = '';
+
+    if (!state.config.autoClicker) {
+      state.config.autoClicker = { enabled: 1, items: [] };
+    }
+    if (!Array.isArray(state.config.autoClicker.items)) {
+      state.config.autoClicker.items = [];
+      // Auto-migrate legacy recordedPath into items[0]
+      if (Array.isArray(state.config.autoClicker.recordedPath) && state.config.autoClicker.recordedPath.length > 0) {
+        state.config.autoClicker.items.push({
+          id: 'mr-' + Date.now(),
+          name: 'Mouse Path 1',
+          trigger: 'Ctrl + Alt + F1',
+          triggerType: 'hotkey',
+          enabled: 1,
+          events: state.config.autoClicker.recordedPath,
+          speed: state.config.autoClicker.playbackSpeed || 1.0,
+          origin: state.config.autoClicker.originMode || 'absolute',
+          loop: state.config.autoClicker.playbackLoop || 1,
+          playbackInfinite: state.config.autoClicker.playbackInfinite || 0,
+          clicksOnly: state.config.autoClicker.clicksOnly || 0,
+          humanize: state.config.autoClicker.humanize || 0,
+          bezier: state.config.autoClicker.bezier || 0,
+          emergencyStop: (state.config.autoClicker.emergencyStop !== undefined) ? state.config.autoClicker.emergencyStop : 1,
+          countdown: state.config.autoClicker.countdown || 0,
+          createdAt: Date.now()
+        });
+        saveCurrentProfileState();
+        syncConfig();
+      }
+    }
+
+    const items = state.config.autoClicker.items;
+    if (mrCountBadge) {
+      mrCountBadge.textContent = items.length;
+    }
+
+    const filterText = mrSearchFilter ? mrSearchFilter.value.trim().toLowerCase() : '';
+    const filteredItems = items.filter(it => {
+      if (!filterText) return true;
+      const name = (it.name || '').toLowerCase();
+      const trig = (it.trigger || '').toLowerCase();
+      return name.includes(filterText) || trig.includes(filterText);
+    });
+
+    if (items.length === 0) {
+      mrListContainer.innerHTML = `
+        <div class="empty-state">
+          <span>No saved mouse scripts yet</span>
+          <p>Record a mouse path above. Each recording is saved as a discrete script with sequential hotkeys (Ctrl + Alt + F1, F2...).</p>
+        </div>
+      `;
+      return;
+    }
+
+    if (filteredItems.length === 0) {
+      mrListContainer.innerHTML = `
+        <div class="empty-state">
+          <span>No matching mouse scripts</span>
+          <p>Try clearing or changing your search query.</p>
+        </div>
+      `;
+      return;
+    }
+
+    filteredItems.forEach((item) => {
+      const isEnabled = (item.enabled !== false && item.enabled !== 0);
+      const isPlaying = (mousePlaybackActive && mousePlaybackScriptId === item.id);
+      const card = document.createElement('div');
+      card.className = `shortcut-card mr-card ${isEnabled ? '' : 'is-disabled'}`;
+      card.dataset.id = item.id;
+      card.dataset.module = 'autoClicker';
+
+      const events = Array.isArray(item.events) ? item.events : [];
+      let ptCount = 0;
+      let clickCount = 0;
+      let keyCount = 0;
+      let totalDelay = 0;
+      for (const ev of events) {
+        if (ev.type === 'move') ptCount++;
+        else if (ev.type === 'click') {
+          if (ev.action === 'Down' || ev.action === 'Click') clickCount++;
+        } else if (ev.type === 'key') {
+          if (ev.action === 'Down' || ev.action === 'Click') keyCount++;
+        }
+        totalDelay += (ev.delay || 0);
+      }
+      const durationStr = `${(totalDelay / 1000).toFixed(1)}s`;
+      const isInf = Boolean(item.playbackInfinite);
+      const loopCnt = isInf ? 'Infinite' : `${item.loop || 1}x`;
+      const originLabel = item.origin === 'relative' ? 'Relative' : 'Original Pos';
+      const displayTrig = item.trigger ? formatKeyDisplay(item.trigger) : 'None (Click to set)';
+      const profileBadgesHtml = renderItemProfileBadges('autoClicker', item.id);
+
+      card.innerHTML = `
+        <div class="mr-card-info">
+          <div class="wm-icon-badge ${isPlaying ? 'is-playing' : ''} ${isEnabled ? '' : 'is-disabled'}" style="width:36px;height:36px;border-radius:var(--radius-btn);">
+            <svg class="wm-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a5 5 0 0 0-5 5v6a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5z"></path>
+              <line x1="12" y1="6" x2="12" y2="10"></line>
+            </svg>
+          </div>
+          <div class="mr-card-text">
+            <div class="mr-card-top">
+              <span class="mr-title" title="Click to rename">${escapeHtml(item.name || 'Mouse Path')}</span>
+              <span class="wm-hotkey-badge mr-hotkey-badge ${isEnabled ? '' : 'is-disabled'}" title="Click to change shortcut (Current: ${escapeHtml(displayTrig)})">${escapeHtml(displayTrig)}</span>
+            </div>
+            <div class="mr-card-meta">
+              <span class="mr-meta-tag">${ptCount} pts</span>
+              <span class="mr-meta-tag">${clickCount} clicks</span>
+              <span class="mr-meta-tag mr-tag-keys" title="${keyCount} recorded keyboard keystrokes">${keyCount} keys</span>
+              <span class="mr-meta-tag">${durationStr}</span>
+              <span class="mr-meta-tag mr-tag-origin" title="Click to cycle origin (Original -> Relative -> Window)" style="cursor:pointer;">${originLabel}</span>
+              <span class="mr-meta-tag mr-tag-speed" title="Click to cycle playback speed (0.5x, 1x, 2x, 5x, 10x, 25x, 50x, 100x)" style="cursor:pointer;">${item.speed || 1.0}x</span>
+              <span class="mr-meta-tag mr-tag-loop" title="Click to cycle repeat count (1x, 2x, 3x, 5x, 10x, Infinite)" style="cursor:pointer;">${loopCnt}</span>
+            </div>
+          </div>
+        </div>
+        ${profileBadgesHtml}
+        <div class="card-actions">
+          <button class="card-btn btn-play-mr ${isPlaying ? 'running' : ''}" title="${isPlaying ? 'Stop Playback (Esc)' : 'Play This Script'}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;">
+              ${isPlaying
+          ? '<rect x="6" y="6" width="12" height="12" rx="2"></rect>'
+          : '<polygon points="5 3 19 12 5 21 5 3"></polygon>'
+        }
+            </svg>
+          </button>
+          <button class="card-btn btn-edit-mr" title="Edit Script Settings">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+          </button>
+          <button class="card-btn btn-delete-mr" title="Delete Script">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+          <div class="toggle-wrapper" title="Enable / Disable Script">
+            <input class="toggle-checkbox mr-switch" type="checkbox" ${isEnabled ? 'checked' : ''}>
+            <div class="toggle-container">
+              <div class="toggle-button"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 1. Play Button
+      const btnPlay = card.querySelector('.btn-play-mr');
+      btnPlay.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (mousePlaybackActive && mousePlaybackScriptId === item.id) {
+          sendToAhk('stopMousePlayback');
+        } else {
+          const loopCount = item.playbackInfinite ? 0 : Math.max(1, parseInt(item.loop, 10) || 1);
+          sendToAhk('playRecordedMouse', {
+            scriptId: item.id,
+            events: item.events || [],
+            speed: parseFloat(item.speed) || 1.0,
+            loop: loopCount,
+            origin: item.origin || 'absolute',
+            clicksOnly: Boolean(item.clicksOnly),
+            humanize: Boolean(item.humanize),
+            bezier: Boolean(item.bezier),
+            emergencyStop: (item.emergencyStop !== undefined) ? Boolean(item.emergencyStop) : true,
+            countdown: (item.countdown !== undefined) ? parseInt(item.countdown, 10) : 0
+          });
+          showToast(`Playing "${item.name}" (${item.speed || 1.0}x)... Press ESC or hotkey to stop.`);
+        }
+      });
+
+      // 2. Hotkey Badge inline recorder
+      const hkBadge = card.querySelector('.mr-hotkey-badge');
+      setupInlineMouseScriptHotkey(hkBadge, item);
+
+      // 3. Rename on title click
+      const titleEl = card.querySelector('.mr-title');
+      titleEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        promptRenameMouseScript(item);
+      });
+
+      // 3b. Interactive Meta Badges: Speed, Origin, Loop
+      const tagSpeed = card.querySelector('.mr-tag-speed');
+      if (tagSpeed) {
+        tagSpeed.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const speeds = [0.5, 1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 100.0];
+          const cur = parseFloat(item.speed) || 1.0;
+          let idx = speeds.indexOf(cur);
+          if (idx === -1) idx = 1;
+          const nextSpeed = speeds[(idx + 1) % speeds.length];
+          item.speed = nextSpeed;
+          saveCurrentProfileState();
+          syncConfig();
+          renderMouseScriptsList();
+          showToast(`"${item.name}" speed set to ${nextSpeed}x`);
+        });
+      }
+
+      const tagOrigin = card.querySelector('.mr-tag-origin');
+      if (tagOrigin) {
+        tagOrigin.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const modes = ['absolute', 'relative', 'window'];
+          const curMode = item.origin || 'absolute';
+          const nextMode = modes[(modes.indexOf(curMode) + 1) % modes.length];
+          item.origin = nextMode;
+          saveCurrentProfileState();
+          syncConfig();
+          renderMouseScriptsList();
+          const label = nextMode === 'relative' ? 'Relative to Mouse' : (nextMode === 'window' ? 'Active Window' : 'Original Screen Pos');
+          showToast(`"${item.name}" origin: ${label}`);
+        });
+      }
+
+      const tagLoop = card.querySelector('.mr-tag-loop');
+      if (tagLoop) {
+        tagLoop.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (item.playbackInfinite) {
+            item.playbackInfinite = 0;
+            item.loop = 1;
+          } else if (item.loop === 1) {
+            item.loop = 2;
+          } else if (item.loop === 2) {
+            item.loop = 3;
+          } else if (item.loop === 3) {
+            item.loop = 5;
+          } else if (item.loop === 5) {
+            item.loop = 10;
+          } else if (item.loop === 10) {
+            item.playbackInfinite = 1;
+            item.loop = 1;
+          } else {
+            item.loop = 1;
+            item.playbackInfinite = 0;
+          }
+          saveCurrentProfileState();
+          syncConfig();
+          renderMouseScriptsList();
+          showToast(`"${item.name}" repeat: ${item.playbackInfinite ? 'Infinite' : item.loop + 'x'}`);
+        });
+      }
+
+      // 4. Edit button
+      const btnEdit = card.querySelector('.btn-edit-mr');
+      btnEdit.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editMouseScript(item);
+      });
+
+      // 5. Delete button
+      const btnDelete = card.querySelector('.btn-delete-mr');
+      btnDelete.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteMouseScript(item.id);
+      });
+
+      // 6. Toggle switch
+      const sw = card.querySelector('.mr-switch');
+      const iconBadge = card.querySelector('.wm-icon-badge');
+      sw.addEventListener('change', () => {
+        const isChecked = sw.checked;
+        onItemToggleStateChanged('autoClicker', item, isChecked);
+        card.classList.toggle('is-disabled', !isChecked);
+        if (hkBadge) hkBadge.classList.toggle('is-disabled', !isChecked);
+        if (iconBadge) iconBadge.classList.toggle('is-disabled', !isChecked);
+        saveCurrentProfileState();
+        syncConfig();
+        updateCardProfileBadges(card, 'autoClicker', item.id);
+        updateGlobalIndicators();
+        showToast(`"${item.name}" ${isChecked ? 'enabled' : 'disabled'}`);
+      });
+
+      // 7. Click card background to toggle switch
+      card.addEventListener('click', (e) => {
+        if (
+          e.target.closest('.card-btn') ||
+          e.target.closest('.toggle-wrapper') ||
+          e.target.closest('.item-profiles-badges') ||
+          e.target.closest('.item-profile-badge') ||
+          e.target.closest('.mr-hotkey-badge') ||
+          e.target.closest('.mr-title') ||
+          e.target.closest('.mr-meta-tag')
+        ) return;
+        sw.checked = !sw.checked;
+        sw.dispatchEvent(new Event('change'));
+      });
+
+      mrListContainer.appendChild(card);
+    });
+  }
+
+  function setupInlineMouseScriptHotkey(badgeEl, item) {
+    if (!badgeEl) return;
+
+    badgeEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (activeRecordingBadge === badgeEl) {
+        stopActiveBadgeRecording(true);
+        return;
+      }
+      stopActiveBadgeRecording(true);
+
+      const originalHk = item.trigger || '';
+      activeRecordingBadge = badgeEl;
+      badgeEl.classList.add('is-recording');
+      badgeEl.textContent = 'Press keys...';
+      badgeEl.title = 'Press shortcut keys, Backspace/Del to clear, or Esc to cancel';
+
+      function onKeyDown(evt) {
+        evt.preventDefault();
+        evt.stopPropagation();
+
+        if (evt.key === 'Escape') {
+          cleanup(true);
+          showToast('Shortcut change cancelled');
+          return;
+        }
+
+        if (evt.key === 'Backspace' || evt.key === 'Delete') {
+          item.trigger = '';
+          saveCurrentProfileState();
+          syncConfig();
+          cleanup(false);
+          badgeEl.textContent = 'None (Click to set)';
+          badgeEl.title = 'Click to change shortcut (Current: None)';
+          showToast(`Shortcut cleared for "${item.name}"`);
+          return;
+        }
+
+        const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+        const parts = [];
+        if (evt.ctrlKey) parts.push('Ctrl');
+        if (evt.altKey) parts.push('Alt');
+        if (evt.shiftKey) parts.push('Shift');
+        if (evt.metaKey) parts.push('Win');
+
+        if (isModifier) {
+          badgeEl.textContent = parts.join(' + ') + ' + ...';
+          return;
+        }
+
+        let key = evt.key;
+        if (evt.code && evt.code.startsWith('Key')) {
+          key = evt.code.slice(3).toUpperCase();
+        } else if (evt.code && evt.code.startsWith('Digit')) {
+          key = evt.code.slice(5);
+        } else if (evt.code && evt.code.startsWith('Numpad')) {
+          key = evt.code;
+        } else if (evt.code && /^F([1-9]|1[0-2])$/i.test(evt.code)) {
+          key = evt.code.toUpperCase();
+        } else if (key === ' ') {
+          key = 'Space';
+        } else if (key === 'ArrowUp') {
+          key = 'Up';
+        } else if (key === 'ArrowDown') {
+          key = 'Down';
+        } else if (key === 'ArrowLeft') {
+          key = 'Left';
+        } else if (key === 'ArrowRight') {
+          key = 'Right';
+        }
+
+        parts.push(key);
+        const newShortcut = parts.join(' + ');
+        item.trigger = newShortcut;
+        saveCurrentProfileState();
+        syncConfig();
+        cleanup(false);
+        badgeEl.textContent = formatKeyDisplay(newShortcut);
+        badgeEl.title = `Click to change shortcut (Current: ${formatKeyDisplay(newShortcut)})`;
+        showToast(`Shortcut set to ${formatKeyDisplay(newShortcut)} for "${item.name}"`);
+      }
+
+      function cleanup(revert) {
+        window.removeEventListener('keydown', onKeyDown, true);
+        badgeEl.classList.remove('is-recording');
+        activeRecordingBadge = null;
+        if (revert) {
+          badgeEl.textContent = originalHk ? formatKeyDisplay(originalHk) : 'None (Click to set)';
+          badgeEl.title = `Click to change shortcut (Current: ${originalHk ? formatKeyDisplay(originalHk) : 'None'})`;
+        }
+      }
+
+      window.addEventListener('keydown', onKeyDown, true);
+    });
+  }
+
+  function promptRenameMouseScript(item) {
+    const newName = prompt('Enter a new name for this mouse script:', item.name || 'Mouse Path');
+    if (newName !== null && newName.trim() !== '') {
+      item.name = newName.trim();
+      saveCurrentProfileState();
+      syncConfig();
+      renderMouseScriptsList();
+      showToast(`Renamed script to "${item.name}"`);
+    }
+  }
+
+  function deleteMouseScript(id) {
+    if (!state.config.autoClicker) return;
+    deleteItemAcrossProfiles('autoClicker', id);
+    if (Array.isArray(state.config.autoClicker.items)) {
+      state.config.autoClicker.items = state.config.autoClicker.items.filter(it => it.id !== id);
+    }
+    saveCurrentProfileState();
+    syncConfig();
+    renderMouseScriptsList();
+    showToast('Mouse script deleted');
+  }
+
+  // ============================================================================
+  // Mouse Path Script Options Modal
+  // ============================================================================
+  let activeEditingMouseScript = null;
+  let activeEditingMouseScriptHk = '';
+  let activeEditingSpeed = 1.0;
+  let activeEditingOrigin = 'absolute';
+
+  function openMouseScriptEditModal(item) {
+    if (!item) return;
+    activeEditingMouseScript = item;
+    activeEditingMouseScriptHk = item.trigger || '';
+    activeEditingSpeed = parseFloat(item.speed) || 1.0;
+    activeEditingOrigin = item.origin || 'absolute';
+
+    const modal = document.getElementById('mouseScriptEditModal');
+    if (!modal) return;
+
+    // Script Name
+    const nameInput = document.getElementById('mseNameInput');
+    if (nameInput) nameInput.value = item.name || 'Mouse Path';
+
+    // Trigger Shortcut
+    const hkBadge = document.getElementById('mseHotkeyBadge');
+    if (hkBadge) {
+      hkBadge.textContent = activeEditingMouseScriptHk ? formatKeyDisplay(activeEditingMouseScriptHk) : 'None (Click to set)';
+      hkBadge.classList.remove('is-recording');
+      hkBadge.title = `Click to record shortcut (Current: ${activeEditingMouseScriptHk ? formatKeyDisplay(activeEditingMouseScriptHk) : 'None'})`;
+    }
+
+    // Playback Speed
+    const speedSel = document.getElementById('mseSpeedSelector');
+    if (speedSel) {
+      speedSel.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', parseFloat(btn.dataset.val) === activeEditingSpeed);
+      });
+    }
+    const speedLabel = document.getElementById('mseSpeedLabel');
+    if (speedLabel) speedLabel.textContent = `${activeEditingSpeed}x`;
+    const speedInput = document.getElementById('mseSpeedInput');
+    if (speedInput) speedInput.value = activeEditingSpeed;
+
+    // Origin Starting Point
+    const originSel = document.getElementById('mseOriginSelector');
+    if (originSel) {
+      originSel.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.val === activeEditingOrigin);
+      });
+    }
+
+    // Repeat Count & Infinite
+    const isInf = Boolean(item.playbackInfinite);
+    const loopVal = item.loop || 1;
+    const chkInf = document.getElementById('mseRepeatInfinite');
+    const repeatInput = document.getElementById('mseRepeatCountInput');
+    if (chkInf) chkInf.checked = isInf;
+    if (repeatInput) {
+      repeatInput.value = isInf ? '' : loopVal;
+      repeatInput.disabled = isInf;
+    }
+
+    // Countdown (Sec)
+    const countInput = document.getElementById('mseCountdownInput');
+    if (countInput) countInput.value = item.countdown || 0;
+
+    // Advanced Options
+    const chkClicksOnly = document.getElementById('mseOptClicksOnly');
+    if (chkClicksOnly) chkClicksOnly.checked = Boolean(item.clicksOnly);
+
+    const chkHumanize = document.getElementById('mseOptHumanize');
+    if (chkHumanize) chkHumanize.checked = Boolean(item.humanize);
+
+    const chkBezier = document.getElementById('mseOptBezier');
+    if (chkBezier) chkBezier.checked = Boolean(item.bezier);
+
+    const chkEmergencyStop = document.getElementById('mseOptEmergencyStop');
+    if (chkEmergencyStop) chkEmergencyStop.checked = (item.emergencyStop !== undefined) ? Boolean(item.emergencyStop) : true;
+
+    // Stats
+    const events = Array.isArray(item.events) ? item.events : [];
+    let ptCount = 0;
+    let clickCount = 0;
+    let keyCount = 0;
+    let totalDelay = 0;
+    for (const ev of events) {
+      if (ev.type === 'move') ptCount++;
+      else if (ev.type === 'click') {
+        if (ev.action === 'Down' || ev.action === 'Click') clickCount++;
+      } else if (ev.type === 'key') {
+        if (ev.action === 'Down' || ev.action === 'Click') keyCount++;
+      }
+      totalDelay += (ev.delay || 0);
+    }
+    const statEvents = document.getElementById('mseStatEvents');
+    if (statEvents) statEvents.textContent = `${ptCount} points, ${clickCount} clicks, ${keyCount} keys`;
+    const statDuration = document.getElementById('mseStatDuration');
+    if (statDuration) statDuration.textContent = `${(totalDelay / 1000).toFixed(1)}s recorded duration`;
+
+    updateMseModalPlaybackState(mousePlaybackActive && mousePlaybackScriptId === item.id);
+
+    modal.classList.remove('hidden-field');
+    if (nameInput) {
+      setTimeout(() => nameInput.focus(), 60);
+    }
+  }
+
+  function closeMouseScriptEditModal() {
+    const modal = document.getElementById('mouseScriptEditModal');
+    if (modal) modal.classList.add('hidden-field');
+    activeEditingMouseScript = null;
+    if (activeRecordingBadge && activeRecordingBadge.id === 'mseHotkeyBadge') {
+      stopActiveBadgeRecording(true);
+    }
+  }
+
+  function saveMouseScriptEditModal() {
+    if (!activeEditingMouseScript) return;
+    const item = activeEditingMouseScript;
+
+    const nameInput = document.getElementById('mseNameInput');
+    if (nameInput && nameInput.value.trim()) {
+      item.name = nameInput.value.trim();
+    }
+
+    const speedInput = document.getElementById('mseSpeedInput');
+    if (speedInput && !isNaN(parseFloat(speedInput.value))) {
+      const v = parseFloat(speedInput.value);
+      if (v > 0) activeEditingSpeed = Math.min(100.0, v);
+    }
+
+    item.trigger = activeEditingMouseScriptHk;
+    item.speed = activeEditingSpeed;
+    item.origin = activeEditingOrigin;
+
+    const chkInf = document.getElementById('mseRepeatInfinite');
+    const repeatInput = document.getElementById('mseRepeatCountInput');
+    item.playbackInfinite = (chkInf && chkInf.checked) ? 1 : 0;
+    item.loop = item.playbackInfinite ? 1 : Math.max(1, parseInt(repeatInput && repeatInput.value, 10) || 1);
+
+    const countInput = document.getElementById('mseCountdownInput');
+    item.countdown = Math.max(0, parseInt(countInput && countInput.value, 10) || 0);
+
+    const chkClicksOnly = document.getElementById('mseOptClicksOnly');
+    item.clicksOnly = (chkClicksOnly && chkClicksOnly.checked) ? 1 : 0;
+
+    const chkHumanize = document.getElementById('mseOptHumanize');
+    item.humanize = (chkHumanize && chkHumanize.checked) ? 1 : 0;
+
+    const chkBezier = document.getElementById('mseOptBezier');
+    item.bezier = (chkBezier && chkBezier.checked) ? 1 : 0;
+
+    const chkEmergencyStop = document.getElementById('mseOptEmergencyStop');
+    item.emergencyStop = (chkEmergencyStop && chkEmergencyStop.checked) ? 1 : 0;
+
+    saveCurrentProfileState();
+    syncConfig();
+    renderMouseScriptsList();
+    closeMouseScriptEditModal();
+    showToast(`Saved options for "${item.name}"`);
+  }
+
+  function testPlayEditingMouseScript() {
+    if (!activeEditingMouseScript) return;
+    if (mousePlaybackActive) {
+      sendToAhk('stopMousePlayback');
+      return;
+    }
+    const item = activeEditingMouseScript;
+    const chkInf = document.getElementById('mseRepeatInfinite');
+    const repeatInput = document.getElementById('mseRepeatCountInput');
+    const isInf = chkInf && chkInf.checked;
+    const loopCount = isInf ? 0 : Math.max(1, parseInt(repeatInput && repeatInput.value, 10) || 1);
+    const countInput = document.getElementById('mseCountdownInput');
+    const cd = Math.max(0, parseInt(countInput && countInput.value, 10) || 0);
+    const chkClicksOnly = document.getElementById('mseOptClicksOnly');
+    const chkHumanize = document.getElementById('mseOptHumanize');
+    const chkBezier = document.getElementById('mseOptBezier');
+    const chkEmergencyStop = document.getElementById('mseOptEmergencyStop');
+
+    sendToAhk('playRecordedMouse', {
+      scriptId: item.id,
+      events: item.events || [],
+      speed: activeEditingSpeed,
+      loop: loopCount,
+      origin: activeEditingOrigin,
+      clicksOnly: Boolean(chkClicksOnly && chkClicksOnly.checked),
+      humanize: Boolean(chkHumanize && chkHumanize.checked),
+      bezier: Boolean(chkBezier && chkBezier.checked),
+      emergencyStop: Boolean(chkEmergencyStop ? chkEmergencyStop.checked : true),
+      countdown: cd
+    });
+    showToast(`Playing "${item.name}" (${activeEditingSpeed}x)... Press ESC to stop.`);
+  }
+
+  function updateMseModalPlaybackState(isPlaying) {
+    const btnPlay = document.getElementById('mseBtnTestPlay');
+    const btnText = document.getElementById('mseBtnTestPlayText');
+    if (!btnPlay) return;
+    btnPlay.classList.toggle('running', isPlaying);
+    if (btnText) {
+      btnText.textContent = isPlaying ? 'Stop (Esc)' : 'Test Play';
+    }
+  }
+
+  function setupMseModalHandlers() {
+    const modal = document.getElementById('mouseScriptEditModal');
+    const btnClose = document.getElementById('btnCloseMseModal');
+    const btnCancel = document.getElementById('btnCancelMseModal');
+    const btnSave = document.getElementById('btnSaveMseModal');
+    const btnTestPlay = document.getElementById('mseBtnTestPlay');
+    const nameInput = document.getElementById('mseNameInput');
+
+    if (modal && !modal.dataset.bound) {
+      modal.dataset.bound = 'true';
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeMouseScriptEditModal();
+      });
+    }
+
+    if (btnClose && !btnClose.dataset.bound) {
+      btnClose.dataset.bound = 'true';
+      btnClose.addEventListener('click', closeMouseScriptEditModal);
+    }
+    if (btnCancel && !btnCancel.dataset.bound) {
+      btnCancel.dataset.bound = 'true';
+      btnCancel.addEventListener('click', closeMouseScriptEditModal);
+    }
+    if (btnSave && !btnSave.dataset.bound) {
+      btnSave.dataset.bound = 'true';
+      btnSave.addEventListener('click', saveMouseScriptEditModal);
+    }
+    if (btnTestPlay && !btnTestPlay.dataset.bound) {
+      btnTestPlay.dataset.bound = 'true';
+      btnTestPlay.addEventListener('click', testPlayEditingMouseScript);
+    }
+    if (nameInput && !nameInput.dataset.bound) {
+      nameInput.dataset.bound = 'true';
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveMouseScriptEditModal();
+        else if (e.key === 'Escape') closeMouseScriptEditModal();
+      });
+    }
+
+    // Hotkey recorder
+    const badgeEl = document.getElementById('mseHotkeyBadge');
+    const btnClearHk = document.getElementById('mseBtnClearHotkey');
+    if (btnClearHk && !btnClearHk.dataset.bound) {
+      btnClearHk.dataset.bound = 'true';
+      btnClearHk.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeEditingMouseScriptHk = '';
+        if (badgeEl) {
+          badgeEl.textContent = 'None (Click to set)';
+          badgeEl.title = 'Click to record new shortcut';
+        }
+      });
+    }
+
+    if (badgeEl && !badgeEl.dataset.bound) {
+      badgeEl.dataset.bound = 'true';
+      badgeEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeRecordingBadge === badgeEl) {
+          stopActiveBadgeRecording(true);
+          return;
+        }
+        stopActiveBadgeRecording(true);
+
+        const originalHk = activeEditingMouseScriptHk;
+        activeRecordingBadge = badgeEl;
+        badgeEl.classList.add('is-recording');
+        badgeEl.textContent = 'Press keys...';
+
+        function onKeyDown(evt) {
+          evt.preventDefault();
+          evt.stopPropagation();
+
+          if (evt.key === 'Escape') {
+            cleanup(true);
+            return;
+          }
+
+          if (evt.key === 'Backspace' || evt.key === 'Delete') {
+            activeEditingMouseScriptHk = '';
+            cleanup(false);
+            badgeEl.textContent = 'None (Click to set)';
+            return;
+          }
+
+          const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+          const parts = [];
+          if (evt.ctrlKey) parts.push('Ctrl');
+          if (evt.altKey) parts.push('Alt');
+          if (evt.shiftKey) parts.push('Shift');
+          if (evt.metaKey) parts.push('Win');
+
+          if (isModifier) {
+            badgeEl.textContent = parts.join(' + ') + ' + ...';
+            return;
+          }
+
+          let key = evt.key;
+          if (evt.code && evt.code.startsWith('Key')) {
+            key = evt.code.slice(3).toUpperCase();
+          } else if (evt.code && evt.code.startsWith('Digit')) {
+            key = evt.code.slice(5);
+          } else if (evt.code && evt.code.startsWith('Numpad')) {
+            key = evt.code;
+          } else if (evt.code && /^F([1-9]|1[0-2])$/i.test(evt.code)) {
+            key = evt.code.toUpperCase();
+          } else if (key === ' ') {
+            key = 'Space';
+          } else if (key === 'ArrowUp') {
+            key = 'Up';
+          } else if (key === 'ArrowDown') {
+            key = 'Down';
+          } else if (key === 'ArrowLeft') {
+            key = 'Left';
+          } else if (key === 'ArrowRight') {
+            key = 'Right';
+          }
+
+          parts.push(key);
+          activeEditingMouseScriptHk = parts.join(' + ');
+          cleanup(false);
+          badgeEl.textContent = formatKeyDisplay(activeEditingMouseScriptHk);
+        }
+
+        function cleanup(revert) {
+          window.removeEventListener('keydown', onKeyDown, true);
+          badgeEl.classList.remove('is-recording');
+          activeRecordingBadge = null;
+          if (revert) {
+            badgeEl.textContent = originalHk ? formatKeyDisplay(originalHk) : 'None (Click to set)';
+          }
+        }
+
+        window.addEventListener('keydown', onKeyDown, true);
+      });
+    }
+
+    // Speed Pill selector & custom input
+    const speedSel = document.getElementById('mseSpeedSelector');
+    const speedLabel = document.getElementById('mseSpeedLabel');
+    const speedInput = document.getElementById('mseSpeedInput');
+    if (speedSel && !speedSel.dataset.bound) {
+      speedSel.dataset.bound = 'true';
+      speedSel.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeEditingSpeed = parseFloat(btn.dataset.val) || 1.0;
+          speedSel.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.toggle('active', b === btn));
+          if (speedLabel) speedLabel.textContent = `${activeEditingSpeed}x`;
+          if (speedInput) speedInput.value = activeEditingSpeed;
+        });
+      });
+    }
+
+    if (speedInput && !speedInput.dataset.bound) {
+      speedInput.dataset.bound = 'true';
+      speedInput.addEventListener('change', () => {
+        let val = parseFloat(speedInput.value);
+        if (isNaN(val) || val <= 0) val = 1.0;
+        if (val > 100.0) val = 100.0;
+        speedInput.value = val;
+        activeEditingSpeed = val;
+        if (speedLabel) speedLabel.textContent = `${val}x`;
+        if (speedSel) {
+          speedSel.querySelectorAll('.ac-pill-btn').forEach(b => {
+            b.classList.toggle('active', parseFloat(b.dataset.val) === val);
+          });
+        }
+      });
+    }
+
+    // Origin Pill selector
+    const originSel = document.getElementById('mseOriginSelector');
+    if (originSel && !originSel.dataset.bound) {
+      originSel.dataset.bound = 'true';
+      originSel.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeEditingOrigin = btn.dataset.val || 'absolute';
+          originSel.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.toggle('active', b === btn));
+        });
+      });
+    }
+
+    // Infinite checkbox toggle
+    const chkInf = document.getElementById('mseRepeatInfinite');
+    const repeatInput = document.getElementById('mseRepeatCountInput');
+    if (chkInf && !chkInf.dataset.bound) {
+      chkInf.dataset.bound = 'true';
+      chkInf.addEventListener('change', () => {
+        if (repeatInput) {
+          repeatInput.disabled = chkInf.checked;
+          if (chkInf.checked) repeatInput.value = '';
+          else repeatInput.value = '1';
+        }
+      });
+    }
+  }
+
+  function editMouseScript(item) {
+    setupMseModalHandlers();
+    openMouseScriptEditModal(item);
   }
 
   function updateAutoClickerUi(isRunning) {
     state.autoClickerRunning = isRunning;
-    acToggleBtn.classList.toggle('running', isRunning);
-    acToggleBtnText.textContent = isRunning ? 'STOP (F8)' : 'START (F8)';
-    acStatusHint.textContent = isRunning
-      ? 'Auto-Clicker is RUNNING! Press F8 anywhere to STOP.'
-      : 'Ready - Press F8 anywhere in Windows to start or stop clicking.';
+    const ac = (state.config && state.config.autoClicker) || {};
+    const hk = (ac.hotkey && String(ac.hotkey).trim() !== '') ? String(ac.hotkey).trim() : 'F8';
+    const hkDisplay = formatKeyDisplay(hk);
+    if (acToggleBtn) {
+      acToggleBtn.classList.toggle('running', isRunning);
+    }
+    if (acToggleBtnText) {
+      acToggleBtnText.textContent = isRunning ? `STOP (${hkDisplay})` : `START (${hkDisplay})`;
+    }
+    if (acStatusHint) {
+      acStatusHint.textContent = isRunning
+        ? `Auto-Clicker is RUNNING! Press ${hkDisplay} anywhere to STOP.`
+        : `Ready - Press ${hkDisplay} anywhere in Windows to start or stop clicking.`;
+    }
 
     // Animate radial dots if present
     if (radialDotsDial) {
@@ -6154,7 +7830,7 @@
       }
       sw.addEventListener('change', () => {
         const isChecked = sw.checked;
-        item.enabled = isChecked ? 1 : 0;
+        onItemToggleStateChanged('macroRecorder', item, isChecked);
         card.classList.toggle('is-disabled', !isChecked);
         if (badge) badge.classList.toggle('is-disabled', !isChecked);
         if (iconBadge) iconBadge.classList.toggle('is-disabled', !isChecked);
@@ -6442,6 +8118,585 @@
   }
 
   // ============================================================================
+  // Module 7: Screen Scanner & Visual Triggers
+  // ============================================================================
+
+  let ssCurrentMode = 'image';
+  let ssCurrentRegion = 'fullscreen';
+  let ssCurrentAction = 'click';
+  let ssCurrentClickBtn = 'Left';
+  let ssScanRate = 150;
+  let ssCondition = 'appear';
+  let ssRepeat = 'debounce';
+  let ssSearchQuery = '';
+
+  function updateScreenScannerImagePreview(path) {
+    const box = document.getElementById('ssImagePreviewBox');
+    if (!box) return;
+    if (!path || !path.trim()) {
+      box.innerHTML = '<span style="font-size:10px; color:var(--text-muted); text-align:center;">No Image</span>';
+      return;
+    }
+    const cleanPath = path.trim().replace(/\\/g, '/');
+    const safeUrl = 'file:///' + cleanPath;
+    box.innerHTML = `<img src="${safeUrl}" style="max-width:100%; max-height:100%; object-fit:contain;" onerror="this.parentElement.innerHTML='<span style=\\'font-size:9px; color:var(--text-muted); text-align:center;\\'>Invalid Image</span>'" />`;
+  }
+
+  function populateScannerActionDropdowns() {
+    // Populate Mouse Recording Scripts
+    const selMouse = document.getElementById('ssSelectMouseScript');
+    if (selMouse) {
+      selMouse.innerHTML = '';
+      const scripts = (state.config && state.config.autoClicker && Array.isArray(state.config.autoClicker.items))
+        ? state.config.autoClicker.items
+        : [];
+      if (scripts.length === 0) {
+        selMouse.innerHTML = '<option value="">No mouse recordings available (create one in Mouse Studio)</option>';
+      } else {
+        scripts.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.name || 'Mouse Path'} (${s.trigger || 'No Hotkey'})`;
+          selMouse.appendChild(opt);
+        });
+      }
+    }
+
+    // Populate Macros
+    const selMacro = document.getElementById('ssSelectMacro');
+    if (selMacro) {
+      selMacro.innerHTML = '';
+      const macros = (state.config && state.config.macroRecorder && Array.isArray(state.config.macroRecorder.items))
+        ? state.config.macroRecorder.items
+        : [];
+      if (macros.length === 0) {
+        selMacro.innerHTML = '<option value="">No macros available (record one in Macro Studio)</option>';
+      } else {
+        macros.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = `${m.name || 'Macro'} (${m.trigger || 'No Hotkey'})`;
+          selMacro.appendChild(opt);
+        });
+      }
+    }
+  }
+
+  function renderScreenScanner() {
+    if (!state.config) return;
+    if (!state.config.screenScanner) {
+      state.config.screenScanner = { enabled: 1, scanRate: 150, items: [] };
+    }
+
+    const masterSwitch = document.getElementById('ssMasterSwitch');
+    if (masterSwitch) {
+      masterSwitch.checked = (state.config.screenScanner.enabled !== 0 && state.config.screenScanner.enabled !== false);
+    }
+
+    populateScannerActionDropdowns();
+    renderScreenScannerList();
+  }
+
+  function renderScreenScannerList() {
+    const listContainer = document.getElementById('ssListContainer');
+    const countBadge = document.getElementById('ssCountBadge');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+
+    if (!state.config.screenScanner || !Array.isArray(state.config.screenScanner.items)) {
+      if (countBadge) countBadge.textContent = '0';
+      return;
+    }
+
+    const items = state.config.screenScanner.items;
+    if (countBadge) countBadge.textContent = String(items.length);
+
+    const q = ssSearchQuery.trim().toLowerCase();
+    const filtered = q
+      ? items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.mode || '').toLowerCase().includes(q))
+      : items;
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = `<div class="empty-state" style="padding:24px; text-align:center; color:var(--text-muted); font-size:12px;">
+        ${q ? 'No matching visual triggers found.' : 'No visual screen triggers configured yet. Configure a pattern above and click "ADD VISUAL TRIGGER".'}
+      </div>`;
+      return;
+    }
+
+    filtered.forEach((item) => {
+      const card = document.createElement('div');
+      card.className = 'shortcut-card' + (item.enabled === 0 || item.enabled === false ? ' is-disabled' : '');
+      card.dataset.id = item.id;
+      card.style.display = 'flex';
+      card.style.alignItems = 'center';
+      card.style.justifyContent = 'space-between';
+      card.style.padding = '12px 16px';
+      card.style.gap = '14px';
+
+      // Mode label & icon
+      let modeLabel = 'Image Search';
+      let modeColor = '#0284c7';
+      if (item.mode === 'pixel') {
+        modeLabel = `Pixel Search (${item.pixelColor || '#FF0000'})`;
+        modeColor = item.pixelColor || '#e11d48';
+      } else if (item.mode === 'point') {
+        modeLabel = `Pixel Watch (${item.pointX}, ${item.pointY})`;
+        modeColor = item.pointColor || '#10b981';
+      } else {
+        const fileName = (item.imagePath || '').split(/[\\/]/).pop();
+        if (fileName) modeLabel = `Image: ${fileName}`;
+      }
+
+      // Action label
+      let actionLabel = 'Mouse Click';
+      if (item.actionType === 'mouseScript') actionLabel = 'Play Mouse Path';
+      else if (item.actionType === 'macro') actionLabel = 'Play Macro';
+      else if (item.actionType === 'key') actionLabel = `Send Key: ${item.keyToSend || '{Key}'}`;
+      else if (item.actionType === 'system') actionLabel = `System: ${item.systemAction || 'Alert'}`;
+
+      const condLabel = item.condition === 'disappear' ? 'When Disappears' : 'When Appears';
+      const repeatLabel = item.repeatRule === 'continuous' ? 'Continuous' : (item.repeatRule === 'once' ? 'Run Once' : `Cooldown ${((item.debounceMs || 2000) / 1000).toFixed(1)}s`);
+
+      card.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
+          <div class="wm-icon-badge" style="background:var(--surface-color); color:var(--accent); border:1px solid var(--border-soft); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-btn); flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+              <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+              <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${item.name || 'Visual Trigger'}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="mr-meta-tag" style="color:${modeColor}; font-weight:700;">${modeLabel}</span>
+              <span class="mr-meta-tag">${item.region || 'fullscreen'}</span>
+              <span class="mr-meta-tag" style="color:#d97706;">${condLabel}</span>
+              <span class="mr-meta-tag" style="color:#8b5cf6;">${actionLabel}</span>
+              <span class="mr-meta-tag">${repeatLabel}</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+          <button class="neumorphic-btn btn-chip btn-test-ss-item" title="Test scan this trigger now" style="padding:4px 10px; font-size:11px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Test</span>
+          </button>
+          <div class="toggle-wrapper" title="Toggle trigger active/inactive">
+            <input class="toggle-checkbox ss-item-toggle" type="checkbox" ${item.enabled !== 0 && item.enabled !== false ? 'checked' : ''} />
+            <div class="toggle-container"><div class="toggle-button"></div></div>
+          </div>
+          <button class="icon-btn btn-delete-ss" title="Delete trigger" style="color:var(--text-muted); width:30px; height:30px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      `;
+
+      // Event: Test Scan single item
+      const btnTest = card.querySelector('.btn-test-ss-item');
+      if (btnTest) {
+        btnTest.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sendToAhk('testScreenScan', { item: item });
+          showToast(`Testing trigger "${item.name}"...`, 'info');
+        });
+      }
+
+      // Event: Toggle enabled/disabled
+      const chk = card.querySelector('.ss-item-toggle');
+      if (chk) {
+        chk.addEventListener('change', (e) => {
+          e.stopPropagation();
+          item.enabled = chk.checked ? 1 : 0;
+          card.classList.toggle('is-disabled', !chk.checked);
+          saveCurrentProfileState();
+          syncConfig();
+          updateGlobalIndicators();
+        });
+      }
+
+      // Event: Delete item
+      const btnDel = card.querySelector('.btn-delete-ss');
+      if (btnDel) {
+        btnDel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const origIdx = items.findIndex(x => x.id === item.id);
+          if (origIdx !== -1) {
+            items.splice(origIdx, 1);
+            saveCurrentProfileState();
+            syncConfig();
+            renderScreenScannerList();
+            updateGlobalIndicators();
+            showToast(`Deleted visual trigger: ${item.name}`);
+          }
+        });
+      }
+
+      listContainer.appendChild(card);
+    });
+  }
+
+  function initScreenScanner() {
+    // 1. Master Toggle
+    const masterSwitch = document.getElementById('ssMasterSwitch');
+    if (masterSwitch) {
+      masterSwitch.addEventListener('change', () => {
+        if (!state.config.screenScanner) state.config.screenScanner = {};
+        state.config.screenScanner.enabled = masterSwitch.checked ? 1 : 0;
+        saveCurrentProfileState();
+        syncConfig();
+        showToast(masterSwitch.checked ? 'Screen Scanner Engine Enabled' : 'Screen Scanner Engine Suspended');
+      });
+    }
+
+    // 2. Detection Mode Selector
+    const modeSelector = document.getElementById('ssModeSelector');
+    const secImage = document.getElementById('ssSectionImage');
+    const secPixel = document.getElementById('ssSectionPixel');
+    const secPoint = document.getElementById('ssSectionPoint');
+
+    if (modeSelector) {
+      modeSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          modeSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          ssCurrentMode = btn.dataset.mode || 'image';
+
+          if (secImage) secImage.classList.toggle('hidden-field', ssCurrentMode !== 'image');
+          if (secPixel) secPixel.classList.toggle('hidden-field', ssCurrentMode !== 'pixel');
+          if (secPoint) secPoint.classList.toggle('hidden-field', ssCurrentMode !== 'point');
+        });
+      });
+    }
+
+    // 3. Image Mode Events
+    const btnBrowseImage = document.getElementById('ssBtnBrowseImage');
+    if (btnBrowseImage) {
+      btnBrowseImage.addEventListener('click', () => {
+        sendToAhk('browseImageForScanner');
+      });
+    }
+
+    const btnSnipImage = document.getElementById('ssBtnSnipImage');
+    if (btnSnipImage) {
+      btnSnipImage.addEventListener('click', () => {
+        sendToAhk('startScreenSnip');
+        showToast('Click and drag on screen to crop template image...', 'info');
+      });
+    }
+
+    const inputImagePath = document.getElementById('ssInputImagePath');
+    if (inputImagePath) {
+      inputImagePath.addEventListener('input', () => {
+        updateScreenScannerImagePreview(inputImagePath.value);
+      });
+    }
+
+    const sliderImageVar = document.getElementById('ssImageVariation');
+    const badgeImageVar = document.getElementById('ssImageVariationVal');
+    if (sliderImageVar && badgeImageVar) {
+      sliderImageVar.addEventListener('input', () => {
+        badgeImageVar.textContent = sliderImageVar.value;
+      });
+    }
+
+    // 4. Pixel Mode Events
+    const btnPickColor = document.getElementById('ssBtnPickColor');
+    if (btnPickColor) {
+      btnPickColor.addEventListener('click', () => {
+        sendToAhk('pickScreenColorForScanner', { target: 'screenScannerPixel' });
+        showToast('Move reticle over target pixel and click to capture color...', 'info');
+      });
+    }
+
+    const inputPixelColor = document.getElementById('ssInputPixelColor');
+    const chipPixel = document.getElementById('ssPixelChip');
+    if (inputPixelColor && chipPixel) {
+      inputPixelColor.addEventListener('input', () => {
+        const col = inputPixelColor.value.trim();
+        if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(col)) {
+          chipPixel.style.background = col;
+        }
+      });
+    }
+
+    const sliderPixelVar = document.getElementById('ssPixelVariation');
+    const badgePixelVar = document.getElementById('ssPixelVariationVal');
+    if (sliderPixelVar && badgePixelVar) {
+      sliderPixelVar.addEventListener('input', () => {
+        badgePixelVar.textContent = sliderPixelVar.value;
+      });
+    }
+
+    // 5. Point Watcher Mode Events
+    const btnPickPoint = document.getElementById('ssBtnPickPoint');
+    if (btnPickPoint) {
+      btnPickPoint.addEventListener('click', () => {
+        sendToAhk('pickScreenColorForScanner', { target: 'screenScannerPoint' });
+        showToast('Click exact pixel on screen to capture position and color...', 'info');
+      });
+    }
+
+    const inputPointColor = document.getElementById('ssInputPointColor');
+    const chipPoint = document.getElementById('ssPointChip');
+    if (inputPointColor && chipPoint) {
+      inputPointColor.addEventListener('input', () => {
+        const col = inputPointColor.value.trim();
+        if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(col)) {
+          chipPoint.style.background = col;
+        }
+      });
+    }
+
+    // 6. Region Selector
+    const regionSelector = document.getElementById('ssRegionSelector');
+    const customRegionBox = document.getElementById('ssCustomRegionBox');
+    if (regionSelector) {
+      regionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          regionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          ssCurrentRegion = btn.dataset.reg || 'fullscreen';
+          if (customRegionBox) {
+            customRegionBox.classList.toggle('hidden-field', ssCurrentRegion !== 'custom');
+          }
+        });
+      });
+    }
+
+    const btnSelectArea = document.getElementById('ssBtnSelectArea');
+    if (btnSelectArea) {
+      btnSelectArea.addEventListener('click', () => {
+        sendToAhk('startScreenRegionSelect');
+        showToast('Click and drag on screen to define bounding box...', 'info');
+      });
+    }
+
+    // 7. Action Selector
+    const actionSelector = document.getElementById('ssActionSelector');
+    const detailClick = document.getElementById('ssActionDetailClick');
+    const detailMouseScript = document.getElementById('ssActionDetailMouseScript');
+    const detailMacro = document.getElementById('ssActionDetailMacro');
+    const detailKey = document.getElementById('ssActionDetailKey');
+    const detailSystem = document.getElementById('ssActionDetailSystem');
+
+    if (actionSelector) {
+      actionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          actionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          ssCurrentAction = btn.dataset.act || 'click';
+
+          if (detailClick) detailClick.classList.toggle('hidden-field', ssCurrentAction !== 'click');
+          if (detailMouseScript) detailMouseScript.classList.toggle('hidden-field', ssCurrentAction !== 'mouseScript');
+          if (detailMacro) detailMacro.classList.toggle('hidden-field', ssCurrentAction !== 'macro');
+          if (detailKey) detailKey.classList.toggle('hidden-field', ssCurrentAction !== 'key');
+          if (detailSystem) detailSystem.classList.toggle('hidden-field', ssCurrentAction !== 'system');
+        });
+      });
+    }
+
+    // 8. Click Button Selector
+    const clickBtnSelector = document.getElementById('ssClickBtnSelector');
+    if (clickBtnSelector) {
+      clickBtnSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          clickBtnSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          ssCurrentClickBtn = btn.dataset.btn || 'Left';
+        });
+      });
+    }
+
+    // 9. Scan Rate Selector
+    const scanRateSelector = document.getElementById('ssScanRateSelector');
+    if (scanRateSelector) {
+      scanRateSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          scanRateSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          ssScanRate = parseInt(btn.dataset.rate, 10) || 150;
+          if (!state.config.screenScanner) state.config.screenScanner = {};
+          state.config.screenScanner.scanRate = ssScanRate;
+          saveCurrentProfileState();
+          syncConfig();
+        });
+      });
+    }
+
+    // 10. Condition & Repeat Selectors
+    const conditionSelector = document.getElementById('ssConditionSelector');
+    if (conditionSelector) {
+      conditionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          conditionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          ssCondition = btn.dataset.cond || 'appear';
+        });
+      });
+    }
+
+    const repeatSelector = document.getElementById('ssRepeatSelector');
+    if (repeatSelector) {
+      repeatSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          repeatSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          ssRepeat = btn.dataset.rep || 'debounce';
+        });
+      });
+    }
+
+    // 11. Search Filter
+    const searchFilter = document.getElementById('ssSearchFilter');
+    if (searchFilter) {
+      searchFilter.addEventListener('input', () => {
+        ssSearchQuery = searchFilter.value;
+        renderScreenScannerList();
+      });
+    }
+
+    // 12. Add Trigger Button
+    const btnAddTrigger = document.getElementById('ssBtnAddTrigger');
+    if (btnAddTrigger) {
+      btnAddTrigger.addEventListener('click', () => {
+        const nameInput = document.getElementById('ssInputName');
+        const name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : 'Screen Trigger';
+
+        // Collect parameters according to mode
+        const imagePath = (document.getElementById('ssInputImagePath') || {}).value || '';
+        const imageVariation = parseInt((document.getElementById('ssImageVariation') || {}).value, 10) || 30;
+
+        const pixelColor = (document.getElementById('ssInputPixelColor') || {}).value || '#FF0000';
+        const pixelVariation = parseInt((document.getElementById('ssPixelVariation') || {}).value, 10) || 15;
+
+        const pointX = parseInt((document.getElementById('ssPointX') || {}).value, 10) || 960;
+        const pointY = parseInt((document.getElementById('ssPointY') || {}).value, 10) || 540;
+        const pointColor = (document.getElementById('ssInputPointColor') || {}).value || '#00FF00';
+
+        if (ssCurrentMode === 'image' && (!imagePath || !imagePath.trim())) {
+          showToast('Please select or snip a template image first!', 'warning');
+          return;
+        }
+
+        const boxX1 = parseInt((document.getElementById('ssBoxX1') || {}).value, 10) || 0;
+        const boxY1 = parseInt((document.getElementById('ssBoxY1') || {}).value, 10) || 0;
+        const boxX2 = parseInt((document.getElementById('ssBoxX2') || {}).value, 10) || 1920;
+        const boxY2 = parseInt((document.getElementById('ssBoxY2') || {}).value, 10) || 1080;
+
+        const clickOffsetX = parseInt((document.getElementById('ssClickOffsetX') || {}).value, 10) || 0;
+        const clickOffsetY = parseInt((document.getElementById('ssClickOffsetY') || {}).value, 10) || 0;
+        const mouseScriptId = (document.getElementById('ssSelectMouseScript') || {}).value || '';
+        const macroId = (document.getElementById('ssSelectMacro') || {}).value || '';
+        const keyToSend = (document.getElementById('ssInputKey') || {}).value || '';
+        const systemAction = (document.getElementById('ssSelectSystemAction') || {}).value || 'beep';
+
+        const debounceSec = parseFloat((document.getElementById('ssDebounceInput') || {}).value) || 2.0;
+        const optSound = document.getElementById('ssOptSound');
+        const optOsd = document.getElementById('ssOptOsd');
+
+        const newRule = {
+          id: 'ss-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          name: name,
+          enabled: 1,
+          mode: ssCurrentMode,
+          imagePath: imagePath.trim(),
+          imageVariation: imageVariation,
+          imageTrans: '',
+          pixelColor: pixelColor.trim(),
+          pixelVariation: pixelVariation,
+          pointX: pointX,
+          pointY: pointY,
+          pointColor: pointColor.trim(),
+          region: ssCurrentRegion,
+          regionBox: { x1: boxX1, y1: boxY1, x2: boxX2, y2: boxY2 },
+          actionType: ssCurrentAction,
+          clickButton: ssCurrentClickBtn,
+          clickOffsetX: clickOffsetX,
+          clickOffsetY: clickOffsetY,
+          mouseScriptId: mouseScriptId,
+          macroId: macroId,
+          keyToSend: keyToSend.trim(),
+          systemAction: systemAction,
+          condition: ssCondition,
+          repeatRule: ssRepeat,
+          debounceMs: Math.round(debounceSec * 1000),
+          soundAlert: optSound ? optSound.checked : true,
+          osdAlert: optOsd ? optOsd.checked : true
+        };
+
+        if (!state.config.screenScanner) {
+          state.config.screenScanner = { enabled: 1, scanRate: ssScanRate, items: [] };
+        }
+        if (!Array.isArray(state.config.screenScanner.items)) {
+          state.config.screenScanner.items = [];
+        }
+
+        state.config.screenScanner.items.push(newRule);
+        saveCurrentProfileState();
+        syncConfig();
+        renderScreenScannerList();
+        updateGlobalIndicators();
+
+        if (nameInput) nameInput.value = '';
+        showToast(`Visual Trigger "${name}" added!`, 'success');
+      });
+    }
+
+    // 13. Instant Test Scan Button
+    const btnTestScan = document.getElementById('ssBtnTestScan');
+    if (btnTestScan) {
+      btnTestScan.addEventListener('click', () => {
+        const imagePath = (document.getElementById('ssInputImagePath') || {}).value || '';
+        const imageVariation = parseInt((document.getElementById('ssImageVariation') || {}).value, 10) || 30;
+        const pixelColor = (document.getElementById('ssInputPixelColor') || {}).value || '#FF0000';
+        const pixelVariation = parseInt((document.getElementById('ssPixelVariation') || {}).value, 10) || 15;
+        const pointX = parseInt((document.getElementById('ssPointX') || {}).value, 10) || 960;
+        const pointY = parseInt((document.getElementById('ssPointY') || {}).value, 10) || 540;
+        const pointColor = (document.getElementById('ssInputPointColor') || {}).value || '#00FF00';
+
+        const boxX1 = parseInt((document.getElementById('ssBoxX1') || {}).value, 10) || 0;
+        const boxY1 = parseInt((document.getElementById('ssBoxY1') || {}).value, 10) || 0;
+        const boxX2 = parseInt((document.getElementById('ssBoxX2') || {}).value, 10) || 1920;
+        const boxY2 = parseInt((document.getElementById('ssBoxY2') || {}).value, 10) || 1080;
+
+        const draftItem = {
+          mode: ssCurrentMode,
+          imagePath: imagePath.trim(),
+          imageVariation: imageVariation,
+          pixelColor: pixelColor.trim(),
+          pixelVariation: pixelVariation,
+          pointX: pointX,
+          pointY: pointY,
+          pointColor: pointColor.trim(),
+          region: ssCurrentRegion,
+          regionBox: { x1: boxX1, y1: boxY1, x2: boxX2, y2: boxY2 }
+        };
+
+        if (ssCurrentMode === 'image' && (!imagePath || !imagePath.trim())) {
+          showToast('Select or snip a template image first to test!', 'warning');
+          return;
+        }
+
+        btnTestScan.disabled = true;
+        sendToAhk('testScreenScan', { item: draftItem });
+        showToast('Scanning screen now...', 'info');
+      });
+    }
+
+    renderScreenScanner();
+  }
+
+  // ============================================================================
   // Master Engine Switch & Indicators
   // ============================================================================
 
@@ -6545,7 +8800,7 @@
       const sw = card.querySelector('.active-overview-switch');
       sw.addEventListener('change', () => {
         const checked = sw.checked;
-        item.enabled = checked ? 1 : 0;
+        onItemToggleStateChanged(moduleName, item, checked);
         card.classList.toggle('is-disabled', !checked);
         if (typeof onToggle === 'function') onToggle(checked);
         syncConfig();
@@ -9423,6 +11678,7 @@
     }
 
     initMacroRecorder();
+    initScreenScanner();
     initFolderCreator();
     initProfileContextMenu();
     initScriptContextMenu();
@@ -9599,6 +11855,58 @@
         }
       } else if (msg.type === 'autoClickerState') {
         updateAutoClickerUi(msg.running);
+      } else if (msg.type === 'mouseCountdownState') {
+        mouseCountdownActive = Boolean(msg.active);
+        mouseCountdownSeconds = msg.seconds || 0;
+        updateMouseRecorderUI();
+      } else if (msg.type === 'mouseRecordingState') {
+        mouseRecordingActive = Boolean(msg.recording);
+        updateMouseRecorderUI();
+      } else if (msg.type === 'mousePlaybackState') {
+        mousePlaybackActive = Boolean(msg.playing);
+        mousePlaybackScriptId = msg.scriptId || '';
+        updateMouseRecorderUI();
+        renderMouseScriptsList();
+        updateMseModalPlaybackState(mousePlaybackActive);
+      } else if (msg.type === 'mouseRecordedPath') {
+        mouseRecordingActive = false;
+        if (!state.config.autoClicker) state.config.autoClicker = {};
+        if (!Array.isArray(state.config.autoClicker.items)) state.config.autoClicker.items = [];
+        const events = Array.isArray(msg.events) ? msg.events : [];
+        if (events.length > 0) {
+          const items = state.config.autoClicker.items;
+          const nextHk = getNextMouseShortcut(items);
+          const newScript = {
+            id: 'mr-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            name: `Mouse Path ${items.length + 1}`,
+            trigger: nextHk,
+            triggerType: 'hotkey',
+            enabled: 1,
+            events: events,
+            speed: state.config.autoClicker.playbackSpeed || 1.0,
+            origin: state.config.autoClicker.originMode || 'absolute',
+            loop: state.config.autoClicker.playbackLoop || 1,
+            playbackInfinite: state.config.autoClicker.playbackInfinite || 0,
+            clicksOnly: state.config.autoClicker.clicksOnly || 0,
+            humanize: state.config.autoClicker.humanize || 0,
+            bezier: state.config.autoClicker.bezier || 0,
+            emergencyStop: (state.config.autoClicker.emergencyStop !== undefined) ? state.config.autoClicker.emergencyStop : 1,
+            countdown: state.config.autoClicker.countdown || 0,
+            createdAt: Date.now()
+          };
+          items.push(newScript);
+          state.config.autoClicker.recordedPath = events;
+          saveCurrentProfileState();
+          syncConfig();
+          renderMouseScriptsList();
+          updateMouseRecorderStats(events);
+          updateMouseRecorderUI();
+          const trigDisplay = nextHk ? ` (${formatKeyDisplay(nextHk)})` : ' (No shortcut)';
+          showToast(`Saved "${newScript.name}" with ${events.length} actions${trigDisplay}`);
+        } else {
+          updateMouseRecorderUI();
+          showToast('Recording ended (no events captured)');
+        }
       } else if (msg.type === 'appSelected') {
         if (msg.path && alInputTarget) {
           alInputTarget.value = msg.path;
@@ -9664,7 +11972,68 @@
         }
         showToast(`Color format changed to ${msg.format}`, 'info');
       } else if (msg.type === 'colorPicked') {
-        showToast(`Color Picked & Copied: ${msg.color}`, 'success');
+        if (msg.target === 'screenScannerPixel') {
+          const inp = document.getElementById('ssInputPixelColor');
+          const chip = document.getElementById('ssPixelChip');
+          if (inp) inp.value = msg.hex || msg.color;
+          if (chip) chip.style.background = msg.hex || msg.color;
+          showToast(`Screen Scanner Color Set: ${msg.hex || msg.color}`, 'success');
+        } else if (msg.target === 'screenScannerPoint') {
+          const ptX = document.getElementById('ssPointX');
+          const ptY = document.getElementById('ssPointY');
+          const ptCol = document.getElementById('ssInputPointColor');
+          const chip = document.getElementById('ssPointChip');
+          if (ptX && typeof msg.x === 'number') ptX.value = msg.x;
+          if (ptY && typeof msg.y === 'number') ptY.value = msg.y;
+          if (ptCol) ptCol.value = msg.hex || msg.color;
+          if (chip) chip.style.background = msg.hex || msg.color;
+          showToast(`Point Set: (${msg.x}, ${msg.y}) - ${msg.hex || msg.color}`, 'success');
+        } else {
+          showToast(`Color Picked & Copied: ${msg.color}`, 'success');
+        }
+      } else if (msg.type === 'screenScanTestResult') {
+        const btn = document.getElementById('ssBtnTestScan');
+        if (btn) btn.disabled = false;
+        if (msg.found) {
+          showToast(`Match FOUND at (${msg.x}, ${msg.y}) in ${msg.elapsedMs}ms!`, 'success');
+        } else {
+          showToast(`No match found on screen (${msg.elapsedMs}ms). Check coordinates or tolerance.`, 'warning');
+        }
+      } else if (msg.type === 'screenScannerImageSelected') {
+        const inp = document.getElementById('ssInputImagePath');
+        if (inp) {
+          inp.value = msg.path || '';
+          updateScreenScannerImagePreview(msg.path);
+        }
+        showToast('Template image selected', 'success');
+      } else if (msg.type === 'screenSnipSaved') {
+        const inp = document.getElementById('ssInputImagePath');
+        if (inp) {
+          inp.value = msg.path || '';
+          updateScreenScannerImagePreview(msg.path);
+        }
+        showToast(`Screen area snipped (${msg.width}x${msg.height})!`, 'success');
+      } else if (msg.type === 'screenRegionSelected') {
+        const bX1 = document.getElementById('ssBoxX1');
+        const bY1 = document.getElementById('ssBoxY1');
+        const bX2 = document.getElementById('ssBoxX2');
+        const bY2 = document.getElementById('ssBoxY2');
+        if (bX1) bX1.value = msg.x1;
+        if (bY1) bY1.value = msg.y1;
+        if (bX2) bX2.value = msg.x2;
+        if (bY2) bY2.value = msg.y2;
+        showToast(`Bounding Box: [${msg.x1}, ${msg.y1}] to [${msg.x2}, ${msg.y2}]`, 'info');
+      } else if (msg.type === 'screenScannerTriggered') {
+        showToast(`Visual Trigger Fired: ${msg.name || 'Screen Scanner'}`, 'info');
+      } else if (msg.type === 'screenScannerItemDisabled') {
+        if (state.config && state.config.screenScanner && Array.isArray(state.config.screenScanner.items)) {
+          const itm = state.config.screenScanner.items.find(x => x.id === msg.id);
+          if (itm) {
+            itm.enabled = 0;
+            renderScreenScannerList();
+            updateGlobalIndicators();
+          }
+        }
       } else if (msg.type === 'moduleEvent') {
         if (msg.message) {
           showToast(msg.message, msg.isError ? 'error' : 'info');
@@ -9730,6 +12099,7 @@
     renderFolderCreator();
     initAutoClicker();
     renderMacroRecorder();
+    renderScreenScanner();
     updateGlobalIndicators();
     renderCuratedPresets();
     renderCustomPresets();
