@@ -407,6 +407,8 @@
   const mrListContainer = document.getElementById('mrListContainer');
   let mousePlaybackScriptId = '';
   let activeRunningScreenTriggers = new Map(); // id -> { name, action, mouseScriptId, macroId, startTime, timer }
+  let activeScanningScreenTriggers = new Set(); // set of itemIds currently actively scanning
+  let screenScannerRunning = false;
 
   // Helper: Post message to AutoHotkey host with resilient offline queue
   let ahkMsgQueue = [];
@@ -6580,7 +6582,7 @@
     filteredItems.forEach((item) => {
       const isEnabled = (item.enabled !== false && item.enabled !== 0);
       const isPlaying = (mousePlaybackActive && mousePlaybackScriptId === item.id);
-      
+
       let scannerRunName = '';
       for (const [sId, info] of activeRunningScreenTriggers.entries()) {
         if (info.action === 'mouseScript' && info.mouseScriptId === item.id) {
@@ -8214,17 +8216,47 @@
       hint.textContent = 'Engine Suspended';
       return;
     }
-    if (activeRunningScreenTriggers && activeRunningScreenTriggers.size > 0) {
+    const ss = (state.config && state.config.screenScanner) || {};
+    const hk = (ss.hotkey && String(ss.hotkey).trim() !== '') ? String(ss.hotkey).trim() : 'F9';
+    const hkDisplay = formatKeyDisplay(hk);
+
+    if (screenScannerRunning || (activeScanningScreenTriggers && activeScanningScreenTriggers.size > 0)) {
+      const cnt = (activeScanningScreenTriggers && activeScanningScreenTriggers.size > 0) ? activeScanningScreenTriggers.size : 1;
+      hint.className = 'hint-tag ss-active-engine-badge is-scanning';
+      hint.style.color = '#ef4444';
+      hint.innerHTML = `<span class="ss-running-dot" style="background:#ef4444;"></span> SCANNING ACTIVE (${cnt}) • Press ${escapeHtml(hkDisplay)} or Stop to halt`;
+    } else if (activeRunningScreenTriggers && activeRunningScreenTriggers.size > 0) {
       const first = activeRunningScreenTriggers.values().next().value;
       hint.className = 'hint-tag ss-active-engine-badge';
       hint.style.color = 'var(--accent-primary)';
-      hint.innerHTML = `<span class="ss-running-dot" style="background:var(--accent-primary);"></span> ACTIVE: ${escapeHtml(first.name || 'Trigger')}`;
+      hint.innerHTML = `<span class="ss-running-dot" style="background:var(--accent-primary);"></span> TRIGGERED: ${escapeHtml(first.name || 'Trigger')}`;
     } else {
-      const rate = (state.config && state.config.screenScanner && state.config.screenScanner.scanRate) || 150;
-      hint.className = 'hint-tag ss-active-engine-badge is-scanning';
-      hint.style.color = '#10b981';
-      hint.innerHTML = `<span class="ss-radar-dot"></span> SCANNING ACTIVE (${rate}ms)`;
+      hint.className = 'hint-tag';
+      hint.style.color = 'var(--text-muted)';
+      hint.innerHTML = `<span>Ready (Press ${escapeHtml(hkDisplay)} or Start to Scan)</span>`;
     }
+  }
+
+  function updateScreenScannerMasterUI(isRunning) {
+    screenScannerRunning = Boolean(isRunning);
+    const ss = (state.config && state.config.screenScanner) || {};
+    const hk = (ss.hotkey && String(ss.hotkey).trim() !== '') ? String(ss.hotkey).trim() : 'F9';
+    const hkDisplay = formatKeyDisplay(hk);
+
+    const hotkeyBox = document.getElementById('ssMasterHotkeyBox');
+    const hotkeyLabel = document.getElementById('ssMasterHotkeyLabel');
+    if (hotkeyLabel) hotkeyLabel.textContent = hkDisplay;
+    if (hotkeyBox) hotkeyBox.title = `Click to record master shortcut (Current: ${hkDisplay})`;
+
+    const btnToggle = document.getElementById('btnToggleScreenScannerMaster');
+    const btnText = document.getElementById('ssMasterToggleBtnText');
+    if (btnToggle) {
+      btnToggle.classList.toggle('is-running', screenScannerRunning);
+    }
+    if (btnText) {
+      btnText.textContent = screenScannerRunning ? `STOP SCAN (${hkDisplay})` : `START SCAN (${hkDisplay})`;
+    }
+    updateScreenScannerEngineStatus();
   }
 
   function renderScreenScanner() {
@@ -8238,7 +8270,7 @@
       masterSwitch.checked = (state.config.screenScanner.enabled !== 0 && state.config.screenScanner.enabled !== false);
     }
 
-    updateScreenScannerEngineStatus();
+    updateScreenScannerMasterUI(screenScannerRunning);
     populateScannerActionDropdowns();
     renderScreenScannerList();
   }
@@ -8259,7 +8291,7 @@
 
     const q = ssSearchQuery.trim().toLowerCase();
     const filtered = q
-      ? items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.mode || '').toLowerCase().includes(q))
+      ? items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.mode || '').toLowerCase().includes(q) || (x.trigger || '').toLowerCase().includes(q))
       : items;
 
     if (filtered.length === 0) {
@@ -8270,12 +8302,14 @@
     }
 
     filtered.forEach((item) => {
+      const isScanning = activeScanningScreenTriggers.has(item.id);
       const isRunning = activeRunningScreenTriggers.has(item.id);
       const runInfo = isRunning ? activeRunningScreenTriggers.get(item.id) : null;
       const isEnabled = (item.enabled !== 0 && item.enabled !== false);
 
       const card = document.createElement('div');
-      card.className = 'shortcut-card' + (!isEnabled ? ' is-disabled' : '') + (isRunning ? ' is-running' : '');
+      card.className = 'shortcut-card' + (!isEnabled ? ' is-disabled' : '') + (isRunning ? ' is-running' : '') + (isScanning ? ' is-scanning' : '');
+      card.className = 'shortcut-card' + (!isEnabled ? ' is-disabled' : '') + (isRunning ? ' is-running' : '') + (isScanning ? ' is-scanning' : '') + (ssEditingId === item.id ? ' is-editing' : '');
       card.dataset.id = item.id;
       card.style.display = 'flex';
       card.style.alignItems = 'center';
@@ -8321,9 +8355,16 @@
       const condLabel = item.condition === 'disappear' ? 'When Disappears' : 'When Appears';
       const repeatLabel = item.repeatRule === 'continuous' ? 'Continuous' : (item.repeatRule === 'once' ? 'Run Once' : `Cooldown ${((item.debounceMs || 2000) / 1000).toFixed(1)}s`);
 
+      const triggerBadge = item.trigger
+        ? `<span class="badge-shortcut" style="padding:2px 8px; font-size:11px; font-weight:700; border-radius:var(--radius-pill); background:var(--surface-color); box-shadow:var(--inset-sm); color:var(--accent-primary);">${escapeHtml(item.trigger)}</span>`
+        : `<span class="badge-shortcut" style="padding:2px 8px; font-size:10px; color:var(--text-muted); border-radius:var(--radius-pill); background:var(--surface-color); box-shadow:var(--inset-sm);">No Shortcut</span>`;
+
       let runningBadgeHtml = '';
+      if (isScanning) {
+        runningBadgeHtml += `<span class="mr-meta-tag ss-running-tag" style="background:#ef4444; color:#fff;"><span class="ss-running-dot" style="background:#fff;"></span> SCANNING ACTIVE</span>`;
+      }
       if (isRunning) {
-        let runText = 'RUNNING NOW';
+        let runText = 'TRIGGERED';
         if (item.actionType === 'mouseScript') {
           runText = `RUNNING SCRIPT: ${targetSubName || 'Mouse Path'}`;
         } else if (item.actionType === 'macro') {
@@ -8335,12 +8376,12 @@
         } else if (item.actionType === 'system') {
           runText = `SYSTEM ${item.systemAction || 'Action'}`;
         }
-        runningBadgeHtml = `<span class="mr-meta-tag ss-running-tag" style="background:#10b981;"><span class="ss-running-dot"></span> ${escapeHtml(runText)}</span>`;
+        runningBadgeHtml += `<span class="mr-meta-tag ss-running-tag" style="background:#10b981;"><span class="ss-running-dot"></span> ${escapeHtml(runText)}</span>`;
       }
 
       card.innerHTML = `
         <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
-          <div class="wm-icon-badge ${isRunning ? 'is-playing' : ''}" style="background:var(--surface-color); color:var(--accent); border:1px solid var(--border-soft); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-btn); flex-shrink:0;">
+          <div class="wm-icon-badge ${isScanning ? 'is-playing' : ''}" style="background:var(--surface-color); color:${isScanning ? '#ef4444' : 'var(--accent)'}; border:1px solid var(--border-soft); width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-btn); flex-shrink:0;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
               <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
@@ -8350,8 +8391,10 @@
             </svg>
           </div>
           <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
-            <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
               <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${escapeHtml(item.name || 'Visual Trigger')}</span>
+              <span class="ss-item-name" style="font-weight:700; font-size:13px; color:var(--text-primary); cursor:pointer;" title="Click to edit">${escapeHtml(item.name || 'Visual Trigger')}</span>
+              ${triggerBadge}
               ${runningBadgeHtml}
             </div>
             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -8363,12 +8406,22 @@
             </div>
           </div>
         </div>
-        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+        <div class="card-actions" style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+          <button class="neumorphic-btn btn-chip btn-scan-ss-item ${isScanning ? 'is-scanning' : ''}" style="${isScanning ? 'color:#ef4444; font-weight:700;' : ''}" title="${isScanning ? 'Scanning active • Click or press ' + (item.trigger || 'shortcut') + ' to Stop' : 'Start scan (or press ' + (item.trigger || 'shortcut') + ')'}">
+            ${isScanning ? '<span class="ss-running-dot" style="background:#ef4444; margin-right:4px;"></span> Stop Scan' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>Start Scan</span>'}
+          </button>
           <button class="neumorphic-btn btn-chip btn-test-ss-item ${isRunning ? 'running' : ''}" title="${isRunning ? 'Currently executing' : 'Test scan this trigger now'}" style="padding:4px 10px; font-size:11px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+              <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+          <button class="card-btn btn-edit btn-edit-ss" title="Edit Visual Trigger">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-            <span>${isRunning ? 'Running...' : 'Test'}</span>
+            <span>${isRunning ? 'Triggered!' : 'Test'}</span>
           </button>
           <div class="toggle-wrapper" title="Toggle trigger active/inactive">
             <input class="toggle-checkbox ss-item-toggle" type="checkbox" ${item.enabled !== 0 && item.enabled !== false ? 'checked' : ''} />
@@ -8376,504 +8429,988 @@
           </div>
           <button class="icon-btn btn-delete-ss" title="Delete trigger" style="color:var(--text-muted); width:30px; height:30px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <button class="card-btn btn-delete btn-delete-ss" title="Delete Visual Trigger">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
           </button>
+          <div class="toggle-wrapper" title="Enable / Disable Trigger">
+            <input class="toggle-checkbox ss-item-toggle" type="checkbox" ${item.enabled !== 0 && item.enabled !== false ? 'checked' : ''} />
+            <div class="toggle-container"><div class="toggle-button"></div></div>
+          </div>
         </div>
       `;
+
+      // Event: Scan Toggle
+      const btnScan = card.querySelector('.btn-scan-ss-item');
+      if (btnScan) {
+        btnScan.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sendToAhk('toggleScreenScannerItem', { id: item.id });
+        });
+      }
 
       // Event: Test Scan single item
       const btnTest = card.querySelector('.btn-test-ss-item');
       if (btnTest) {
         btnTest.addEventListener('click', (e) => {
+          // Event: Click title to edit
+          const titleEl = card.querySelector('.ss-item-name');
+          if (titleEl) {
+            titleEl.addEventListener('click', (e) => {
+              e.stopPropagation();
+              card.classList.add('is-running');
+              btnTest.innerHTML = '<span>Scanning...</span>';
+              btnTest.disabled = true;
+              sendToAhk('testScreenScan', { item: item });
+              showToast(`Testing trigger "${item.name}"...`, 'info');
+              setTimeout(() => {
+                btnTest.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;"><circle cx="12" cy="12" r="3"></circle><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path></svg><span>Test</span>`;
+                btnTest.disabled = false;
+                if (!activeRunningScreenTriggers.has(item.id)) {
+                  card.classList.remove('is-running');
+                }
+              }, 1400);
+              editScreenTrigger(item);
+            });
+          }
+
+          // Event: Edit item
+          const btnEdit = card.querySelector('.btn-edit-ss');
+          if (btnEdit) {
+            btnEdit.addEventListener('click', (e) => {
+              e.stopPropagation();
+              editScreenTrigger(item);
+            });
+          }
+
+          // Event: Toggle enabled/disabled
+          const chk = card.querySelector('.ss-item-toggle');
+          if (chk) {
+            chk.addEventListener('change', (e) => {
+              e.stopPropagation();
+              item.enabled = chk.checked ? 1 : 0;
+              card.classList.toggle('is-disabled', !chk.checked);
+              saveCurrentProfileState();
+              syncConfig();
+              updateGlobalIndicators();
+            });
+          }
+
+          // Event: Delete item
+          const btnDel = card.querySelector('.btn-delete-ss');
+          if (btnDel) {
+            btnDel.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (ssEditingId === item.id) {
+                cancelEditScreenTrigger();
+              }
+              activeScanningScreenTriggers.delete(item.id);
+              activeRunningScreenTriggers.delete(item.id);
+              const origIdx = items.findIndex(x => x.id === item.id);
+              if (origIdx !== -1) {
+                items.splice(origIdx, 1);
+                saveCurrentProfileState();
+                syncConfig();
+                renderScreenScannerList();
+                updateGlobalIndicators();
+                showToast(`Deleted visual trigger: ${item.name}`);
+              }
+            });
+          }
+
+          listContainer.appendChild(card);
+        });
+      }
+
+      let ssEditingId = null;
+
+      function editScreenTrigger(item) {
+        if (!item) return;
+        ssEditingId = item.id;
+
+        const nameInput = document.getElementById('ssInputName');
+        if (nameInput) nameInput.value = item.name || '';
+
+        const triggerInput = document.getElementById('ssInputTrigger');
+        const ssBtnClearTrigger = document.getElementById('ssBtnClearTrigger');
+        if (triggerInput) {
+          triggerInput.value = item.trigger || '';
+          if (ssBtnClearTrigger) {
+            ssBtnClearTrigger.classList.toggle('hidden-field', !item.trigger);
+          }
+        }
+
+        // Detection mode
+        ssCurrentMode = item.mode || 'image';
+        const modeSelector = document.getElementById('ssModeSelector');
+        if (modeSelector) {
+          modeSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === ssCurrentMode);
+          });
+        }
+        const secImage = document.getElementById('ssSectionImage');
+        const secPixel = document.getElementById('ssSectionPixel');
+        const secPoint = document.getElementById('ssSectionPoint');
+        if (secImage) secImage.classList.toggle('hidden-field', ssCurrentMode !== 'image');
+        if (secPixel) secPixel.classList.toggle('hidden-field', ssCurrentMode !== 'pixel');
+        if (secPoint) secPoint.classList.toggle('hidden-field', ssCurrentMode !== 'point');
+
+        // Image details
+        const inputImagePath = document.getElementById('ssInputImagePath');
+        if (inputImagePath) inputImagePath.value = item.imagePath || '';
+        const sliderImageVar = document.getElementById('ssImageVariation');
+        const badgeImageVar = document.getElementById('ssImageVariationVal');
+        if (sliderImageVar) sliderImageVar.value = item.imageVariation || 30;
+        if (badgeImageVar) badgeImageVar.textContent = item.imageVariation || 30;
+        updateScreenScannerImagePreview(item.imagePath || '');
+
+        // Pixel details
+        const inputPixelColor = document.getElementById('ssInputPixelColor');
+        const chipPixel = document.getElementById('ssPixelChip');
+        const sliderPixelVar = document.getElementById('ssPixelVariation');
+        const badgePixelVar = document.getElementById('ssPixelVariationVal');
+        if (inputPixelColor) inputPixelColor.value = item.pixelColor || '#FF0000';
+        if (chipPixel) chipPixel.style.background = item.pixelColor || '#FF0000';
+        if (sliderPixelVar) sliderPixelVar.value = item.pixelVariation || 15;
+        if (badgePixelVar) badgePixelVar.textContent = item.pixelVariation || 15;
+
+        // Point details
+        const pointX = document.getElementById('ssPointX');
+        const pointY = document.getElementById('ssPointY');
+        const inputPointColor = document.getElementById('ssInputPointColor');
+        const chipPoint = document.getElementById('ssPointChip');
+        if (pointX) pointX.value = item.pointX || 960;
+        if (pointY) pointY.value = item.pointY || 540;
+        if (inputPointColor) inputPointColor.value = item.pointColor || '#00FF00';
+        if (chipPoint) chipPoint.style.background = item.pointColor || '#00FF00';
+
+        // Region
+        ssCurrentRegion = item.region || 'fullscreen';
+        const regionSelector = document.getElementById('ssRegionSelector');
+        if (regionSelector) {
+          regionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.reg === ssCurrentRegion);
+          });
+        }
+        const customRegionBox = document.getElementById('ssCustomRegionBox');
+        if (customRegionBox) {
+          customRegionBox.classList.toggle('hidden-field', ssCurrentRegion !== 'custom');
+        }
+        if (item.regionBox) {
+          const bX1 = document.getElementById('ssBoxX1');
+          const bY1 = document.getElementById('ssBoxY1');
+          const bX2 = document.getElementById('ssBoxX2');
+          const bY2 = document.getElementById('ssBoxY2');
+          if (bX1) bX1.value = item.regionBox.x1 || 0;
+          if (bY1) bY1.value = item.regionBox.y1 || 0;
+          if (bX2) bX2.value = item.regionBox.x2 || 1920;
+          if (bY2) bY2.value = item.regionBox.y2 || 1080;
+        }
+
+        // Action
+        ssCurrentAction = item.actionType || 'click';
+        const actionSelector = document.getElementById('ssActionSelector');
+        if (actionSelector) {
+          actionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.act === ssCurrentAction);
+          });
+        }
+        const detailClick = document.getElementById('ssActionDetailClick');
+        const detailMouseScript = document.getElementById('ssActionDetailMouseScript');
+        const detailMacro = document.getElementById('ssActionDetailMacro');
+        const detailKey = document.getElementById('ssActionDetailKey');
+        const detailSystem = document.getElementById('ssActionDetailSystem');
+        if (detailClick) detailClick.classList.toggle('hidden-field', ssCurrentAction !== 'click');
+        if (detailMouseScript) detailMouseScript.classList.toggle('hidden-field', ssCurrentAction !== 'mouseScript');
+        if (detailMacro) detailMacro.classList.toggle('hidden-field', ssCurrentAction !== 'macro');
+        if (detailKey) detailKey.classList.toggle('hidden-field', ssCurrentAction !== 'key');
+        if (detailSystem) detailSystem.classList.toggle('hidden-field', ssCurrentAction !== 'system');
+
+        // Click details
+        ssCurrentClickBtn = item.clickButton || 'Left';
+        const clickBtnSelector = document.getElementById('ssClickBtnSelector');
+        if (clickBtnSelector) {
+          clickBtnSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.btn === ssCurrentClickBtn);
+          });
+        }
+        const clickOffsetX = document.getElementById('ssClickOffsetX');
+        const clickOffsetY = document.getElementById('ssClickOffsetY');
+        if (clickOffsetX) clickOffsetX.value = item.clickOffsetX || 0;
+        if (clickOffsetY) clickOffsetY.value = item.clickOffsetY || 0;
+
+        // Sub-selects
+        const selMouse = document.getElementById('ssSelectMouseScript');
+        if (selMouse && item.mouseScriptId) selMouse.value = item.mouseScriptId;
+        const selMacro = document.getElementById('ssSelectMacro');
+        if (selMacro && item.macroId) selMacro.value = item.macroId;
+        const inputKey = document.getElementById('ssInputKey');
+        if (inputKey) inputKey.value = item.keyToSend || '';
+        const selSys = document.getElementById('ssSelectSystemAction');
+        if (selSys && item.systemAction) selSys.value = item.systemAction;
+
+        // Scan rate
+        ssScanRate = item.scanRate || 150;
+        const scanRateSelector = document.getElementById('ssScanRateSelector');
+        if (scanRateSelector) {
+          scanRateSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.classList.toggle('active', parseInt(btn.dataset.rate, 10) === ssScanRate);
+          });
+        }
+
+        // Condition
+        ssCondition = item.condition || 'appear';
+        const conditionSelector = document.getElementById('ssConditionSelector');
+        if (conditionSelector) {
+          conditionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.cond === ssCondition);
+          });
+        }
+
+        // Repeat rule
+        ssRepeat = item.repeatRule || 'debounce';
+        const repeatSelector = document.getElementById('ssRepeatSelector');
+        if (repeatSelector) {
+          repeatSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.rep === ssRepeat);
+          });
+        }
+
+        // Debounce
+        const debounceInput = document.getElementById('ssDebounceInput');
+        if (debounceInput) debounceInput.value = ((item.debounceMs || 2000) / 1000).toFixed(1);
+
+        // Alerts
+        const optSound = document.getElementById('ssOptSound');
+        if (optSound) optSound.checked = (item.soundAlert !== false && item.soundAlert !== 0);
+        const optOsd = document.getElementById('ssOptOsd');
+        if (optOsd) optOsd.checked = (item.osdAlert !== false && item.osdAlert !== 0);
+
+        // Form button state
+        const btnAddText = document.getElementById('ssBtnAddTriggerText');
+        if (btnAddText) btnAddText.textContent = 'SAVE CHANGES';
+        const btnCancel = document.getElementById('ssBtnCancelEdit');
+        if (btnCancel) btnCancel.classList.remove('hidden-field');
+
+        renderScreenScannerList();
+
+        // Scroll to form
+        const setupCard = document.querySelector('#panel-screenScanner .ac-setting-card');
+        if (setupCard) setupCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (nameInput) nameInput.focus();
+        showToast(`Editing visual trigger: ${item.name || 'Trigger'}`, 'info');
+      }
+
+      function cancelEditScreenTrigger() {
+        ssEditingId = null;
+        const nameInput = document.getElementById('ssInputName');
+        if (nameInput) nameInput.value = '';
+        const triggerInput = document.getElementById('ssInputTrigger');
+        if (triggerInput) {
+          triggerInput.value = '';
+          triggerInput.placeholder = 'Shortcut (e.g. F9)...';
+        }
+        const ssBtnClearTrigger = document.getElementById('ssBtnClearTrigger');
+        if (ssBtnClearTrigger) ssBtnClearTrigger.classList.add('hidden-field');
+
+        const btnAddText = document.getElementById('ssBtnAddTriggerText');
+        if (btnAddText) btnAddText.textContent = 'ADD VISUAL TRIGGER';
+        const btnCancel = document.getElementById('ssBtnCancelEdit');
+        if (btnCancel) btnCancel.classList.add('hidden-field');
+      }
+
+      let activeSsMasterRecording = false;
+      let activeSsMasterTargetBox = null;
+
+      function stopSsMasterRecording(restore = true) {
+        if (activeSsMasterRecording && activeSsMasterTargetBox && typeof activeSsMasterTargetBox._cancelSsMasterRecording === 'function') {
+          activeSsMasterTargetBox._cancelSsMasterRecording(restore);
+        }
+      }
+
+      function setupScreenScannerMasterHotkey() {
+        const boxEl = document.getElementById('ssMasterHotkeyBox');
+        const labelEl = document.getElementById('ssMasterHotkeyLabel');
+        if (!boxEl || boxEl.dataset.bound) return;
+        boxEl.dataset.bound = 'true';
+
+        boxEl.addEventListener('click', (e) => {
           e.stopPropagation();
-          card.classList.add('is-running');
-          btnTest.innerHTML = '<span>Scanning...</span>';
-          btnTest.disabled = true;
-          sendToAhk('testScreenScan', { item: item });
-          showToast(`Testing trigger "${item.name}"...`, 'info');
-          setTimeout(() => {
-            btnTest.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>Test</span>`;
-            btnTest.disabled = false;
-            if (!activeRunningScreenTriggers.has(item.id)) {
-              card.classList.remove('is-running');
+          e.preventDefault();
+
+          if (activeSsMasterRecording) {
+            stopSsMasterRecording(true);
+            return;
+          }
+
+          if (typeof stopActiveBadgeRecording === 'function') {
+            stopActiveBadgeRecording(true);
+          }
+          if (typeof stopAcRecording === 'function') {
+            stopAcRecording(true);
+          }
+
+          const ss = (state.config && state.config.screenScanner) || {};
+          const originalHk = (ss.hotkey && String(ss.hotkey).trim() !== '') ? String(ss.hotkey).trim() : 'F9';
+
+          activeSsMasterRecording = true;
+          activeSsMasterTargetBox = boxEl;
+          boxEl.classList.add('is-recording');
+          if (labelEl) labelEl.textContent = 'Press key...';
+
+          let pendingMod = null;
+
+          function onKeyDown(evt) {
+            evt.preventDefault();
+            evt.stopPropagation();
+
+            if (evt.key === 'Escape') {
+              cleanup(true);
+              showToast('Shortcut change cancelled');
+              return;
             }
-          }, 1400);
+
+            const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+            const parts = [];
+            if (evt.ctrlKey) parts.push('Ctrl');
+            if (evt.altKey) parts.push('Alt');
+            if (evt.shiftKey) parts.push('Shift');
+            if (evt.metaKey) parts.push('Win');
+
+            if (isModifier) {
+              pendingMod = (evt.key === 'Control') ? 'Ctrl' : ((evt.key === 'Shift') ? 'Shift' : ((evt.key === 'Alt') ? 'Alt' : 'Win'));
+              if (labelEl) labelEl.textContent = parts.join(' + ') + ' + ...';
+              return;
+            }
+
+            pendingMod = null;
+
+            let key = evt.key;
+            if (evt.code && evt.code.startsWith('Key')) {
+              key = evt.code.slice(3).toUpperCase();
+            } else if (evt.code && evt.code.startsWith('Digit')) {
+              key = evt.code.slice(5);
+            } else if (evt.code && evt.code.startsWith('Numpad')) {
+              key = evt.code;
+            } else if (key === ' ') {
+              key = 'Space';
+            } else if (key === 'ArrowUp') {
+              key = 'Up';
+            } else if (key === 'ArrowDown') {
+              key = 'Down';
+            } else if (key === 'ArrowLeft') {
+              key = 'Left';
+            } else if (key === 'ArrowRight') {
+              key = 'Right';
+            } else if (key === 'PageUp') {
+              key = 'PgUp';
+            } else if (key === 'PageDown') {
+              key = 'PgDn';
+            } else if (evt.code === 'Minus') {
+              key = '-';
+            } else if (evt.code === 'Equal') {
+              key = '=';
+            } else if (evt.code === 'BracketLeft') {
+              key = '[';
+            } else if (evt.code === 'BracketRight') {
+              key = ']';
+            } else if (evt.code === 'Backslash') {
+              key = '\\';
+            } else if (evt.code === 'Semicolon') {
+              key = ';';
+            } else if (evt.code === 'Quote') {
+              key = "'";
+            } else if (evt.code === 'Backquote') {
+              key = '`';
+            } else if (evt.code === 'Comma') {
+              key = ',';
+            } else if (evt.code === 'Period') {
+              key = '.';
+            } else if (evt.code === 'Slash') {
+              key = '/';
+            } else if (key.length === 1) {
+              key = key.toUpperCase();
+            }
+
+            if (!parts.includes(key)) {
+              parts.push(key);
+            }
+
+            const combo = parts.join(' + ');
+            const ahkHk = comboToAhk(combo);
+
+            if (!state.config.screenScanner) state.config.screenScanner = {};
+            state.config.screenScanner.hotkey = ahkHk;
+
+            cleanup(false);
+            saveCurrentProfileState();
+            syncConfig();
+            updateScreenScannerMasterUI(screenScannerRunning);
+            showToast(`Screen Scanner shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+          }
+
+          function onKeyUp(evt) {
+            if (pendingMod) {
+              const combo = pendingMod;
+              const ahkHk = comboToAhk(combo);
+              if (!state.config.screenScanner) state.config.screenScanner = {};
+              state.config.screenScanner.hotkey = ahkHk;
+              cleanup(false);
+              saveCurrentProfileState();
+              syncConfig();
+              updateScreenScannerMasterUI(screenScannerRunning);
+              showToast(`Screen Scanner shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+              pendingMod = null;
+            }
+          }
+
+          function onDocClick(evt) {
+            if (!boxEl.contains(evt.target)) {
+              cleanup(true);
+            }
+          }
+
+          function cleanup(restore) {
+            activeSsMasterRecording = false;
+            activeSsMasterTargetBox = null;
+            boxEl.classList.remove('is-recording');
+            window.removeEventListener('keydown', onKeyDown, true);
+            window.removeEventListener('keyup', onKeyUp, true);
+            document.removeEventListener('click', onDocClick, true);
+            boxEl._cancelSsMasterRecording = null;
+            if (restore) {
+              const curSs = (state.config && state.config.screenScanner) || {};
+              const curHk = curSs.hotkey || 'F9';
+              if (labelEl) labelEl.textContent = formatKeyDisplay(curHk);
+            }
+          }
+
+          boxEl._cancelSsMasterRecording = cleanup;
+
+          window.addEventListener('keydown', onKeyDown, true);
+          window.addEventListener('keyup', onKeyUp, true);
+          setTimeout(() => {
+            document.addEventListener('click', onDocClick, true);
+          }, 50);
         });
       }
 
-      // Event: Toggle enabled/disabled
-      const chk = card.querySelector('.ss-item-toggle');
-      if (chk) {
-        chk.addEventListener('change', (e) => {
-          e.stopPropagation();
-          item.enabled = chk.checked ? 1 : 0;
-          card.classList.toggle('is-disabled', !chk.checked);
-          saveCurrentProfileState();
-          syncConfig();
-          updateGlobalIndicators();
-        });
-      }
+      function initScreenScanner() {
+        // Master Hotkey Setup
+        setupScreenScannerMasterHotkey();
 
-      // Event: Delete item
-      const btnDel = card.querySelector('.btn-delete-ss');
-      if (btnDel) {
-        btnDel.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const origIdx = items.findIndex(x => x.id === item.id);
-          if (origIdx !== -1) {
-            items.splice(origIdx, 1);
+        // Master Start/Stop Scan Button
+        const btnToggleMaster = document.getElementById('btnToggleScreenScannerMaster');
+        if (btnToggleMaster && !btnToggleMaster.dataset.bound) {
+          btnToggleMaster.dataset.bound = 'true';
+          btnToggleMaster.addEventListener('click', () => {
+            sendToAhk('toggleScreenScannerMaster');
+          });
+        }
+
+        // 1. Master Toggle
+        const masterSwitch = document.getElementById('ssMasterSwitch');
+        if (masterSwitch) {
+          masterSwitch.addEventListener('change', () => {
+            if (!state.config.screenScanner) state.config.screenScanner = {};
+            state.config.screenScanner.enabled = masterSwitch.checked ? 1 : 0;
+            saveCurrentProfileState();
+            syncConfig();
+            showToast(masterSwitch.checked ? 'Screen Scanner Engine Enabled' : 'Screen Scanner Engine Suspended');
+          });
+        }
+
+        // 2. Detection Mode Selector
+        const modeSelector = document.getElementById('ssModeSelector');
+        const secImage = document.getElementById('ssSectionImage');
+        const secPixel = document.getElementById('ssSectionPixel');
+        const secPoint = document.getElementById('ssSectionPoint');
+
+        if (modeSelector) {
+          modeSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              modeSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              ssCurrentMode = btn.dataset.mode || 'image';
+
+              if (secImage) secImage.classList.toggle('hidden-field', ssCurrentMode !== 'image');
+              if (secPixel) secPixel.classList.toggle('hidden-field', ssCurrentMode !== 'pixel');
+              if (secPoint) secPoint.classList.toggle('hidden-field', ssCurrentMode !== 'point');
+            });
+          });
+        }
+
+        // 3. Image Mode Events
+        const btnBrowseImage = document.getElementById('ssBtnBrowseImage');
+        if (btnBrowseImage) {
+          btnBrowseImage.addEventListener('click', () => {
+            sendToAhk('browseImageForScanner');
+          });
+        }
+
+        const btnSnipImage = document.getElementById('ssBtnSnipImage');
+        if (btnSnipImage) {
+          btnSnipImage.addEventListener('click', () => {
+            sendToAhk('startScreenSnip');
+            showToast('Click and drag on screen to crop template image...', 'info');
+          });
+        }
+
+        const inputImagePath = document.getElementById('ssInputImagePath');
+        if (inputImagePath) {
+          inputImagePath.addEventListener('input', () => {
+            updateScreenScannerImagePreview(inputImagePath.value);
+          });
+        }
+
+        const sliderImageVar = document.getElementById('ssImageVariation');
+        const badgeImageVar = document.getElementById('ssImageVariationVal');
+        if (sliderImageVar && badgeImageVar) {
+          sliderImageVar.addEventListener('input', () => {
+            badgeImageVar.textContent = sliderImageVar.value;
+          });
+        }
+
+        // 4. Pixel Mode Events
+        const btnPickColor = document.getElementById('ssBtnPickColor');
+        if (btnPickColor) {
+          btnPickColor.addEventListener('click', () => {
+            sendToAhk('pickScreenColorForScanner', { target: 'screenScannerPixel' });
+            showToast('Move reticle over target pixel and click to capture color...', 'info');
+          });
+        }
+
+        const inputPixelColor = document.getElementById('ssInputPixelColor');
+        const chipPixel = document.getElementById('ssPixelChip');
+        if (inputPixelColor && chipPixel) {
+          inputPixelColor.addEventListener('input', () => {
+            const col = inputPixelColor.value.trim();
+            if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(col)) {
+              chipPixel.style.background = col;
+            }
+          });
+        }
+
+        const sliderPixelVar = document.getElementById('ssPixelVariation');
+        const badgePixelVar = document.getElementById('ssPixelVariationVal');
+        if (sliderPixelVar && badgePixelVar) {
+          sliderPixelVar.addEventListener('input', () => {
+            badgePixelVar.textContent = sliderPixelVar.value;
+          });
+        }
+
+        // 5. Point Watcher Mode Events
+        const btnPickPoint = document.getElementById('ssBtnPickPoint');
+        if (btnPickPoint) {
+          btnPickPoint.addEventListener('click', () => {
+            sendToAhk('pickScreenColorForScanner', { target: 'screenScannerPoint' });
+            showToast('Click exact pixel on screen to capture position and color...', 'info');
+          });
+        }
+
+        const inputPointColor = document.getElementById('ssInputPointColor');
+        const chipPoint = document.getElementById('ssPointChip');
+        if (inputPointColor && chipPoint) {
+          inputPointColor.addEventListener('input', () => {
+            const col = inputPointColor.value.trim();
+            if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(col)) {
+              chipPoint.style.background = col;
+            }
+          });
+        }
+
+        // 6. Region Selector
+        const regionSelector = document.getElementById('ssRegionSelector');
+        const customRegionBox = document.getElementById('ssCustomRegionBox');
+        if (regionSelector) {
+          regionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              regionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              ssCurrentRegion = btn.dataset.reg || 'fullscreen';
+              if (customRegionBox) {
+                customRegionBox.classList.toggle('hidden-field', ssCurrentRegion !== 'custom');
+              }
+            });
+          });
+        }
+
+        const btnSelectArea = document.getElementById('ssBtnSelectArea');
+        if (btnSelectArea) {
+          btnSelectArea.addEventListener('click', () => {
+            sendToAhk('startScreenRegionSelect');
+            showToast('Click and drag on screen to define bounding box...', 'info');
+          });
+        }
+
+        // 7. Action Selector
+        const actionSelector = document.getElementById('ssActionSelector');
+        const detailClick = document.getElementById('ssActionDetailClick');
+        const detailMouseScript = document.getElementById('ssActionDetailMouseScript');
+        const detailMacro = document.getElementById('ssActionDetailMacro');
+        const detailKey = document.getElementById('ssActionDetailKey');
+        const detailSystem = document.getElementById('ssActionDetailSystem');
+
+        if (actionSelector) {
+          actionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              actionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              ssCurrentAction = btn.dataset.act || 'click';
+
+              if (detailClick) detailClick.classList.toggle('hidden-field', ssCurrentAction !== 'click');
+              if (detailMouseScript) detailMouseScript.classList.toggle('hidden-field', ssCurrentAction !== 'mouseScript');
+              if (detailMacro) detailMacro.classList.toggle('hidden-field', ssCurrentAction !== 'macro');
+              if (detailKey) detailKey.classList.toggle('hidden-field', ssCurrentAction !== 'key');
+              if (detailSystem) detailSystem.classList.toggle('hidden-field', ssCurrentAction !== 'system');
+            });
+          });
+        }
+
+        // 8. Click Button Selector
+        const clickBtnSelector = document.getElementById('ssClickBtnSelector');
+        if (clickBtnSelector) {
+          clickBtnSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              clickBtnSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              ssCurrentClickBtn = btn.dataset.btn || 'Left';
+            });
+          });
+        }
+
+        // 9. Scan Rate Selector
+        const scanRateSelector = document.getElementById('ssScanRateSelector');
+        if (scanRateSelector) {
+          scanRateSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              scanRateSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              ssScanRate = parseInt(btn.dataset.rate, 10) || 150;
+              if (!state.config.screenScanner) state.config.screenScanner = {};
+              state.config.screenScanner.scanRate = ssScanRate;
+              saveCurrentProfileState();
+              syncConfig();
+            });
+          });
+        }
+
+        // 10. Condition & Repeat Selectors
+        const conditionSelector = document.getElementById('ssConditionSelector');
+        if (conditionSelector) {
+          conditionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              conditionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              ssCondition = btn.dataset.cond || 'appear';
+            });
+          });
+        }
+
+        const repeatSelector = document.getElementById('ssRepeatSelector');
+        if (repeatSelector) {
+          repeatSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              repeatSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              ssRepeat = btn.dataset.rep || 'debounce';
+            });
+          });
+        }
+
+        // 11. Search Filter
+        const searchFilter = document.getElementById('ssSearchFilter');
+        if (searchFilter) {
+          searchFilter.addEventListener('input', () => {
+            ssSearchQuery = searchFilter.value;
+            renderScreenScannerList();
+          });
+        }
+
+        // 11. Trigger Shortcut Box Recorder
+        const ssTriggerBox = document.getElementById('ssTriggerBox');
+        const ssInputTrigger = document.getElementById('ssInputTrigger');
+        const ssBtnClearTrigger = document.getElementById('ssBtnClearTrigger');
+        if (ssTriggerBox && ssInputTrigger) {
+          setupKeyCombinationBox(ssTriggerBox, ssInputTrigger, ssBtnClearTrigger, null, () => {
+            const btn = document.getElementById('ssBtnAddTrigger');
+            if (btn) btn.click();
+          });
+        }
+
+        // 12. Add Trigger Button
+        const btnAddTrigger = document.getElementById('ssBtnAddTrigger');
+        if (btnAddTrigger) {
+          btnAddTrigger.addEventListener('click', () => {
+            const nameInput = document.getElementById('ssInputName');
+            const name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : 'Screen Trigger';
+            const triggerInput = document.getElementById('ssInputTrigger');
+            const trigger = (triggerInput && triggerInput.value.trim()) ? triggerInput.value.trim() : '';
+
+            // Collect parameters according to mode
+            const imagePath = (document.getElementById('ssInputImagePath') || {}).value || '';
+            const imageVariation = parseInt((document.getElementById('ssImageVariation') || {}).value, 10) || 30;
+
+            const pixelColor = (document.getElementById('ssInputPixelColor') || {}).value || '#FF0000';
+            const pixelVariation = parseInt((document.getElementById('ssPixelVariation') || {}).value, 10) || 15;
+
+            const pointX = parseInt((document.getElementById('ssPointX') || {}).value, 10) || 960;
+            const pointY = parseInt((document.getElementById('ssPointY') || {}).value, 10) || 540;
+            const pointColor = (document.getElementById('ssInputPointColor') || {}).value || '#00FF00';
+
+            if (ssCurrentMode === 'image' && (!imagePath || !imagePath.trim())) {
+              showToast('Please select or snip a template image first!', 'warning');
+              return;
+            }
+
+            const boxX1 = parseInt((document.getElementById('ssBoxX1') || {}).value, 10) || 0;
+            const boxY1 = parseInt((document.getElementById('ssBoxY1') || {}).value, 10) || 0;
+            const boxX2 = parseInt((document.getElementById('ssBoxX2') || {}).value, 10) || 1920;
+            const boxY2 = parseInt((document.getElementById('ssBoxY2') || {}).value, 10) || 1080;
+
+            const clickOffsetX = parseInt((document.getElementById('ssClickOffsetX') || {}).value, 10) || 0;
+            const clickOffsetY = parseInt((document.getElementById('ssClickOffsetY') || {}).value, 10) || 0;
+            const mouseScriptId = (document.getElementById('ssSelectMouseScript') || {}).value || '';
+            const macroId = (document.getElementById('ssSelectMacro') || {}).value || '';
+            const keyToSend = (document.getElementById('ssInputKey') || {}).value || '';
+            const systemAction = (document.getElementById('ssSelectSystemAction') || {}).value || 'beep';
+
+            const debounceSec = parseFloat((document.getElementById('ssDebounceInput') || {}).value) || 2.0;
+            const optSound = document.getElementById('ssOptSound');
+            const optOsd = document.getElementById('ssOptOsd');
+
+            const newRule = {
+              id: 'ss-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+              name: name,
+              trigger: trigger,
+              enabled: 1,
+              mode: ssCurrentMode,
+              imagePath: imagePath.trim(),
+              imageVariation: imageVariation,
+              imageTrans: '',
+              pixelColor: pixelColor.trim(),
+              pixelVariation: pixelVariation,
+              pointX: pointX,
+              pointY: pointY,
+              pointColor: pointColor.trim(),
+              region: ssCurrentRegion,
+              regionBox: { x1: boxX1, y1: boxY1, x2: boxX2, y2: boxY2 },
+              actionType: ssCurrentAction,
+              clickButton: ssCurrentClickBtn,
+              clickOffsetX: clickOffsetX,
+              clickOffsetY: clickOffsetY,
+              mouseScriptId: mouseScriptId,
+              macroId: macroId,
+              keyToSend: keyToSend.trim(),
+              systemAction: systemAction,
+              condition: ssCondition,
+              repeatRule: ssRepeat,
+              debounceMs: Math.round(debounceSec * 1000),
+              soundAlert: optSound ? optSound.checked : true,
+              osdAlert: optOsd ? optOsd.checked : true
+            };
+
+            if (ssEditingId && state.config.screenScanner && Array.isArray(state.config.screenScanner.items)) {
+              const existing = state.config.screenScanner.items.find(x => x.id === ssEditingId);
+              if (existing) {
+                existing.name = name;
+                existing.trigger = trigger;
+                existing.mode = ssCurrentMode;
+                existing.imagePath = imagePath.trim();
+                existing.imageVariation = imageVariation;
+                existing.pixelColor = pixelColor.trim();
+                existing.pixelVariation = pixelVariation;
+                existing.pointX = pointX;
+                existing.pointY = pointY;
+                existing.pointColor = pointColor.trim();
+                existing.region = ssCurrentRegion;
+                existing.regionBox = { x1: boxX1, y1: boxY1, x2: boxX2, y2: boxY2 };
+                existing.actionType = ssCurrentAction;
+                existing.clickButton = ssCurrentClickBtn;
+                existing.clickOffsetX = clickOffsetX;
+                existing.clickOffsetY = clickOffsetY;
+                existing.mouseScriptId = mouseScriptId;
+                existing.macroId = macroId;
+                existing.keyToSend = keyToSend.trim();
+                existing.systemAction = systemAction;
+                existing.condition = ssCondition;
+                existing.repeatRule = ssRepeat;
+                existing.debounceMs = Math.round(debounceSec * 1000);
+                existing.soundAlert = optSound ? optSound.checked : true;
+                existing.osdAlert = optOsd ? optOsd.checked : true;
+
+                cancelEditScreenTrigger();
+                saveCurrentProfileState();
+                syncConfig();
+                renderScreenScannerList();
+                updateGlobalIndicators();
+                showToast(`Visual Trigger "${name}" updated!`, 'success');
+                return;
+              }
+            }
+
+            if (!state.config.screenScanner) {
+              state.config.screenScanner = { enabled: 1, scanRate: ssScanRate, items: [] };
+            }
+            if (!Array.isArray(state.config.screenScanner.items)) {
+              state.config.screenScanner.items = [];
+            }
+
+            state.config.screenScanner.items.push(newRule);
             saveCurrentProfileState();
             syncConfig();
             renderScreenScannerList();
             updateGlobalIndicators();
-            showToast(`Deleted visual trigger: ${item.name}`);
+
+            if (nameInput) nameInput.value = '';
+            if (triggerInput) {
+              triggerInput.value = '';
+              triggerInput.placeholder = 'Shortcut (e.g. F9)...';
+            }
+            if (ssBtnClearTrigger) ssBtnClearTrigger.classList.add('hidden-field');
+            showToast(`Visual Trigger "${name}" added! Press ${trigger || 'Start Scan'} to scan.`, 'success');
+          });
+        }
+
+        // 13. Instant Test Scan Button
+        const btnTestScan = document.getElementById('ssBtnTestScan');
+        if (btnTestScan) {
+          btnTestScan.addEventListener('click', () => {
+            const imagePath = (document.getElementById('ssInputImagePath') || {}).value || '';
+            const imageVariation = parseInt((document.getElementById('ssImageVariation') || {}).value, 10) || 30;
+            const pixelColor = (document.getElementById('ssInputPixelColor') || {}).value || '#FF0000';
+            const pixelVariation = parseInt((document.getElementById('ssPixelVariation') || {}).value, 10) || 15;
+            const pointX = parseInt((document.getElementById('ssPointX') || {}).value, 10) || 960;
+            const pointY = parseInt((document.getElementById('ssPointY') || {}).value, 10) || 540;
+            const pointColor = (document.getElementById('ssInputPointColor') || {}).value || '#00FF00';
+
+            const boxX1 = parseInt((document.getElementById('ssBoxX1') || {}).value, 10) || 0;
+            const boxY1 = parseInt((document.getElementById('ssBoxY1') || {}).value, 10) || 0;
+            const boxX2 = parseInt((document.getElementById('ssBoxX2') || {}).value, 10) || 1920;
+            const boxY2 = parseInt((document.getElementById('ssBoxY2') || {}).value, 10) || 1080;
+
+            const draftItem = {
+              mode: ssCurrentMode,
+              imagePath: imagePath.trim(),
+              imageVariation: imageVariation,
+              pixelColor: pixelColor.trim(),
+              pixelVariation: pixelVariation,
+              pointX: pointX,
+              pointY: pointY,
+              pointColor: pointColor.trim(),
+              region: ssCurrentRegion,
+              regionBox: { x1: boxX1, y1: boxY1, x2: boxX2, y2: boxY2 }
+            };
+
+            if (ssCurrentMode === 'image' && (!imagePath || !imagePath.trim())) {
+              showToast('Select or snip a template image first to test!', 'warning');
+              return;
+            }
+
+            btnTestScan.disabled = true;
+            sendToAhk('testScreenScan', { item: draftItem });
+            showToast('Scanning screen now...', 'info');
+            // 13. Cancel Edit Button
+            const btnCancelEdit = document.getElementById('ssBtnCancelEdit');
+            if (btnCancelEdit) {
+              btnCancelEdit.addEventListener('click', () => {
+                cancelEditScreenTrigger();
+                renderScreenScannerList();
+                showToast('Editing cancelled', 'info');
+              });
+            }
+
+            renderScreenScanner();
           }
-        });
-      }
-
-      listContainer.appendChild(card);
-    });
-  }
-
-  function initScreenScanner() {
-    // 1. Master Toggle
-    const masterSwitch = document.getElementById('ssMasterSwitch');
-    if (masterSwitch) {
-      masterSwitch.addEventListener('change', () => {
-        if (!state.config.screenScanner) state.config.screenScanner = {};
-        state.config.screenScanner.enabled = masterSwitch.checked ? 1 : 0;
-        saveCurrentProfileState();
-        syncConfig();
-        showToast(masterSwitch.checked ? 'Screen Scanner Engine Enabled' : 'Screen Scanner Engine Suspended');
-      });
-    }
-
-    // 2. Detection Mode Selector
-    const modeSelector = document.getElementById('ssModeSelector');
-    const secImage = document.getElementById('ssSectionImage');
-    const secPixel = document.getElementById('ssSectionPixel');
-    const secPoint = document.getElementById('ssSectionPoint');
-
-    if (modeSelector) {
-      modeSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          modeSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          ssCurrentMode = btn.dataset.mode || 'image';
-
-          if (secImage) secImage.classList.toggle('hidden-field', ssCurrentMode !== 'image');
-          if (secPixel) secPixel.classList.toggle('hidden-field', ssCurrentMode !== 'pixel');
-          if (secPoint) secPoint.classList.toggle('hidden-field', ssCurrentMode !== 'point');
-        });
-      });
-    }
-
-    // 3. Image Mode Events
-    const btnBrowseImage = document.getElementById('ssBtnBrowseImage');
-    if (btnBrowseImage) {
-      btnBrowseImage.addEventListener('click', () => {
-        sendToAhk('browseImageForScanner');
-      });
-    }
-
-    const btnSnipImage = document.getElementById('ssBtnSnipImage');
-    if (btnSnipImage) {
-      btnSnipImage.addEventListener('click', () => {
-        sendToAhk('startScreenSnip');
-        showToast('Click and drag on screen to crop template image...', 'info');
-      });
-    }
-
-    const inputImagePath = document.getElementById('ssInputImagePath');
-    if (inputImagePath) {
-      inputImagePath.addEventListener('input', () => {
-        updateScreenScannerImagePreview(inputImagePath.value);
-      });
-    }
-
-    const sliderImageVar = document.getElementById('ssImageVariation');
-    const badgeImageVar = document.getElementById('ssImageVariationVal');
-    if (sliderImageVar && badgeImageVar) {
-      sliderImageVar.addEventListener('input', () => {
-        badgeImageVar.textContent = sliderImageVar.value;
-      });
-    }
-
-    // 4. Pixel Mode Events
-    const btnPickColor = document.getElementById('ssBtnPickColor');
-    if (btnPickColor) {
-      btnPickColor.addEventListener('click', () => {
-        sendToAhk('pickScreenColorForScanner', { target: 'screenScannerPixel' });
-        showToast('Move reticle over target pixel and click to capture color...', 'info');
-      });
-    }
-
-    const inputPixelColor = document.getElementById('ssInputPixelColor');
-    const chipPixel = document.getElementById('ssPixelChip');
-    if (inputPixelColor && chipPixel) {
-      inputPixelColor.addEventListener('input', () => {
-        const col = inputPixelColor.value.trim();
-        if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(col)) {
-          chipPixel.style.background = col;
-        }
-      });
-    }
-
-    const sliderPixelVar = document.getElementById('ssPixelVariation');
-    const badgePixelVar = document.getElementById('ssPixelVariationVal');
-    if (sliderPixelVar && badgePixelVar) {
-      sliderPixelVar.addEventListener('input', () => {
-        badgePixelVar.textContent = sliderPixelVar.value;
-      });
-    }
-
-    // 5. Point Watcher Mode Events
-    const btnPickPoint = document.getElementById('ssBtnPickPoint');
-    if (btnPickPoint) {
-      btnPickPoint.addEventListener('click', () => {
-        sendToAhk('pickScreenColorForScanner', { target: 'screenScannerPoint' });
-        showToast('Click exact pixel on screen to capture position and color...', 'info');
-      });
-    }
-
-    const inputPointColor = document.getElementById('ssInputPointColor');
-    const chipPoint = document.getElementById('ssPointChip');
-    if (inputPointColor && chipPoint) {
-      inputPointColor.addEventListener('input', () => {
-        const col = inputPointColor.value.trim();
-        if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(col)) {
-          chipPoint.style.background = col;
-        }
-      });
-    }
-
-    // 6. Region Selector
-    const regionSelector = document.getElementById('ssRegionSelector');
-    const customRegionBox = document.getElementById('ssCustomRegionBox');
-    if (regionSelector) {
-      regionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          regionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          ssCurrentRegion = btn.dataset.reg || 'fullscreen';
-          if (customRegionBox) {
-            customRegionBox.classList.toggle('hidden-field', ssCurrentRegion !== 'custom');
-          }
-        });
-      });
-    }
-
-    const btnSelectArea = document.getElementById('ssBtnSelectArea');
-    if (btnSelectArea) {
-      btnSelectArea.addEventListener('click', () => {
-        sendToAhk('startScreenRegionSelect');
-        showToast('Click and drag on screen to define bounding box...', 'info');
-      });
-    }
-
-    // 7. Action Selector
-    const actionSelector = document.getElementById('ssActionSelector');
-    const detailClick = document.getElementById('ssActionDetailClick');
-    const detailMouseScript = document.getElementById('ssActionDetailMouseScript');
-    const detailMacro = document.getElementById('ssActionDetailMacro');
-    const detailKey = document.getElementById('ssActionDetailKey');
-    const detailSystem = document.getElementById('ssActionDetailSystem');
-
-    if (actionSelector) {
-      actionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          actionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          ssCurrentAction = btn.dataset.act || 'click';
-
-          if (detailClick) detailClick.classList.toggle('hidden-field', ssCurrentAction !== 'click');
-          if (detailMouseScript) detailMouseScript.classList.toggle('hidden-field', ssCurrentAction !== 'mouseScript');
-          if (detailMacro) detailMacro.classList.toggle('hidden-field', ssCurrentAction !== 'macro');
-          if (detailKey) detailKey.classList.toggle('hidden-field', ssCurrentAction !== 'key');
-          if (detailSystem) detailSystem.classList.toggle('hidden-field', ssCurrentAction !== 'system');
-        });
-      });
-    }
-
-    // 8. Click Button Selector
-    const clickBtnSelector = document.getElementById('ssClickBtnSelector');
-    if (clickBtnSelector) {
-      clickBtnSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          clickBtnSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          ssCurrentClickBtn = btn.dataset.btn || 'Left';
-        });
-      });
-    }
-
-    // 9. Scan Rate Selector
-    const scanRateSelector = document.getElementById('ssScanRateSelector');
-    if (scanRateSelector) {
-      scanRateSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          scanRateSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          ssScanRate = parseInt(btn.dataset.rate, 10) || 150;
-          if (!state.config.screenScanner) state.config.screenScanner = {};
-          state.config.screenScanner.scanRate = ssScanRate;
-          saveCurrentProfileState();
-          syncConfig();
-        });
-      });
-    }
-
-    // 10. Condition & Repeat Selectors
-    const conditionSelector = document.getElementById('ssConditionSelector');
-    if (conditionSelector) {
-      conditionSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          conditionSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          ssCondition = btn.dataset.cond || 'appear';
-        });
-      });
-    }
-
-    const repeatSelector = document.getElementById('ssRepeatSelector');
-    if (repeatSelector) {
-      repeatSelector.querySelectorAll('.ac-pill-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          repeatSelector.querySelectorAll('.ac-pill-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          ssRepeat = btn.dataset.rep || 'debounce';
-        });
-      });
-    }
-
-    // 11. Search Filter
-    const searchFilter = document.getElementById('ssSearchFilter');
-    if (searchFilter) {
-      searchFilter.addEventListener('input', () => {
-        ssSearchQuery = searchFilter.value;
-        renderScreenScannerList();
-      });
-    }
-
-    // 12. Add Trigger Button
-    const btnAddTrigger = document.getElementById('ssBtnAddTrigger');
-    if (btnAddTrigger) {
-      btnAddTrigger.addEventListener('click', () => {
-        const nameInput = document.getElementById('ssInputName');
-        const name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : 'Screen Trigger';
-
-        // Collect parameters according to mode
-        const imagePath = (document.getElementById('ssInputImagePath') || {}).value || '';
-        const imageVariation = parseInt((document.getElementById('ssImageVariation') || {}).value, 10) || 30;
-
-        const pixelColor = (document.getElementById('ssInputPixelColor') || {}).value || '#FF0000';
-        const pixelVariation = parseInt((document.getElementById('ssPixelVariation') || {}).value, 10) || 15;
-
-        const pointX = parseInt((document.getElementById('ssPointX') || {}).value, 10) || 960;
-        const pointY = parseInt((document.getElementById('ssPointY') || {}).value, 10) || 540;
-        const pointColor = (document.getElementById('ssInputPointColor') || {}).value || '#00FF00';
-
-        if (ssCurrentMode === 'image' && (!imagePath || !imagePath.trim())) {
-          showToast('Please select or snip a template image first!', 'warning');
-          return;
-        }
-
-        const boxX1 = parseInt((document.getElementById('ssBoxX1') || {}).value, 10) || 0;
-        const boxY1 = parseInt((document.getElementById('ssBoxY1') || {}).value, 10) || 0;
-        const boxX2 = parseInt((document.getElementById('ssBoxX2') || {}).value, 10) || 1920;
-        const boxY2 = parseInt((document.getElementById('ssBoxY2') || {}).value, 10) || 1080;
-
-        const clickOffsetX = parseInt((document.getElementById('ssClickOffsetX') || {}).value, 10) || 0;
-        const clickOffsetY = parseInt((document.getElementById('ssClickOffsetY') || {}).value, 10) || 0;
-        const mouseScriptId = (document.getElementById('ssSelectMouseScript') || {}).value || '';
-        const macroId = (document.getElementById('ssSelectMacro') || {}).value || '';
-        const keyToSend = (document.getElementById('ssInputKey') || {}).value || '';
-        const systemAction = (document.getElementById('ssSelectSystemAction') || {}).value || 'beep';
-
-        const debounceSec = parseFloat((document.getElementById('ssDebounceInput') || {}).value) || 2.0;
-        const optSound = document.getElementById('ssOptSound');
-        const optOsd = document.getElementById('ssOptOsd');
-
-        const newRule = {
-          id: 'ss-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-          name: name,
-          enabled: 1,
-          mode: ssCurrentMode,
-          imagePath: imagePath.trim(),
-          imageVariation: imageVariation,
-          imageTrans: '',
-          pixelColor: pixelColor.trim(),
-          pixelVariation: pixelVariation,
-          pointX: pointX,
-          pointY: pointY,
-          pointColor: pointColor.trim(),
-          region: ssCurrentRegion,
-          regionBox: { x1: boxX1, y1: boxY1, x2: boxX2, y2: boxY2 },
-          actionType: ssCurrentAction,
-          clickButton: ssCurrentClickBtn,
-          clickOffsetX: clickOffsetX,
-          clickOffsetY: clickOffsetY,
-          mouseScriptId: mouseScriptId,
-          macroId: macroId,
-          keyToSend: keyToSend.trim(),
-          systemAction: systemAction,
-          condition: ssCondition,
-          repeatRule: ssRepeat,
-          debounceMs: Math.round(debounceSec * 1000),
-          soundAlert: optSound ? optSound.checked : true,
-          osdAlert: optOsd ? optOsd.checked : true
-        };
-
-        if (!state.config.screenScanner) {
-          state.config.screenScanner = { enabled: 1, scanRate: ssScanRate, items: [] };
-        }
-        if (!Array.isArray(state.config.screenScanner.items)) {
-          state.config.screenScanner.items = [];
-        }
-
-        state.config.screenScanner.items.push(newRule);
-        saveCurrentProfileState();
-        syncConfig();
-        renderScreenScannerList();
-        updateGlobalIndicators();
-
-        if (nameInput) nameInput.value = '';
-        showToast(`Visual Trigger "${name}" added!`, 'success');
-      });
-    }
-
-    // 13. Instant Test Scan Button
-    const btnTestScan = document.getElementById('ssBtnTestScan');
-    if (btnTestScan) {
-      btnTestScan.addEventListener('click', () => {
-        const imagePath = (document.getElementById('ssInputImagePath') || {}).value || '';
-        const imageVariation = parseInt((document.getElementById('ssImageVariation') || {}).value, 10) || 30;
-        const pixelColor = (document.getElementById('ssInputPixelColor') || {}).value || '#FF0000';
-        const pixelVariation = parseInt((document.getElementById('ssPixelVariation') || {}).value, 10) || 15;
-        const pointX = parseInt((document.getElementById('ssPointX') || {}).value, 10) || 960;
-        const pointY = parseInt((document.getElementById('ssPointY') || {}).value, 10) || 540;
-        const pointColor = (document.getElementById('ssInputPointColor') || {}).value || '#00FF00';
-
-        const boxX1 = parseInt((document.getElementById('ssBoxX1') || {}).value, 10) || 0;
-        const boxY1 = parseInt((document.getElementById('ssBoxY1') || {}).value, 10) || 0;
-        const boxX2 = parseInt((document.getElementById('ssBoxX2') || {}).value, 10) || 1920;
-        const boxY2 = parseInt((document.getElementById('ssBoxY2') || {}).value, 10) || 1080;
-
-        const draftItem = {
-          mode: ssCurrentMode,
-          imagePath: imagePath.trim(),
-          imageVariation: imageVariation,
-          pixelColor: pixelColor.trim(),
-          pixelVariation: pixelVariation,
-          pointX: pointX,
-          pointY: pointY,
-          pointColor: pointColor.trim(),
-          region: ssCurrentRegion,
-          regionBox: { x1: boxX1, y1: boxY1, x2: boxX2, y2: boxY2 }
-        };
-
-        if (ssCurrentMode === 'image' && (!imagePath || !imagePath.trim())) {
-          showToast('Select or snip a template image first to test!', 'warning');
-          return;
-        }
-
-        btnTestScan.disabled = true;
-        sendToAhk('testScreenScan', { item: draftItem });
-        showToast('Scanning screen now...', 'info');
-      });
-    }
-
-    renderScreenScanner();
-  }
 
   // ============================================================================
   // Master Engine Switch & Indicators
   // ============================================================================
 
   function toggleMasterEngine() {
-    state.enabled = !state.enabled;
-    updateSwitchUi();
-    syncConfig();
-  }
+              state.enabled = !state.enabled;
+              updateSwitchUi();
+              syncConfig();
+            }
 
   function updateSwitchUi() {
-    if (state.enabled) {
-      if (mainEngineSwitch) {
-        mainEngineSwitch.classList.remove('is-off');
-        mainEngineSwitch.classList.add('is-on');
-      }
-      if (switchCaptionText) switchCaptionText.textContent = 'ACTIVE';
-      if (statusSubtitle) statusSubtitle.innerHTML = 'Engine: <span class="status-indicator-text online">Active</span>';
-    } else {
-      if (mainEngineSwitch) {
-        mainEngineSwitch.classList.remove('is-on');
-        mainEngineSwitch.classList.add('is-off');
-      }
-      if (switchCaptionText) switchCaptionText.textContent = 'SUSPENDED';
-      if (statusSubtitle) statusSubtitle.innerHTML = 'Engine: <span class="status-indicator-text offline">Suspended</span>';
-    }
-  }
+              if (state.enabled) {
+                if (mainEngineSwitch) {
+                  mainEngineSwitch.classList.remove('is-off');
+                  mainEngineSwitch.classList.add('is-on');
+                }
+                if (switchCaptionText) switchCaptionText.textContent = 'ACTIVE';
+                if (statusSubtitle) statusSubtitle.innerHTML = 'Engine: <span class="status-indicator-text online">Active</span>';
+              } else {
+                if (mainEngineSwitch) {
+                  mainEngineSwitch.classList.remove('is-on');
+                  mainEngineSwitch.classList.add('is-off');
+                }
+                if (switchCaptionText) switchCaptionText.textContent = 'SUSPENDED';
+                if (statusSubtitle) statusSubtitle.innerHTML = 'Engine: <span class="status-indicator-text offline">Suspended</span>';
+              }
+            }
 
   function updateGlobalIndicators() {
-    const currentProfName = (state.config && state.config.activeProfile) || 'Default';
-    const totalItems = getProfileActiveScriptsCount(currentProfName);
+              const currentProfName = (state.config && state.config.activeProfile) || 'Default';
+              const totalItems = getProfileActiveScriptsCount(currentProfName);
 
-    const badge = document.getElementById('activeCountBadge') || activeCountBadge;
-    if (badge) {
-      badge.textContent = String(totalItems);
-    }
+              const badge = document.getElementById('activeCountBadge') || activeCountBadge;
+              if (badge) {
+                badge.textContent = String(totalItems);
+              }
 
-    const gauge = document.getElementById('gaugeCircle') || gaugeCircle;
-    if (gauge) {
-      const maxItems = 15;
-      const progress = Math.min(totalItems / maxItems, 1);
-      const circumference = 150.79;
-      const offset = circumference - (progress * circumference * 0.75);
-      gauge.style.strokeDashoffset = offset;
-    }
-  }
+              const gauge = document.getElementById('gaugeCircle') || gaugeCircle;
+              if (gauge) {
+                const maxItems = 15;
+                const progress = Math.min(totalItems / maxItems, 1);
+                const circumference = 150.79;
+                const offset = circumference - (progress * circumference * 0.75);
+                gauge.style.strokeDashoffset = offset;
+              }
+            }
 
   // ============================================================================
   // Active Scripts Overview Modal (Quick Switchboard for Current Profile)
   // ============================================================================
 
   function openActiveScriptsModal() {
-    const modal = document.getElementById('activeScriptsModal');
-    const body = document.getElementById('activeScriptsModalBody');
-    const titleEl = document.getElementById('activeScriptsModalTitle');
-    const subtitleEl = document.getElementById('activeScriptsModalSubtitle');
-    if (!modal || !body) return;
+              const modal = document.getElementById('activeScriptsModal');
+              const body = document.getElementById('activeScriptsModalBody');
+              const titleEl = document.getElementById('activeScriptsModalTitle');
+              const subtitleEl = document.getElementById('activeScriptsModalSubtitle');
+              if (!modal || !body) return;
 
-    saveCurrentProfileState();
-    const currentProfName = (state.config && state.config.activeProfile) || 'Default';
-    let prof = null;
-    if (state.config && state.config.profiles) {
-      if (!Array.isArray(state.config.profiles) && state.config.profiles[currentProfName]) {
-        prof = state.config.profiles[currentProfName];
-      } else if (Array.isArray(state.config.profiles)) {
-        prof = state.config.profiles.find(p => p && (p.name === currentProfName || p.id === currentProfName));
-      }
-    }
-    if (!prof) prof = state.config || {};
+              saveCurrentProfileState();
+              const currentProfName = (state.config && state.config.activeProfile) || 'Default';
+              let prof = null;
+              if (state.config && state.config.profiles) {
+                if (!Array.isArray(state.config.profiles) && state.config.profiles[currentProfName]) {
+                  prof = state.config.profiles[currentProfName];
+                } else if (Array.isArray(state.config.profiles)) {
+                  prof = state.config.profiles.find(p => p && (p.name === currentProfName || p.id === currentProfName));
+                }
+              }
+              if (!prof) prof = state.config || {};
 
-    if (titleEl) {
-      titleEl.textContent = `ACTIVE SCRIPTS (${currentProfName.toUpperCase()})`;
-    }
+              if (titleEl) {
+                titleEl.textContent = `ACTIVE SCRIPTS (${currentProfName.toUpperCase()})`;
+              }
 
-    body.innerHTML = '';
-    let totalActive = 0;
+              body.innerHTML = '';
+              let totalActive = 0;
 
-    function createActiveItemCard(item, moduleName, displayTitle, displayMeta, onToggle) {
-      const card = document.createElement('div');
-      card.className = 'shortcut-card active-script-card';
-      card.dataset.module = moduleName;
-      if (item && item.id) card.dataset.id = item.id;
-      if (item && item.featureKey) card.dataset.featureKey = item.featureKey;
-      const isEnabled = item.enabled !== false && item.enabled !== 0;
+              function createActiveItemCard(item, moduleName, displayTitle, displayMeta, onToggle) {
+                const card = document.createElement('div');
+                card.className = 'shortcut-card active-script-card';
+                card.dataset.module = moduleName;
+                if (item && item.id) card.dataset.id = item.id;
+                if (item && item.featureKey) card.dataset.featureKey = item.featureKey;
+                const isEnabled = item.enabled !== false && item.enabled !== 0;
 
-      card.innerHTML = `
+                card.innerHTML = `
         <div class="card-info">
           <span class="trigger-badge">${escapeHtml(displayTitle)}</span>
           <span class="arrow-divider"><svg class="arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg></span>
@@ -8889,35 +9426,35 @@
         </div>
       `;
 
-      const sw = card.querySelector('.active-overview-switch');
-      sw.addEventListener('change', () => {
-        const checked = sw.checked;
-        onItemToggleStateChanged(moduleName, item, checked);
-        card.classList.toggle('is-disabled', !checked);
-        if (typeof onToggle === 'function') onToggle(checked);
-        syncConfig();
-        updateGlobalIndicators();
-        // Re-sync subtitle count
-        if (subtitleEl) {
-          const count = body.querySelectorAll('.active-overview-switch:checked').length;
-          subtitleEl.textContent = `Profile: ${currentProfName} • ${count} Active`;
-        }
-      });
+                const sw = card.querySelector('.active-overview-switch');
+                sw.addEventListener('change', () => {
+                  const checked = sw.checked;
+                  onItemToggleStateChanged(moduleName, item, checked);
+                  card.classList.toggle('is-disabled', !checked);
+                  if (typeof onToggle === 'function') onToggle(checked);
+                  syncConfig();
+                  updateGlobalIndicators();
+                  // Re-sync subtitle count
+                  if (subtitleEl) {
+                    const count = body.querySelectorAll('.active-overview-switch:checked').length;
+                    subtitleEl.textContent = `Profile: ${currentProfName} • ${count} Active`;
+                  }
+                });
 
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.toggle-wrapper')) return;
-        sw.checked = !sw.checked;
-        sw.dispatchEvent(new Event('change'));
-      });
+                card.addEventListener('click', (e) => {
+                  if (e.target.closest('.toggle-wrapper')) return;
+                  sw.checked = !sw.checked;
+                  sw.dispatchEvent(new Event('change'));
+                });
 
-      return card;
-    }
+                return card;
+              }
 
-    function appendSection(title, cards) {
-      if (!cards || cards.length === 0) return;
-      const header = document.createElement('div');
-      header.className = 'active-scripts-category-header';
-      header.innerHTML = `
+              function appendSection(title, cards) {
+                if (!cards || cards.length === 0) return;
+                const header = document.createElement('div');
+                header.className = 'active-scripts-category-header';
+                header.innerHTML = `
         <span class="active-scripts-category-title">
           <svg style="width:13px;height:13px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"></polyline>
@@ -8926,260 +9463,260 @@
         </span>
         <span class="multiline-badge">${cards.length}</span>
       `;
-      body.appendChild(header);
-      cards.forEach(c => body.appendChild(c));
-    }
+                body.appendChild(header);
+                cards.forEach(c => body.appendChild(c));
+              }
 
-    // 1. Text Expander
-    const te = prof.textExpander || {};
-    if (te.items && Array.isArray(te.items)) {
-      const activeTe = te.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
-      const cards = activeTe.map(item => {
-        totalActive++;
-        return createActiveItemCard(
-          item,
-          'textExpander',
-          item.input,
-          item.output.replace(/\n/g, ' \\n '),
-          (checked) => {
-            if (state.config && state.config.textExpander && Array.isArray(state.config.textExpander.items)) {
-              const live = state.config.textExpander.items.find(x => x.id === item.id);
-              if (live) live.enabled = checked ? 1 : 0;
-            }
-            renderTextExpander();
-          }
-        );
-      });
-      appendSection('Text Expander', cards);
-    }
+              // 1. Text Expander
+              const te = prof.textExpander || {};
+              if (te.items && Array.isArray(te.items)) {
+                const activeTe = te.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+                const cards = activeTe.map(item => {
+                  totalActive++;
+                  return createActiveItemCard(
+                    item,
+                    'textExpander',
+                    item.input,
+                    item.output.replace(/\n/g, ' \\n '),
+                    (checked) => {
+                      if (state.config && state.config.textExpander && Array.isArray(state.config.textExpander.items)) {
+                        const live = state.config.textExpander.items.find(x => x.id === item.id);
+                        if (live) live.enabled = checked ? 1 : 0;
+                      }
+                      renderTextExpander();
+                    }
+                  );
+                });
+                appendSection('Text Expander', cards);
+              }
 
-    // 2. Key Remapper
-    const kr = prof.keyRemapper || {};
-    if (kr.items && Array.isArray(kr.items)) {
-      const activeKr = kr.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
-      const cards = activeKr.map(item => {
-        totalActive++;
-        const src = formatKeyDisplay(item.source);
-        const tgt = formatKeyDisplay(item.target);
-        return createActiveItemCard(
-          item,
-          'keyRemapper',
-          src,
-          tgt,
-          (checked) => {
-            if (state.config && state.config.keyRemapper && Array.isArray(state.config.keyRemapper.items)) {
-              const live = state.config.keyRemapper.items.find(x => x.id === item.id);
-              if (live) live.enabled = checked ? 1 : 0;
-            }
-            renderKeyRemapper();
-          }
-        );
-      });
-      appendSection('Key Remapper', cards);
-    }
+              // 2. Key Remapper
+              const kr = prof.keyRemapper || {};
+              if (kr.items && Array.isArray(kr.items)) {
+                const activeKr = kr.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+                const cards = activeKr.map(item => {
+                  totalActive++;
+                  const src = formatKeyDisplay(item.source);
+                  const tgt = formatKeyDisplay(item.target);
+                  return createActiveItemCard(
+                    item,
+                    'keyRemapper',
+                    src,
+                    tgt,
+                    (checked) => {
+                      if (state.config && state.config.keyRemapper && Array.isArray(state.config.keyRemapper.items)) {
+                        const live = state.config.keyRemapper.items.find(x => x.id === item.id);
+                        if (live) live.enabled = checked ? 1 : 0;
+                      }
+                      renderKeyRemapper();
+                    }
+                  );
+                });
+                appendSection('Key Remapper', cards);
+              }
 
-    // 3. App Launcher
-    const al = prof.appLauncher || {};
-    if (al.items && Array.isArray(al.items)) {
-      const activeAl = al.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
-      const cards = activeAl.map(item => {
-        totalActive++;
-        const trig = item.triggerType === 'hotkey' ? formatKeyDisplay(item.trigger) : item.trigger;
-        return createActiveItemCard(
-          item,
-          'appLauncher',
-          trig,
-          `${item.name || 'Launch'}: ${item.target}`,
-          (checked) => {
-            if (state.config && state.config.appLauncher && Array.isArray(state.config.appLauncher.items)) {
-              const live = state.config.appLauncher.items.find(x => x.id === item.id);
-              if (live) live.enabled = checked ? 1 : 0;
-            }
-            renderAppLauncher();
-          }
-        );
-      });
-      appendSection('App Launcher', cards);
-    }
+              // 3. App Launcher
+              const al = prof.appLauncher || {};
+              if (al.items && Array.isArray(al.items)) {
+                const activeAl = al.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+                const cards = activeAl.map(item => {
+                  totalActive++;
+                  const trig = item.triggerType === 'hotkey' ? formatKeyDisplay(item.trigger) : item.trigger;
+                  return createActiveItemCard(
+                    item,
+                    'appLauncher',
+                    trig,
+                    `${item.name || 'Launch'}: ${item.target}`,
+                    (checked) => {
+                      if (state.config && state.config.appLauncher && Array.isArray(state.config.appLauncher.items)) {
+                        const live = state.config.appLauncher.items.find(x => x.id === item.id);
+                        if (live) live.enabled = checked ? 1 : 0;
+                      }
+                      renderAppLauncher();
+                    }
+                  );
+                });
+                appendSection('App Launcher', cards);
+              }
 
-    // 3.5. Folder Creator
-    const fc = prof.folderCreator || {};
-    if (fc.items && Array.isArray(fc.items)) {
-      const activeFc = fc.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
-      const cards = activeFc.map(item => {
-        totalActive++;
-        const isHk = item.triggerType === 'hotkey';
-        const trig = isHk ? formatKeyDisplay(item.trigger || 'No Key') : (item.trigger || 'No Trigger');
-        return createActiveItemCard(
-          item,
-          'folderCreator',
-          trig,
-          item.name || 'Folder Creator',
-          (checked) => {
-            if (state.config && state.config.folderCreator && Array.isArray(state.config.folderCreator.items)) {
-              const live = state.config.folderCreator.items.find(x => x.id === item.id);
-              if (live) live.enabled = checked ? 1 : 0;
-            }
-            renderFolderCreator();
-          }
-        );
-      });
-      appendSection('Folder Creator', cards);
-    }
+              // 3.5. Folder Creator
+              const fc = prof.folderCreator || {};
+              if (fc.items && Array.isArray(fc.items)) {
+                const activeFc = fc.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+                const cards = activeFc.map(item => {
+                  totalActive++;
+                  const isHk = item.triggerType === 'hotkey';
+                  const trig = isHk ? formatKeyDisplay(item.trigger || 'No Key') : (item.trigger || 'No Trigger');
+                  return createActiveItemCard(
+                    item,
+                    'folderCreator',
+                    trig,
+                    item.name || 'Folder Creator',
+                    (checked) => {
+                      if (state.config && state.config.folderCreator && Array.isArray(state.config.folderCreator.items)) {
+                        const live = state.config.folderCreator.items.find(x => x.id === item.id);
+                        if (live) live.enabled = checked ? 1 : 0;
+                      }
+                      renderFolderCreator();
+                    }
+                  );
+                });
+                appendSection('Folder Creator', cards);
+              }
 
-    // 4. Macro Recorder
-    const mr = prof.macroRecorder || {};
-    if (mr.items && Array.isArray(mr.items)) {
-      const activeMr = mr.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
-      const cards = activeMr.map(item => {
-        totalActive++;
-        const trig = formatKeyDisplay(item.trigger || 'No Key');
-        const count = (item.steps && Array.isArray(item.steps)) ? item.steps.length : 0;
-        return createActiveItemCard(
-          item,
-          'macroRecorder',
-          trig,
-          `${item.name || 'Macro'} (${count} steps)`,
-          (checked) => {
-            if (state.config && state.config.macroRecorder && Array.isArray(state.config.macroRecorder.items)) {
-              const live = state.config.macroRecorder.items.find(x => x.id === item.id);
-              if (live) live.enabled = checked ? 1 : 0;
-            }
-            renderMacroRecorder();
-          }
-        );
-      });
-      appendSection('Macro Recorder', cards);
-    }
+              // 4. Macro Recorder
+              const mr = prof.macroRecorder || {};
+              if (mr.items && Array.isArray(mr.items)) {
+                const activeMr = mr.items.filter(i => i && i.enabled !== false && i.enabled !== 0);
+                const cards = activeMr.map(item => {
+                  totalActive++;
+                  const trig = formatKeyDisplay(item.trigger || 'No Key');
+                  const count = (item.steps && Array.isArray(item.steps)) ? item.steps.length : 0;
+                  return createActiveItemCard(
+                    item,
+                    'macroRecorder',
+                    trig,
+                    `${item.name || 'Macro'} (${count} steps)`,
+                    (checked) => {
+                      if (state.config && state.config.macroRecorder && Array.isArray(state.config.macroRecorder.items)) {
+                        const live = state.config.macroRecorder.items.find(x => x.id === item.id);
+                        if (live) live.enabled = checked ? 1 : 0;
+                      }
+                      renderMacroRecorder();
+                    }
+                  );
+                });
+                appendSection('Macro Recorder', cards);
+              }
 
-    // 5. Window Tools
-    const wm = prof.windowManager || prof.systemTools || (state.config && (state.config.windowManager || state.config.systemTools)) || {};
-    const wmDefinitions = [
-      { key: 'alwaysOnTopEnabled', title: 'Always on Top', meta: wm.alwaysOnTopHotkey ? formatKeyDisplay(wm.alwaysOnTopHotkey) : 'Ctrl+Space' },
-      { key: 'centerWindowEnabled', title: 'Center Window', meta: wm.centerWindowHotkey ? formatKeyDisplay(wm.centerWindowHotkey) : 'Ctrl+Alt+C' },
-      { key: 'hideWindowEnabled', title: 'Hide to Tray', meta: wm.hideWindowHotkey ? formatKeyDisplay(wm.hideWindowHotkey) : 'Ctrl+Alt+H' },
-      { key: 'borderlessEnabled', title: 'Borderless Fullscreen', meta: wm.borderlessHotkey ? formatKeyDisplay(wm.borderlessHotkey) : 'Ctrl+Alt+Enter' },
-      { key: 'windowShadeEnabled', title: 'Window Shade Roll-Up', meta: wm.windowShadeHotkey ? formatKeyDisplay(wm.windowShadeHotkey) : 'Ctrl+Alt+R' },
-      { key: 'appVolumeWheel', title: 'Hover App Volume Wheel', meta: 'Alt + Mouse Wheel over window' },
-      { key: 'appVolumeMuteEnabled', title: 'App Volume Mute', meta: wm.appVolumeMuteHotkey ? formatKeyDisplay(wm.appVolumeMuteHotkey) : 'Alt+M' },
-      { key: 'masterAudioMuteEnabled', title: 'Master Audio Mute', meta: 'Alt+M (Mute Speakers)' },
-      { key: 'transparencyWheel', title: 'Window Transparency Wheel', meta: 'Ctrl + Alt + Mouse Wheel' },
-      { key: 'clickThroughGhost', title: 'Ghost Click-Through Window', meta: wm.clickThroughGhostHotkey ? formatKeyDisplay(wm.clickThroughGhostHotkey) : 'Ctrl+Alt+G' },
-      { key: 'textTransformEnabled', title: 'Uppercase Transformation', meta: 'Convert selected text' },
-      { key: 'textTransformCleanEnabled', title: 'Clean String Stripper', meta: 'Strip symbols & spaces' },
-      { key: 'screenOcrEnabled', title: 'Screen Text OCR Snipper', meta: 'Copy text directly from screen' },
-      { key: 'colorPickerEnabled', title: 'Precision Color Eyedropper', meta: 'Pick hex colors from pixels' },
-      { key: 'virtualDesktopsEnabled', title: 'Virtual Desktop Taskbar Switch', meta: 'Mouse wheel over taskbar' },
-      { key: 'taskbarScrollEnabled', title: 'Taskbar Volume Control', meta: 'Mouse wheel over taskbar' },
-      { key: 'sleepEnabled', title: 'Quick Sleep / Hibernate', meta: 'Win + S' }
-    ];
+              // 5. Window Tools
+              const wm = prof.windowManager || prof.systemTools || (state.config && (state.config.windowManager || state.config.systemTools)) || {};
+              const wmDefinitions = [
+                { key: 'alwaysOnTopEnabled', title: 'Always on Top', meta: wm.alwaysOnTopHotkey ? formatKeyDisplay(wm.alwaysOnTopHotkey) : 'Ctrl+Space' },
+                { key: 'centerWindowEnabled', title: 'Center Window', meta: wm.centerWindowHotkey ? formatKeyDisplay(wm.centerWindowHotkey) : 'Ctrl+Alt+C' },
+                { key: 'hideWindowEnabled', title: 'Hide to Tray', meta: wm.hideWindowHotkey ? formatKeyDisplay(wm.hideWindowHotkey) : 'Ctrl+Alt+H' },
+                { key: 'borderlessEnabled', title: 'Borderless Fullscreen', meta: wm.borderlessHotkey ? formatKeyDisplay(wm.borderlessHotkey) : 'Ctrl+Alt+Enter' },
+                { key: 'windowShadeEnabled', title: 'Window Shade Roll-Up', meta: wm.windowShadeHotkey ? formatKeyDisplay(wm.windowShadeHotkey) : 'Ctrl+Alt+R' },
+                { key: 'appVolumeWheel', title: 'Hover App Volume Wheel', meta: 'Alt + Mouse Wheel over window' },
+                { key: 'appVolumeMuteEnabled', title: 'App Volume Mute', meta: wm.appVolumeMuteHotkey ? formatKeyDisplay(wm.appVolumeMuteHotkey) : 'Alt+M' },
+                { key: 'masterAudioMuteEnabled', title: 'Master Audio Mute', meta: 'Alt+M (Mute Speakers)' },
+                { key: 'transparencyWheel', title: 'Window Transparency Wheel', meta: 'Ctrl + Alt + Mouse Wheel' },
+                { key: 'clickThroughGhost', title: 'Ghost Click-Through Window', meta: wm.clickThroughGhostHotkey ? formatKeyDisplay(wm.clickThroughGhostHotkey) : 'Ctrl+Alt+G' },
+                { key: 'textTransformEnabled', title: 'Uppercase Transformation', meta: 'Convert selected text' },
+                { key: 'textTransformCleanEnabled', title: 'Clean String Stripper', meta: 'Strip symbols & spaces' },
+                { key: 'screenOcrEnabled', title: 'Screen Text OCR Snipper', meta: 'Copy text directly from screen' },
+                { key: 'colorPickerEnabled', title: 'Precision Color Eyedropper', meta: 'Pick hex colors from pixels' },
+                { key: 'virtualDesktopsEnabled', title: 'Virtual Desktop Taskbar Switch', meta: 'Mouse wheel over taskbar' },
+                { key: 'taskbarScrollEnabled', title: 'Taskbar Volume Control', meta: 'Mouse wheel over taskbar' },
+                { key: 'sleepEnabled', title: 'Quick Sleep / Hibernate', meta: 'Win + S' }
+              ];
 
-    const activeWmCards = [];
-    wmDefinitions.forEach(def => {
-      if (wm[def.key] === 1 || wm[def.key] === true) {
-        totalActive++;
-        const dummyItem = { enabled: 1, featureKey: def.key };
-        const c = createActiveItemCard(
-          dummyItem,
-          'windowManager',
-          def.title,
-          def.meta,
-          (checked) => {
-            wm[def.key] = checked ? 1 : 0;
-            if (state.config && state.config.windowManager) {
-              state.config.windowManager[def.key] = checked ? 1 : 0;
-            }
-            initWindowManager();
-          }
-        );
-        activeWmCards.push(c);
-      }
-    });
-    appendSection('Window Tools & Productivity', activeWmCards);
+              const activeWmCards = [];
+              wmDefinitions.forEach(def => {
+                if (wm[def.key] === 1 || wm[def.key] === true) {
+                  totalActive++;
+                  const dummyItem = { enabled: 1, featureKey: def.key };
+                  const c = createActiveItemCard(
+                    dummyItem,
+                    'windowManager',
+                    def.title,
+                    def.meta,
+                    (checked) => {
+                      wm[def.key] = checked ? 1 : 0;
+                      if (state.config && state.config.windowManager) {
+                        state.config.windowManager[def.key] = checked ? 1 : 0;
+                      }
+                      initWindowManager();
+                    }
+                  );
+                  activeWmCards.push(c);
+                }
+              });
+              appendSection('Window Tools & Productivity', activeWmCards);
 
-    // 6. Mouse Gestures & Corners
-    const mg = prof.mouseGestures || prof.gesturesAndCorners || (state.config && (state.config.mouseGestures || state.config.gesturesAndCorners)) || {};
-    const mgCards = [];
-    if (mg.cornersEnabled === 1 || mg.cornersEnabled === true) {
-      totalActive++;
-      const dummyItem = { enabled: 1, featureKey: 'cornersEnabled' };
-      mgCards.push(createActiveItemCard(
-        dummyItem,
-        'mouseGestures',
-        'Screen Hot Corners',
-        `Top-Left: ${mg.cornerTopLeft || 'None'} • Top-Right: ${mg.cornerTopRight || 'None'}`,
-        (checked) => {
-          mg.cornersEnabled = checked ? 1 : 0;
-          if (state.config && state.config.mouseGestures) {
-            state.config.mouseGestures.cornersEnabled = checked ? 1 : 0;
-          }
-          initMouseGestures();
-        }
-      ));
-    }
-    if (mg.gesturesEnabled === 1 || mg.gesturesEnabled === true) {
-      totalActive++;
-      const dummyItem = { enabled: 1, featureKey: 'gesturesEnabled' };
-      mgCards.push(createActiveItemCard(
-        dummyItem,
-        'mouseGestures',
-        'Mouse Gestures',
-        `Trigger: ${mg.triggerButton || 'MButton'}`,
-        (checked) => {
-          mg.gesturesEnabled = checked ? 1 : 0;
-          if (state.config && state.config.mouseGestures) {
-            state.config.mouseGestures.gesturesEnabled = checked ? 1 : 0;
-          }
-          initMouseGestures();
-        }
-      ));
-    }
-    appendSection('Mouse Gestures & Hot Corners', mgCards);
+              // 6. Mouse Gestures & Corners
+              const mg = prof.mouseGestures || prof.gesturesAndCorners || (state.config && (state.config.mouseGestures || state.config.gesturesAndCorners)) || {};
+              const mgCards = [];
+              if (mg.cornersEnabled === 1 || mg.cornersEnabled === true) {
+                totalActive++;
+                const dummyItem = { enabled: 1, featureKey: 'cornersEnabled' };
+                mgCards.push(createActiveItemCard(
+                  dummyItem,
+                  'mouseGestures',
+                  'Screen Hot Corners',
+                  `Top-Left: ${mg.cornerTopLeft || 'None'} • Top-Right: ${mg.cornerTopRight || 'None'}`,
+                  (checked) => {
+                    mg.cornersEnabled = checked ? 1 : 0;
+                    if (state.config && state.config.mouseGestures) {
+                      state.config.mouseGestures.cornersEnabled = checked ? 1 : 0;
+                    }
+                    initMouseGestures();
+                  }
+                ));
+              }
+              if (mg.gesturesEnabled === 1 || mg.gesturesEnabled === true) {
+                totalActive++;
+                const dummyItem = { enabled: 1, featureKey: 'gesturesEnabled' };
+                mgCards.push(createActiveItemCard(
+                  dummyItem,
+                  'mouseGestures',
+                  'Mouse Gestures',
+                  `Trigger: ${mg.triggerButton || 'MButton'}`,
+                  (checked) => {
+                    mg.gesturesEnabled = checked ? 1 : 0;
+                    if (state.config && state.config.mouseGestures) {
+                      state.config.mouseGestures.gesturesEnabled = checked ? 1 : 0;
+                    }
+                    initMouseGestures();
+                  }
+                ));
+              }
+              appendSection('Mouse Gestures & Hot Corners', mgCards);
 
-    // 7. Radial Menu
-    const rm = prof.radialMenu || {};
-    if (rm.enabled === 1 || rm.enabled === true) {
-      totalActive++;
-      const dummyItem = { enabled: 1, featureKey: 'enabled' };
-      const c = createActiveItemCard(
-        dummyItem,
-        'radialMenu',
-        'Radial Menu (Pie Wheel)',
-        `Trigger: ${rm.triggerButton || '^SPACE'} • Radius: ${rm.wheelRadius || 190}px`,
-        (checked) => {
-          rm.enabled = checked ? 1 : 0;
-          if (state.config && state.config.radialMenu) {
-            state.config.radialMenu.enabled = checked ? 1 : 0;
-          }
-          initRadialMenu();
-        }
-      );
-      appendSection('Radial Menu', [c]);
-    }
+              // 7. Radial Menu
+              const rm = prof.radialMenu || {};
+              if (rm.enabled === 1 || rm.enabled === true) {
+                totalActive++;
+                const dummyItem = { enabled: 1, featureKey: 'enabled' };
+                const c = createActiveItemCard(
+                  dummyItem,
+                  'radialMenu',
+                  'Radial Menu (Pie Wheel)',
+                  `Trigger: ${rm.triggerButton || '^SPACE'} • Radius: ${rm.wheelRadius || 190}px`,
+                  (checked) => {
+                    rm.enabled = checked ? 1 : 0;
+                    if (state.config && state.config.radialMenu) {
+                      state.config.radialMenu.enabled = checked ? 1 : 0;
+                    }
+                    initRadialMenu();
+                  }
+                );
+                appendSection('Radial Menu', [c]);
+              }
 
-    // 8. Auto Clicker
-    const ac = prof.autoClicker || {};
-    if (ac.enabled === 1 || ac.enabled === true) {
-      totalActive++;
-      const dummyItem = { enabled: 1 };
-      const c = createActiveItemCard(
-        dummyItem,
-        'autoClicker',
-        'Auto Clicker',
-        `Speed: ${ac.cps || 20} CPS • Button: ${ac.button || 'Left'} • Hotkey: ${ac.hotkey || 'F8'}`,
-        (checked) => {
-          ac.enabled = checked ? 1 : 0;
-          if (state.config && state.config.autoClicker) {
-            state.config.autoClicker.enabled = checked ? 1 : 0;
-          }
-          initAutoClicker();
-        }
-      );
-      appendSection('Auto Clicker', [c]);
-    }
+              // 8. Auto Clicker
+              const ac = prof.autoClicker || {};
+              if (ac.enabled === 1 || ac.enabled === true) {
+                totalActive++;
+                const dummyItem = { enabled: 1 };
+                const c = createActiveItemCard(
+                  dummyItem,
+                  'autoClicker',
+                  'Auto Clicker',
+                  `Speed: ${ac.cps || 20} CPS • Button: ${ac.button || 'Left'} • Hotkey: ${ac.hotkey || 'F8'}`,
+                  (checked) => {
+                    ac.enabled = checked ? 1 : 0;
+                    if (state.config && state.config.autoClicker) {
+                      state.config.autoClicker.enabled = checked ? 1 : 0;
+                    }
+                    initAutoClicker();
+                  }
+                );
+                appendSection('Auto Clicker', [c]);
+              }
 
-    if (totalActive === 0) {
-      body.innerHTML = `
+              if (totalActive === 0) {
+                body.innerHTML = `
         <div class="active-scripts-empty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
@@ -9190,23 +9727,23 @@
           <span style="font-size: 12px; max-width: 320px;">Turn on any script switch in the tabs to activate it for this profile.</span>
         </div>
       `;
-    }
+              }
 
-    if (subtitleEl) {
-      subtitleEl.textContent = `Profile: ${currentProfName} • ${totalActive} Active`;
-    }
+              if (subtitleEl) {
+                subtitleEl.textContent = `Profile: ${currentProfName} • ${totalActive} Active`;
+              }
 
-    modal.classList.remove('hidden-field');
-  }
+              modal.classList.remove('hidden-field');
+            }
 
   function closeActiveScriptsModal() {
-    const modal = document.getElementById('activeScriptsModal');
-    if (modal) {
-      modal.classList.add('hidden-field');
-      syncConfig();
-      updateGlobalIndicators();
-    }
-  }
+              const modal = document.getElementById('activeScriptsModal');
+              if (modal) {
+                modal.classList.add('hidden-field');
+                syncConfig();
+                updateGlobalIndicators();
+              }
+            }
 
   // ============================================================================
   // Theme Engine (Primary Background & Secondary Elements Colors)
@@ -9215,3053 +9752,3075 @@
   // ============================================================================
 
   function hexToRgb(hex) {
-    let c = hex.replace('#', '').trim();
-    if (c.length === 3) c = c.split('').map(x => x + x).join('');
-    const num = parseInt(c, 16);
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255
-    };
-  }
+              let c = hex.replace('#', '').trim();
+              if (c.length === 3) c = c.split('').map(x => x + x).join('');
+              const num = parseInt(c, 16);
+              return {
+                r: (num >> 16) & 255,
+                g: (num >> 8) & 255,
+                b: num & 255
+              };
+            }
 
   function rgbToHex(r, g, b) {
-    const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
-    return '#' + [clamp(r), clamp(g), clamp(b)].map(x => x.toString(16).padStart(2, '0')).join('');
-  }
+              const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+              return '#' + [clamp(r), clamp(g), clamp(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+            }
 
   function hexToHsl(hex) {
-    let c = hex.replace('#', '').trim();
-    if (c.length === 3) c = c.split('').map(x => x + x).join('');
-    const r = parseInt(c.substring(0, 2), 16) / 255;
-    const g = parseInt(c.substring(2, 4), 16) / 255;
-    const b = parseInt(c.substring(4, 6), 16) / 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h, s, l = (max + min) / 2;
-    if (max === min) {
-      h = s = 0;
-    } else {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      switch (max) {
-        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-        case g: h = (b - r) / d + 2; break;
-        case b: h = (r - g) / d + 4; break;
-      }
-      h /= 6;
-    }
-    return { h, s, l };
-  }
+              let c = hex.replace('#', '').trim();
+              if (c.length === 3) c = c.split('').map(x => x + x).join('');
+              const r = parseInt(c.substring(0, 2), 16) / 255;
+              const g = parseInt(c.substring(2, 4), 16) / 255;
+              const b = parseInt(c.substring(4, 6), 16) / 255;
+              const max = Math.max(r, g, b), min = Math.min(r, g, b);
+              let h, s, l = (max + min) / 2;
+              if (max === min) {
+                h = s = 0;
+              } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                  case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                  case g: h = (b - r) / d + 2; break;
+                  case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+              }
+              return { h, s, l };
+            }
 
   function hslToHex(h, s, l) {
-    l = Math.max(0, Math.min(1, l));
-    s = Math.max(0, Math.min(1, s));
-    let r, g, b;
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      function hue2rgb(p, q, t) {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1 / 6) return p + (q - p) * 6 * t;
-        if (t < 1 / 2) return q;
-        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-        return p;
-      }
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1 / 3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1 / 3);
-    }
-    const toHex = x => {
-      const hex = Math.round(Math.max(0, Math.min(255, x * 255))).toString(16);
-      return hex.length === 1 ? '0' + hex : hex;
-    };
-    return '#' + toHex(r) + toHex(g) + toHex(b);
-  }
+              l = Math.max(0, Math.min(1, l));
+              s = Math.max(0, Math.min(1, s));
+              let r, g, b;
+              if (s === 0) {
+                r = g = b = l;
+              } else {
+                function hue2rgb(p, q, t) {
+                  if (t < 0) t += 1;
+                  if (t > 1) t -= 1;
+                  if (t < 1 / 6) return p + (q - p) * 6 * t;
+                  if (t < 1 / 2) return q;
+                  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                  return p;
+                }
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1 / 3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1 / 3);
+              }
+              const toHex = x => {
+                const hex = Math.round(Math.max(0, Math.min(255, x * 255))).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+              };
+              return '#' + toHex(r) + toHex(g) + toHex(b);
+            }
 
   // Hand-crafted Neumorphic Theme Presets: Diverse, colorful clay base palettes across all aesthetics
   const THEME_PRESETS = {
-    'custom-default': {
-      name: 'Warm Clay (Default)',
-      bgColor: '#e8dfd5',
-      accentColor: '#d97706',
-      radius: 5,
-      distance: 4,
-      lightIntensity: 39,
-      darkIntensity: 5,
-      blur: 9
-    },
-    'dribbble-soft-gray': {
-      name: 'Dribbble Soft Canvas',
-      bgColor: '#e0e5ec',
-      accentColor: '#3b82f6',
-      radius: 16,
-      distance: 5,
-      lightIntensity: 85,
-      darkIntensity: 18,
-      blur: 10
-    },
-    'porcelain-ceramic': {
-      name: 'Porcelain Ceramic',
-      bgColor: '#f1f5f9',
-      accentColor: '#2563eb',
-      radius: 28,
-      distance: 7,
-      lightIntensity: 85,
-      darkIntensity: 20,
-      blur: 16
-    },
-    'pure-snow': {
-      name: 'Pure Snow Clay',
-      bgColor: '#f8fafc',
-      accentColor: '#0ea5e9',
-      radius: 18,
-      distance: 4,
-      lightIntensity: 90,
-      darkIntensity: 15,
-      blur: 12
-    },
-    'alabaster-clean': {
-      name: 'Alabaster Minimal',
-      bgColor: '#f4f4f5',
-      accentColor: '#18181b',
-      radius: 12,
-      distance: 4,
-      lightIntensity: 80,
-      darkIntensity: 18,
-      blur: 10
-    },
-    'nordic-linen': {
-      name: 'Nordic Linen',
-      bgColor: '#dfd9ce',
-      accentColor: '#92400e',
-      radius: 10,
-      distance: 4,
-      lightIntensity: 65,
-      darkIntensity: 20,
-      blur: 8
-    },
-    'nord-frost': {
-      name: 'Nord Frost',
-      bgColor: '#e5e9f0',
-      accentColor: '#5e81ac',
-      radius: 8,
-      distance: 3,
-      lightIntensity: 32,
-      darkIntensity: 16,
-      blur: 7
-    },
-    'silver-chiffon': {
-      name: 'Silver Chiffon',
-      bgColor: '#e2e8f0',
-      accentColor: '#475569',
-      radius: 14,
-      distance: 4,
-      lightIntensity: 75,
-      darkIntensity: 18,
-      blur: 9
-    },
-    'retro-sharp': {
-      name: 'Retro Paper',
-      bgColor: '#f2efe9',
-      accentColor: '#e11d48',
-      radius: 4,
-      distance: 3,
-      lightIntensity: 50,
-      darkIntensity: 16,
-      blur: 0
-    },
-    'solarized-cream': {
-      name: 'Solarized Cream',
-      bgColor: '#fdf6e3',
-      accentColor: '#b58900',
-      radius: 6,
-      distance: 3,
-      lightIntensity: 32,
-      darkIntensity: 14,
-      blur: 6
-    },
-    'butter-cream': {
-      name: 'Butter Cream',
-      bgColor: '#fef3c7',
-      accentColor: '#b45309',
-      radius: 14,
-      distance: 4,
-      lightIntensity: 35,
-      darkIntensity: 15,
-      blur: 8
-    },
-    'cappuccino-foam': {
-      name: 'Cappuccino Foam',
-      bgColor: '#ede0d4',
-      accentColor: '#7f4f24',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 45,
-      darkIntensity: 16,
-      blur: 9
-    },
-    'desert-caramel': {
-      name: 'Desert Caramel',
-      bgColor: '#c68b59',
-      accentColor: '#451a03',
-      radius: 8,
-      distance: 3,
-      lightIntensity: 25,
-      darkIntensity: 22,
-      blur: 7
-    },
-    'roasted-cocoa': {
-      name: 'Roasted Cocoa',
-      bgColor: '#351c14',
-      accentColor: '#fbbf24',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 60,
-      blur: 5
-    },
-    'espresso-mocha': {
-      name: 'Espresso Mocha',
-      bgColor: '#2b1d14',
-      accentColor: '#f59e0b',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 18,
-      darkIntensity: 36,
-      blur: 7
-    },
-    'brutalist-concrete': {
-      name: 'Brutalist Concrete',
-      bgColor: '#78716c',
-      accentColor: '#f97316',
-      radius: 2,
-      distance: 5,
-      lightIntensity: 55,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'brutalist-amber': {
-      name: 'Brutalist Amber',
-      bgColor: '#f59e0b',
-      accentColor: '#1e1b4b',
-      radius: 2,
-      distance: 6,
-      lightIntensity: 65,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'hard-canary': {
-      name: 'Hard Canary Yellow',
-      bgColor: '#facc15',
-      accentColor: '#09090b',
-      radius: 0,
-      distance: 5,
-      lightIntensity: 70,
-      darkIntensity: 80,
-      blur: 0
-    },
-    'hard-bubblegum': {
-      name: 'Hard Bubblegum Pop',
-      bgColor: '#f472b6',
-      accentColor: '#0f172a',
-      radius: 4,
-      distance: 6,
-      lightIntensity: 65,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'hard-acid-lime': {
-      name: 'Hard Acid Lime',
-      bgColor: '#a3e635',
-      accentColor: '#14532d',
-      radius: 1,
-      distance: 5,
-      lightIntensity: 60,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'hard-bauhaus-red': {
-      name: 'Hard Bauhaus Red',
-      bgColor: '#ef4444',
-      accentColor: '#000000',
-      radius: 0,
-      distance: 7,
-      lightIntensity: 60,
-      darkIntensity: 80,
-      blur: 0
-    },
-    'hard-blueprint': {
-      name: 'Hard Electric Blueprint',
-      bgColor: '#2563eb',
-      accentColor: '#fde047',
-      radius: 0,
-      distance: 7,
-      lightIntensity: 55,
-      darkIntensity: 85,
-      blur: 0
-    },
-    'hard-tangerine': {
-      name: 'Hard Tangerine Pop',
-      bgColor: '#fb923c',
-      accentColor: '#09090b',
-      radius: 3,
-      distance: 6,
-      lightIntensity: 60,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'hard-arcade-cyan': {
-      name: 'Hard Arcade Cyan',
-      bgColor: '#38bdf8',
-      accentColor: '#0f172a',
-      radius: 6,
-      distance: 6,
-      lightIntensity: 65,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'hard-toxic-mint': {
-      name: 'Hard Toxic Mint',
-      bgColor: '#34d399',
-      accentColor: '#064e3b',
-      radius: 2,
-      distance: 5,
-      lightIntensity: 65,
-      darkIntensity: 70,
-      blur: 0
-    },
-    'hard-ultraviolet': {
-      name: 'Hard Ultraviolet Pop',
-      bgColor: '#8b5cf6',
-      accentColor: '#facc15',
-      radius: 4,
-      distance: 6,
-      lightIntensity: 55,
-      darkIntensity: 80,
-      blur: 0
-    },
-    'hard-swiss-white': {
-      name: 'Hard Swiss Stark White',
-      bgColor: '#ffffff',
-      accentColor: '#e11d48',
-      radius: 0,
-      distance: 6,
-      lightIntensity: 80,
-      darkIntensity: 85,
-      blur: 0
-    },
-    'hard-parchment': {
-      name: 'Hard Parchment Blueprint',
-      bgColor: '#f6f1eb',
-      accentColor: '#1d4ed8',
-      radius: 2,
-      distance: 4,
-      lightIntensity: 60,
-      darkIntensity: 65,
-      blur: 0
-    },
-    'hard-hazard': {
-      name: 'Hard Industrial Hazard',
-      bgColor: '#eab308',
-      accentColor: '#000000',
-      radius: 0,
-      distance: 8,
-      lightIntensity: 65,
-      darkIntensity: 85,
-      blur: 0
-    },
-    'hard-gameboy': {
-      name: 'Hard Dot Matrix Handheld',
-      bgColor: '#8bac0f',
-      accentColor: '#0f380f',
-      radius: 4,
-      distance: 4,
-      lightIntensity: 50,
-      darkIntensity: 75,
-      blur: 0
-    },
-    'hard-steel': {
-      name: 'Hard Machined Steel',
-      bgColor: '#475569',
-      accentColor: '#38bdf8',
-      radius: 1,
-      distance: 5,
-      lightIntensity: 50,
-      darkIntensity: 80,
-      blur: 0
-    },
-    'hard-terminal-green': {
-      name: 'Hard CRT Terminal Green',
-      bgColor: '#052e16',
-      accentColor: '#22c55e',
-      radius: 0,
-      distance: 4,
-      lightIntensity: 45,
-      darkIntensity: 90,
-      blur: 0
-    },
-    'hard-cyber-black': {
-      name: 'Hard Cyber Void',
-      bgColor: '#121214',
-      accentColor: '#f43f5e',
-      radius: 0,
-      distance: 6,
-      lightIntensity: 45,
-      darkIntensity: 90,
-      blur: 0
-    },
-    'hard-midnight-navy': {
-      name: 'Hard Midnight Navy',
-      bgColor: '#0f172a',
-      accentColor: '#38bdf8',
-      radius: 2,
-      distance: 6,
-      lightIntensity: 45,
-      darkIntensity: 85,
-      blur: 0
-    },
-    'hard-blood-dark': {
-      name: 'Hard Blood Obsidian',
-      bgColor: '#260707',
-      accentColor: '#ef4444',
-      radius: 0,
-      distance: 6,
-      lightIntensity: 45,
-      darkIntensity: 85,
-      blur: 0
-    },
-    'hard-kawaii-lilac': {
-      name: 'Hard Kawaii Lilac',
-      bgColor: '#ddd6fe',
-      accentColor: '#6d28d9',
-      radius: 8,
-      distance: 6,
-      lightIntensity: 70,
-      darkIntensity: 70,
-      blur: 0
-    },
-    'hard-matcha': {
-      name: 'Hard Matcha Ceramic',
-      bgColor: '#d5dfc3',
-      accentColor: '#14532d',
-      radius: 2,
-      distance: 5,
-      lightIntensity: 65,
-      darkIntensity: 65,
-      blur: 0
-    },
-    'hard-teal-punch': {
-      name: 'Hard Teal Punch',
-      bgColor: '#0f766e',
-      accentColor: '#fef08a',
-      radius: 3,
-      distance: 6,
-      lightIntensity: 55,
-      darkIntensity: 80,
-      blur: 0
-    },
-    'hard-neon-coral': {
-      name: 'Hard Neon Coral',
-      bgColor: '#f43f5e',
-      accentColor: '#ffffff',
-      radius: 4,
-      distance: 7,
-      lightIntensity: 60,
-      darkIntensity: 80,
-      blur: 0
-    },
-    'hard-amber-slate': {
-      name: 'Hard Amber Slate',
-      bgColor: '#1c1917',
-      accentColor: '#f59e0b',
-      radius: 1,
-      distance: 5,
-      lightIntensity: 45,
-      darkIntensity: 85,
-      blur: 0
-    },
-    'hard-industrial-gray': {
-      name: 'Hard Industrial Gray',
-      bgColor: '#d1d5db',
-      accentColor: '#111827',
-      radius: 0,
-      distance: 6,
-      lightIntensity: 75,
-      darkIntensity: 80,
-      blur: 0
-    },
-    'hard-peach-punch': {
-      name: 'Hard Peach Punch',
-      bgColor: '#fed7aa',
-      accentColor: '#c2410c',
-      radius: 6,
-      distance: 5,
-      lightIntensity: 70,
-      darkIntensity: 70,
-      blur: 0
-    },
-    'solar-tangerine': {
-      name: 'Solar Tangerine',
-      bgColor: '#ea580c',
-      accentColor: '#fef08a',
-      radius: 34,
-      distance: 5,
-      lightIntensity: 38,
-      darkIntensity: 42,
-      blur: 12
-    },
-    'peach-fuzz': {
-      name: 'Peach Fuzz',
-      bgColor: '#fed7aa',
-      accentColor: '#c2410c',
-      radius: 16,
-      distance: 3,
-      lightIntensity: 28,
-      darkIntensity: 16,
-      blur: 7
-    },
-    'sunset-terracotta': {
-      name: 'Sunset Terracotta',
-      bgColor: '#8c3a27',
-      accentColor: '#fcd34d',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 28,
-      blur: 8
-    },
-    'vintage-rose': {
-      name: 'Vintage Rose',
-      bgColor: '#b85d68',
-      accentColor: '#ffe4e6',
-      radius: 14,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 24,
-      blur: 8
-    },
-    'dusty-blush': {
-      name: 'Dusty Blush',
-      bgColor: '#ebdcd9',
-      accentColor: '#9f1239',
-      radius: 18,
-      distance: 5,
-      lightIntensity: 75,
-      darkIntensity: 20,
-      blur: 10
-    },
-    'sakura-blossom': {
-      name: 'Sakura Blossom',
-      bgColor: '#fce7f3',
-      accentColor: '#be123c',
-      radius: 18,
-      distance: 3,
-      lightIntensity: 30,
-      darkIntensity: 14,
-      blur: 8
-    },
-    'bubblegum-magenta': {
-      name: 'Bubblegum Magenta',
-      bgColor: '#db2777',
-      accentColor: '#fef08a',
-      radius: 30,
-      distance: 7,
-      lightIntensity: 42,
-      darkIntensity: 38,
-      blur: 15
-    },
-    'electric-coral': {
-      name: 'Electric Coral',
-      bgColor: '#f43f5e',
-      accentColor: '#ffffff',
-      radius: 20,
-      distance: 5,
-      lightIntensity: 40,
-      darkIntensity: 35,
-      blur: 10
-    },
-    'marshmallow-indigo': {
-      name: 'Marshmallow Indigo',
-      bgColor: '#4f46e5',
-      accentColor: '#fde047',
-      radius: 42,
-      distance: 8,
-      lightIntensity: 40,
-      darkIntensity: 48,
-      blur: 18
-    },
-    'lilac-cloud': {
-      name: 'Lilac Cloud',
-      bgColor: '#c4b5fd',
-      accentColor: '#4c1d95',
-      radius: 22,
-      distance: 4,
-      lightIntensity: 36,
-      darkIntensity: 22,
-      blur: 11
-    },
-    'lavender-dream': {
-      name: 'Lavender Dream',
-      bgColor: '#e2d9f3',
-      accentColor: '#6b21a8',
-      radius: 14,
-      distance: 3,
-      lightIntensity: 28,
-      darkIntensity: 18,
-      blur: 8
-    },
-    'sage-mint': {
-      name: 'Sage Mint',
-      bgColor: '#c8d6c0',
-      accentColor: '#166534',
-      radius: 18,
-      distance: 3,
-      lightIntensity: 24,
-      darkIntensity: 18,
-      blur: 7
-    },
-    'matcha-cream': {
-      name: 'Matcha Cream',
-      bgColor: '#dbe4d2',
-      accentColor: '#3f5622',
-      radius: 16,
-      distance: 3,
-      lightIntensity: 26,
-      darkIntensity: 18,
-      blur: 8
-    },
-    'eucalyptus-mist': {
-      name: 'Eucalyptus Mist',
-      bgColor: '#d4ded6',
-      accentColor: '#065f46',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 70,
-      darkIntensity: 22,
-      blur: 9
-    },
-    'spearmint-gelato': {
-      name: 'Spearmint Gelato',
-      bgColor: '#6ee7b7',
-      accentColor: '#831843',
-      radius: 38,
-      distance: 6,
-      lightIntensity: 48,
-      darkIntensity: 28,
-      blur: 14
-    },
-    'pistachio-gelato': {
-      name: 'Pistachio Gelato',
-      bgColor: '#dcfce7',
-      accentColor: '#15803d',
-      radius: 20,
-      distance: 4,
-      lightIntensity: 45,
-      darkIntensity: 16,
-      blur: 10
-    },
-    'aqua-marine': {
-      name: 'Aqua Marine',
-      bgColor: '#cffafe',
-      accentColor: '#0369a1',
-      radius: 16,
-      distance: 3,
-      lightIntensity: 30,
-      darkIntensity: 16,
-      blur: 8
-    },
-    'sky-blue-pastel': {
-      name: 'Sky Blue Pastel',
-      bgColor: '#bae6fd',
-      accentColor: '#0369a1',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 45,
-      darkIntensity: 18,
-      blur: 9
-    },
-    'cyber-cyan': {
-      name: 'Cyber Cyan',
-      bgColor: '#0891b2',
-      accentColor: '#fef08a',
-      radius: 18,
-      distance: 4,
-      lightIntensity: 35,
-      darkIntensity: 32,
-      blur: 6
-    },
-    'neon-lime': {
-      name: 'Neon Lime Pop',
-      bgColor: '#84cc16',
-      accentColor: '#1a2e05',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 50,
-      darkIntensity: 30,
-      blur: 8
-    },
-    'sunburst-yellow': {
-      name: 'Sunburst Gold',
-      bgColor: '#eab308',
-      accentColor: '#172554',
-      radius: 14,
-      distance: 4,
-      lightIntensity: 55,
-      darkIntensity: 35,
-      blur: 8
-    },
-    'laguna-teal': {
-      name: 'Laguna Teal',
-      bgColor: '#134e4a',
-      accentColor: '#2dd4bf',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 30,
-      blur: 8
-    },
-    'forest-emerald': {
-      name: 'Forest Emerald',
-      bgColor: '#1b4332',
-      accentColor: '#52b788',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 30,
-      blur: 7
-    },
-    'matrix-terminal': {
-      name: 'Matrix CRT',
-      bgColor: '#052e16',
-      accentColor: '#22c55e',
-      radius: 4,
-      distance: 2,
-      lightIntensity: 40,
-      darkIntensity: 70,
-      blur: 2
-    },
-    'ocean-azure': {
-      name: 'Ocean Azure',
-      bgColor: '#1e3a5f',
-      accentColor: '#38bdf8',
-      radius: 14,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 30,
-      blur: 8
-    },
-    'abyssal-ocean': {
-      name: 'Abyssal Ocean',
-      bgColor: '#0e2a47',
-      accentColor: '#38bdf8',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 22,
-      darkIntensity: 55,
-      blur: 10
-    },
-    'electric-cobalt': {
-      name: 'Electric Cobalt',
-      bgColor: '#1d3557',
-      accentColor: '#34d399',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 30,
-      blur: 8
-    },
-    'nordic-slate': {
-      name: 'Nordic Slate',
-      bgColor: '#334155',
-      accentColor: '#60a5fa',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 28,
-      blur: 8
-    },
-    'matte-titanium': {
-      name: 'Matte Titanium',
-      bgColor: '#1e293b',
-      accentColor: '#06b6d4',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 45,
-      blur: 7
-    },
-    'graphite-carbon': {
-      name: 'Graphite Studio',
-      bgColor: '#24272c',
-      accentColor: '#00f2fe',
-      radius: 12,
-      distance: 4,
-      lightIntensity: 18,
-      darkIntensity: 42,
-      blur: 8
-    },
-    'royal-violet': {
-      name: 'Royal Violet',
-      bgColor: '#442759',
-      accentColor: '#f472b6',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 20,
-      darkIntensity: 32,
-      blur: 9
-    },
-    'midnight-violet': {
-      name: 'Midnight Violet',
-      bgColor: '#3b0764',
-      accentColor: '#f43f5e',
-      radius: 24,
-      distance: 6,
-      lightIntensity: 32,
-      darkIntensity: 65,
-      blur: 14
-    },
-    'garnet-obsidian': {
-      name: 'Garnet Obsidian',
-      bgColor: '#450a0a',
-      accentColor: '#fb7185',
-      radius: 8,
-      distance: 4,
-      lightIntensity: 24,
-      darkIntensity: 70,
-      blur: 9
-    },
-    'crimson-vampire': {
-      name: 'Crimson Vampire',
-      bgColor: '#2a0808',
-      accentColor: '#ef4444',
-      radius: 10,
-      distance: 4,
-      lightIntensity: 18,
-      darkIntensity: 60,
-      blur: 8
-    },
-    'obsidian-gold': {
-      name: 'Obsidian Gold',
-      bgColor: '#1e1e24',
-      accentColor: '#f59e0b',
-      radius: 10,
-      distance: 4,
-      lightIntensity: 16,
-      darkIntensity: 48,
-      blur: 8
-    },
-    'synth-slate': {
-      name: 'Synthwave Slate',
-      bgColor: '#2b2d42',
-      accentColor: '#ff007f',
-      radius: 12,
-      distance: 5,
-      lightIntensity: 22,
-      darkIntensity: 38,
-      blur: 9
-    },
-    'synthwave-sunset': {
-      name: 'Synthwave Sunset',
-      bgColor: '#262335',
-      accentColor: '#ff7b00',
-      radius: 14,
-      distance: 4,
-      lightIntensity: 20,
-      darkIntensity: 32,
-      blur: 9
-    },
-    'tokyo-night': {
-      name: 'Tokyo Night',
-      bgColor: '#1a1b26',
-      accentColor: '#7aa2f7',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 18,
-      darkIntensity: 38,
-      blur: 8
-    },
-    'catppuccin-mocha': {
-      name: 'Catppuccin Mocha',
-      bgColor: '#1e1e2e',
-      accentColor: '#cba6f7',
-      radius: 14,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 35,
-      blur: 8
-    },
-    'dracula-classic': {
-      name: 'Dracula Classic',
-      bgColor: '#282a36',
-      accentColor: '#ff79c6',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 32,
-      blur: 7
-    },
-    'monokai-charcoal': {
-      name: 'Monokai Charcoal',
-      bgColor: '#2d2a2e',
-      accentColor: '#ffd866',
-      radius: 10,
-      distance: 3,
-      lightIntensity: 18,
-      darkIntensity: 34,
-      blur: 7
-    },
-    'cyberpunk-neon': {
-      name: 'Cyberpunk Neon',
-      bgColor: '#12131a',
-      accentColor: '#fcee0a',
-      radius: 6,
-      distance: 3,
-      lightIntensity: 15,
-      darkIntensity: 45,
-      blur: 6
-    },
-    'midnight-onyx': {
-      name: 'Midnight Onyx',
-      bgColor: '#18181b',
-      accentColor: '#a855f7',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 16,
-      darkIntensity: 45,
-      blur: 7
-    },
-    'oled-black': {
-      name: 'OLED Void',
-      bgColor: '#09090b',
-      accentColor: '#38bdf8',
-      radius: 8,
-      distance: 3,
-      lightIntensity: 14,
-      darkIntensity: 65,
-      blur: 6
-    },
-    'atomic-tangerine': {
-      name: 'Atomic Tangerine',
-      bgColor: '#151922',
-      accentColor: '#ff6b35',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 20,
-      darkIntensity: 42,
-      blur: 8
-    },
-    'matcha-pistachio': {
-      name: 'Matcha Cream',
-      bgColor: '#dce5d8',
-      accentColor: '#2d6a4f',
-      radius: 16,
-      distance: 4,
-      lightIntensity: 65,
-      darkIntensity: 18,
-      blur: 10
-    },
-    'velvet-amethyst': {
-      name: 'Velvet Amethyst',
-      bgColor: '#241829',
-      accentColor: '#e0aaff',
-      radius: 14,
-      distance: 4,
-      lightIntensity: 22,
-      darkIntensity: 48,
-      blur: 9
-    },
-    'golden-dunes': {
-      name: 'Golden Dunes',
-      bgColor: '#d9c5b2',
-      accentColor: '#b05b3b',
-      radius: 10,
-      distance: 4,
-      lightIntensity: 55,
-      darkIntensity: 16,
-      blur: 8
-    },
-    'glacial-teal': {
-      name: 'Glacial Teal',
-      bgColor: '#11222c',
-      accentColor: '#00f5d4',
-      radius: 12,
-      distance: 3,
-      lightIntensity: 22,
-      darkIntensity: 45,
-      blur: 8
-    },
-    'soft-gray': {
-      name: 'Warm Clay (Default)',
-      bgColor: '#e8dfd5',
-      accentColor: '#d97706',
-      radius: 5,
-      distance: 4,
-      lightIntensity: 39,
-      darkIntensity: 5,
-      blur: 9
-    }
-  };
-
-  function deriveRealisticShadows(bgColor, lightIntensity = 20, darkIntensity = 20) {
-    const rgb = hexToRgb(bgColor);
-    const lum = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255.0;
-
-    // Realistic specular light highlight (blended with pure white)
-    let lFactor;
-    if (lum < 0.25) {
-      lFactor = (lightIntensity / 100.0) * 0.45;
-    } else if (lum < 0.55) {
-      lFactor = (lightIntensity / 100.0) * 0.65;
-    } else {
-      lFactor = (lightIntensity / 100.0) * 0.95;
-    }
-    lFactor = Math.min(0.95, Math.max(0.03, lFactor));
-
-    const lightR = Math.min(255, Math.round(rgb.r + (255 - rgb.r) * lFactor));
-    const lightG = Math.min(255, Math.round(rgb.g + (255 - rgb.g) * lFactor));
-    const lightB = Math.min(255, Math.round(rgb.b + (255 - rgb.b) * lFactor));
-
-    // Realistic ambient occlusion shadow (blended with pure black)
-    let dFactor;
-    if (lum < 0.25) {
-      dFactor = (darkIntensity / 100.0) * 0.75;
-    } else if (lum < 0.55) {
-      dFactor = (darkIntensity / 100.0) * 0.95;
-    } else {
-      dFactor = (darkIntensity / 100.0) * 1.15;
-    }
-    dFactor = Math.min(0.95, Math.max(0.03, dFactor));
-
-    const darkR = Math.max(0, Math.round(rgb.r * (1.0 - dFactor)));
-    const darkG = Math.max(0, Math.round(rgb.g * (1.0 - dFactor)));
-    const darkB = Math.max(0, Math.round(rgb.b * (1.0 - dFactor)));
-
-    const deepFactor = Math.min(0.98, dFactor * 1.35);
-    const deepR = Math.max(0, Math.round(rgb.r * (1.0 - deepFactor)));
-    const deepG = Math.max(0, Math.round(rgb.g * (1.0 - deepFactor)));
-    const deepB = Math.max(0, Math.round(rgb.b * (1.0 - deepFactor)));
-
-    return {
-      shadowLight: rgbToHex(lightR, lightG, lightB),
-      shadowDark: rgbToHex(darkR, darkG, darkB),
-      shadowDarkDeep: rgbToHex(deepR, deepG, deepB)
-    };
-  }
-
-  function computePresetShadow(bgColor, lightIntensity = 20, darkIntensity = 20, distance = 3, blur = 8) {
-    const d = Math.max(2, Math.round(distance * 0.75));
-    const b = blur;
-    const maxDark = (blur === 0) ? 0.85 : 0.55;
-    const maxLight = (blur === 0) ? 0.85 : 0.65;
-    const darkAlpha = Math.min(maxDark, Math.max(0.12, (darkIntensity / 100.0) * 1.1));
-    const lightAlpha = Math.min(maxLight, Math.max(0.10, (lightIntensity / 100.0) * 1.1));
-    if (blur === 0) {
-      return `${d}px ${d}px 0px rgba(0, 0, 0, ${darkAlpha.toFixed(2)}), -${d}px -${d}px 0px rgba(255, 255, 255, ${lightAlpha.toFixed(2)})`;
-    }
-    return `${d}px ${d}px ${b}px rgba(0, 0, 0, ${darkAlpha.toFixed(2)}), -${d}px -${d}px ${b}px rgba(255, 255, 255, ${lightAlpha.toFixed(2)})`;
-  }
-
-  function lightenHex(hex, percent) {
-    const rgb = hexToRgb(hex);
-    const factor = percent / 100;
-    return rgbToHex(
-      rgb.r + (255 - rgb.r) * factor,
-      rgb.g + (255 - rgb.g) * factor,
-      rgb.b + (255 - rgb.b) * factor
-    );
-  }
-
-  function darkenHex(hex, percent) {
-    const rgb = hexToRgb(hex);
-    const factor = 1 - (percent / 100);
-    return rgbToHex(rgb.r * factor, rgb.g * factor, rgb.b * factor);
-  }
-
-  function getLuminance(r, g, b) {
-    const a = [r, g, b].map(v => {
-      v /= 255;
-      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-    });
-    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
-  }
-
-  function getContrastRatio(lum1, lum2) {
-    const lighter = Math.max(lum1, lum2);
-    const darker = Math.min(lum1, lum2);
-    return (lighter + 0.05) / (darker + 0.05);
-  }
-
-  function deriveHarmonicTypography(bgHex) {
-    const rgb = hexToRgb(bgHex);
-    const bgLum = getLuminance(rgb.r, rgb.g, rgb.b);
-    const hsl = hexToHsl(bgHex);
-
-    const contrastWhite = (1.0 + 0.05) / (bgLum + 0.05);
-    const contrastBlack = (bgLum + 0.05) / (0.0 + 0.05);
-
-    // Harmonic undertone saturation (keeps text naturally keyed to the base clay)
-    const harmSat = Math.min(0.22, Math.max(0.06, hsl.s * 0.45));
-    const useDarkText = contrastBlack >= contrastWhite;
-
-    let textPrimary, textSecondary, textMuted, textDisabled;
-
-    if (useDarkText) {
-      // Dark text mode (on light, beige, caramel, mint backgrounds)
-      textPrimary = hslToHex(hsl.h, harmSat, 0.09);
-
-      // Search lightness for secondary text (minimum contrast 5.5:1)
-      let secL = 0.09;
-      for (let l = 12; l <= 45; l++) {
-        const testHex = hslToHex(hsl.h, harmSat, l / 100);
-        const testRgb = hexToRgb(testHex);
-        const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
-        if (getContrastRatio(bgLum, testLum) >= 5.5) {
-          secL = l / 100;
-        } else {
-          break;
-        }
-      }
-      textSecondary = hslToHex(hsl.h, harmSat, secL);
-
-      // Search lightness for muted text (guaranteed WCAG AA >= 4.5:1)
-      let mutedL = secL;
-      for (let l = Math.round(secL * 100); l <= 55; l++) {
-        const testHex = hslToHex(hsl.h, harmSat, l / 100);
-        const testRgb = hexToRgb(testHex);
-        const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
-        if (getContrastRatio(bgLum, testLum) >= 4.5) {
-          mutedL = l / 100;
-        } else {
-          break;
-        }
-      }
-      textMuted = hslToHex(hsl.h, harmSat, mutedL);
-
-      // Search lightness for disabled text (minimum contrast 2.4:1)
-      let disL = mutedL;
-      for (let l = Math.round(mutedL * 100); l <= 75; l++) {
-        const testHex = hslToHex(hsl.h, harmSat, l / 100);
-        const testRgb = hexToRgb(testHex);
-        const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
-        if (getContrastRatio(bgLum, testLum) >= 2.4) {
-          disL = l / 100;
-        } else {
-          break;
-        }
-      }
-      textDisabled = hslToHex(hsl.h, harmSat, disL);
-    } else {
-      // Light text mode (on dark, navy, emerald, terracotta, violet backgrounds)
-      textPrimary = hslToHex(hsl.h, harmSat * 0.5, 0.96);
-
-      // Search lightness for secondary text (minimum contrast 5.5:1)
-      let secL = 0.96;
-      for (let l = 92; l >= 50; l--) {
-        const testHex = hslToHex(hsl.h, harmSat, l / 100);
-        const testRgb = hexToRgb(testHex);
-        const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
-        if (getContrastRatio(bgLum, testLum) >= 5.5) {
-          secL = l / 100;
-        } else {
-          break;
-        }
-      }
-      textSecondary = hslToHex(hsl.h, harmSat, secL);
-
-      // Search lightness for muted text (guaranteed WCAG AA >= 4.5:1)
-      let mutedL = secL;
-      for (let l = Math.round(secL * 100); l >= 40; l--) {
-        const testHex = hslToHex(hsl.h, harmSat, l / 100);
-        const testRgb = hexToRgb(testHex);
-        const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
-        if (getContrastRatio(bgLum, testLum) >= 4.5) {
-          mutedL = l / 100;
-        } else {
-          break;
-        }
-      }
-      textMuted = hslToHex(hsl.h, harmSat, mutedL);
-
-      // Search lightness for disabled text (minimum contrast 2.4:1)
-      let disL = mutedL;
-      for (let l = Math.round(mutedL * 100); l >= 20; l--) {
-        const testHex = hslToHex(hsl.h, harmSat, l / 100);
-        const testRgb = hexToRgb(testHex);
-        const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
-        if (getContrastRatio(bgLum, testLum) >= 2.4) {
-          disL = l / 100;
-        } else {
-          break;
-        }
-      }
-      textDisabled = hslToHex(hsl.h, harmSat, disL);
-    }
-
-    return {
-      textPrimary,
-      textSecondary,
-      textMuted,
-      textDisabled
-    };
-  }
-
-  function applyTheme(bgColor, accentColor, save = false, neo = null) {
-    if (!bgColor) bgColor = '#e8dfd5';
-    if (!accentColor) accentColor = '#d97706';
-    if (!bgColor.startsWith('#')) bgColor = '#' + bgColor;
-    if (!accentColor.startsWith('#')) accentColor = '#' + accentColor;
-
-    // Resolve Neumorphism Parameters (Radius, Distance, Light/Dark Intensity, Blur)
-    const radius = (neo && typeof neo.radius !== 'undefined')
-      ? parseInt(neo.radius, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.radius !== 'undefined') ? parseInt(state.config.theme.radius, 10) : 5);
-
-    const distance = Math.min(10, Math.max(1, (neo && typeof neo.distance !== 'undefined')
-      ? parseInt(neo.distance, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined') ? parseInt(state.config.theme.distance, 10) : 3)));
-
-    const lightIntensity = (neo && typeof neo.lightIntensity !== 'undefined')
-      ? parseInt(neo.lightIntensity, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.lightIntensity !== 'undefined')
-        ? parseInt(state.config.theme.lightIntensity, 10)
-        : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined')
-          ? parseInt(state.config.theme.intensity, 10) : 22));
-
-    const darkIntensity = (neo && typeof neo.darkIntensity !== 'undefined')
-      ? parseInt(neo.darkIntensity, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.darkIntensity !== 'undefined')
-        ? parseInt(state.config.theme.darkIntensity, 10)
-        : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined')
-          ? parseInt(state.config.theme.intensity, 10) : 6));
-
-    const blur = (neo && typeof neo.blur !== 'undefined')
-      ? parseInt(neo.blur, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.blur !== 'undefined') ? parseInt(state.config.theme.blur, 10) : 10);
-
-    const avgIntensity = Math.round((lightIntensity + darkIntensity) / 2);
-
-    // Compute Chromatic Shadows: exact lighter tint for top and darker shade for bottom
-    const chromatic = deriveRealisticShadows(bgColor, lightIntensity, darkIntensity);
-    const shadowLight = chromatic.shadowLight;
-    const shadowDark = chromatic.shadowDark;
-    const shadowDarkDeep = chromatic.shadowDarkDeep;
-
-    // Dynamic WCAG-compliant harmonic typography system (guaranteed >= 4.5:1 contrast)
-    const typography = deriveHarmonicTypography(bgColor);
-    const textPrimary = typography.textPrimary;
-    const textSecondary = typography.textSecondary;
-    const textMuted = typography.textMuted;
-    const textDisabled = typography.textDisabled;
-
-    // Derived accent color shades
-    const accRgb = hexToRgb(accentColor);
-    const accLight = lightenHex(accentColor, 20);
-    const accPastel = lightenHex(accentColor, 45);
-    const accSuperPastel = lightenHex(accentColor, 60);
-    const accDark = darkenHex(accentColor, 18);
-    const accDeep = darkenHex(accentColor, 35);
-    const deepRgb = hexToRgb(accDeep);
-
-    const accGlow = `0 4px 16px rgba(${accRgb.r}, ${accRgb.g}, ${accRgb.b}, 0.45)`;
-    const accGradient = `linear-gradient(135deg, ${accLight} 0%, ${accentColor} 100%)`;
-    const accTroughGrad = accentColor;
-    const accTroughShadow = `inset 0 2px 4px rgba(0, 0, 0, 0.35), 0 0 10px ${accentColor}`;
-
-    const root = document.documentElement;
-    root.style.setProperty('--bg-color', bgColor);
-    root.style.setProperty('--surface-color', bgColor);
-    root.style.setProperty('--shadow-light', shadowLight);
-    root.style.setProperty('--shadow-dark', shadowDark);
-    root.style.setProperty('--shadow-dark-deep', shadowDarkDeep);
-    root.style.setProperty('--text-primary', textPrimary);
-    root.style.setProperty('--text-secondary', textSecondary);
-    root.style.setProperty('--text-muted', textMuted);
-    root.style.setProperty('--text-disabled', textDisabled);
-
-    root.style.setProperty('--accent-primary', accentColor);
-    root.style.setProperty('--accent-light', accLight);
-    root.style.setProperty('--accent-pastel', accPastel);
-    root.style.setProperty('--accent-dark', accDark);
-    root.style.setProperty('--accent-deep', accDeep);
-    root.style.setProperty('--accent-glow', accGlow);
-    root.style.setProperty('--accent-gradient', accGradient);
-    root.style.setProperty('--accent-trough-gradient', accTroughGrad);
-    root.style.setProperty('--accent-trough-shadow', accTroughShadow);
-
-    // Dynamic theme-matching scrollbar variables
-    root.style.setProperty('--scrollbar-thumb', shadowDark);
-    root.style.setProperty('--scrollbar-thumb-hover', accentColor);
-    root.style.setProperty('--bg-hover', shadowDark);
-
-    // Apply dynamic Neumorphism core parameters
-    root.style.setProperty('--neo-radius', `${radius}px`);
-    root.style.setProperty('--neo-dist', `${distance}px`);
-    root.style.setProperty('--neo-blur', `${blur}px`);
-    root.style.setProperty('--neo-light-intensity', `${lightIntensity}%`);
-    root.style.setProperty('--neo-dark-intensity', `${darkIntensity}%`);
-    root.style.setProperty('--neo-intensity', `${avgIntensity}%`);
-
-    // Sync state
-    if (!state.config.theme) {
-      state.config.theme = {};
-    }
-    state.config.theme.bgColor = bgColor;
-    state.config.theme.accentColor = accentColor;
-    state.config.theme.radius = radius;
-    state.config.theme.distance = distance;
-    state.config.theme.lightIntensity = lightIntensity;
-    state.config.theme.darkIntensity = darkIntensity;
-    state.config.theme.intensity = avgIntensity;
-    state.config.theme.blur = blur;
-
-    // Persist to localStorage immediately
-    try {
-      localStorage.setItem('ahk_theme', JSON.stringify({
-        bgColor,
-        accentColor,
-        radius,
-        distance,
-        lightIntensity,
-        darkIntensity,
-        intensity: avgIntensity,
-        blur
-      }));
-    } catch (e) { }
-
-    // Sync input controls if present
-    if (themeBgColorPicker) themeBgColorPicker.value = bgColor;
-    if (themeBgHex) themeBgHex.value = bgColor.toUpperCase();
-    if (themeAccentColorPicker) themeAccentColorPicker.value = accentColor;
-    if (themeAccentHex) themeAccentHex.value = accentColor.toUpperCase();
-
-    if (themeSliderRadius) {
-      themeSliderRadius.value = radius;
-      updateSliderProgress(themeSliderRadius);
-      if (badgeRadius) badgeRadius.textContent = `${radius}px`;
-    }
-    if (themeSliderDistance) {
-      themeSliderDistance.value = distance;
-      updateSliderProgress(themeSliderDistance);
-      if (badgeDistance) badgeDistance.textContent = `${distance}px`;
-    }
-    if (themeSliderLightIntensity) {
-      themeSliderLightIntensity.value = lightIntensity;
-      updateSliderProgress(themeSliderLightIntensity);
-      if (badgeLightIntensity) badgeLightIntensity.textContent = `${lightIntensity}%`;
-    }
-    if (themeSliderDarkIntensity) {
-      themeSliderDarkIntensity.value = darkIntensity;
-      updateSliderProgress(themeSliderDarkIntensity);
-      if (badgeDarkIntensity) badgeDarkIntensity.textContent = `${darkIntensity}%`;
-    }
-    if (themeSliderBlur) {
-      themeSliderBlur.value = blur;
-      updateSliderProgress(themeSliderBlur);
-      if (badgeBlur) badgeBlur.textContent = `${blur}px`;
-    }
-
-    const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
-    if (themeOsdIconOnly) {
-      themeOsdIconOnly.checked = !!(state.config && state.config.theme && (state.config.theme.osdIconOnly === 1 || state.config.theme.osdIconOnly === true));
-    }
-
-    // Refresh all neumorphic sliders so track fills dynamically adapt to the active theme colors
-    document.querySelectorAll('.neumorphic-slider').forEach(sl => {
-      updateSliderProgress(sl);
-    });
-
-    updateActivePresetChips();
-
-    if (save) {
-      syncConfig();
-    }
-  }
-
-  function getCurrentThemeColors(preferDom = true) {
-    let bg = '';
-    let acc = '';
-
-    if (preferDom) {
-      if (themeBgHex && /^#[0-9A-Fa-f]{6}$/i.test(themeBgHex.value.trim())) {
-        bg = themeBgHex.value.trim();
-      } else if (themeBgColorPicker && /^#[0-9A-Fa-f]{6}$/i.test(themeBgColorPicker.value)) {
-        bg = themeBgColorPicker.value;
-      }
-
-      if (themeAccentHex && /^#[0-9A-Fa-f]{6}$/i.test(themeAccentHex.value.trim())) {
-        acc = themeAccentHex.value.trim();
-      } else if (themeAccentColorPicker && /^#[0-9A-Fa-f]{6}$/i.test(themeAccentColorPicker.value)) {
-        acc = themeAccentColorPicker.value;
-      }
-    }
-
-    if (!bg) {
-      bg = (state.config && state.config.theme && state.config.theme.bgColor)
-        || document.documentElement.style.getPropertyValue('--bg-color')
-        || '#e8dfd5';
-    }
-
-    if (!acc) {
-      acc = (state.config && state.config.theme && state.config.theme.accentColor)
-        || document.documentElement.style.getPropertyValue('--accent-primary')
-        || '#d97706';
-    }
-
-    const radius = (preferDom && themeSliderRadius)
-      ? parseInt(themeSliderRadius.value, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.radius !== 'undefined') ? parseInt(state.config.theme.radius, 10) : 5);
-
-    const distance = Math.min(10, Math.max(1, (preferDom && themeSliderDistance)
-      ? parseInt(themeSliderDistance.value, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined') ? parseInt(state.config.theme.distance, 10) : 3)));
-
-    const lightIntensity = (preferDom && themeSliderLightIntensity)
-      ? parseInt(themeSliderLightIntensity.value, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.lightIntensity !== 'undefined')
-        ? parseInt(state.config.theme.lightIntensity, 10)
-        : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 22));
-
-    const darkIntensity = (preferDom && themeSliderDarkIntensity)
-      ? parseInt(themeSliderDarkIntensity.value, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.darkIntensity !== 'undefined')
-        ? parseInt(state.config.theme.darkIntensity, 10)
-        : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 6));
-
-    const blur = (preferDom && themeSliderBlur)
-      ? parseInt(themeSliderBlur.value, 10)
-      : ((state.config && state.config.theme && typeof state.config.theme.blur !== 'undefined') ? parseInt(state.config.theme.blur, 10) : 10);
-
-    return {
-      bg: bg.trim(),
-      acc: acc.trim(),
-      radius,
-      distance,
-      lightIntensity,
-      darkIntensity,
-      intensity: Math.round((lightIntensity + darkIntensity) / 2),
-      blur
-    };
-  }
-
-  function getNeoSliderValues() {
-    return {
-      radius: themeSliderRadius ? parseInt(themeSliderRadius.value, 10) : 22,
-      distance: themeSliderDistance ? parseInt(themeSliderDistance.value, 10) : 3,
-      lightIntensity: themeSliderLightIntensity ? parseInt(themeSliderLightIntensity.value, 10) : 18,
-      darkIntensity: themeSliderDarkIntensity ? parseInt(themeSliderDarkIntensity.value, 10) : 18,
-      blur: themeSliderBlur ? parseInt(themeSliderBlur.value, 10) : 8
-    };
-  }
-
-  function getCustomThemePresets() {
-    if (state.config && state.config.theme && Array.isArray(state.config.theme.customPresets)) {
-      return state.config.theme.customPresets;
-    }
-    try {
-      const cached = localStorage.getItem('ahk_custom_theme_presets');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          if (!state.config.theme) state.config.theme = {};
-          state.config.theme.customPresets = parsed;
-          return parsed;
-        }
-      }
-    } catch (e) { }
-    return [];
-  }
-
-  function renderCuratedPresets() {
-    const grid = document.getElementById('bgSwatchesGrid');
-    if (!grid) return;
-
-    grid.innerHTML = '';
-    const currentColors = getCurrentThemeColors(true);
-
-    Object.entries(THEME_PRESETS).forEach(([key, preset]) => {
-      if (key === 'soft-gray') return;
-
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'theme-swatch-chip theme-card-chip';
-      chip.dataset.preset = key;
-      chip.dataset.color = preset.bgColor;
-      chip.title = `${preset.name} (Background: ${preset.bgColor}, Accent: ${preset.accentColor || currentColors.acc})`;
-      chip.setAttribute('aria-label', preset.name);
-      chip.style.backgroundColor = preset.bgColor;
-      chip.style.borderColor = preset.accentColor || currentColors.acc;
-      chip.style.color = preset.accentColor || currentColors.acc;
-      chip.style.borderRadius = `${Math.min(24, Math.max(0, typeof preset.radius !== 'undefined' ? preset.radius : 10))}px`;
-      chip.style.boxShadow = computePresetShadow(
-        preset.bgColor,
-        preset.lightIntensity,
-        preset.darkIntensity,
-        preset.distance,
-        preset.blur
-      );
-
-      chip.innerHTML = `
+            'custom-default': {
+              name: 'Warm Clay (Default)',
+              bgColor: '#e8dfd5',
+              accentColor: '#d97706',
+              radius: 5,
+              distance: 4,
+              lightIntensity: 39,
+              darkIntensity: 5,
+              blur: 9
+            },
+            'dribbble-soft-gray': {
+              name: 'Dribbble Soft Canvas',
+              bgColor: '#e0e5ec',
+              accentColor: '#3b82f6',
+              radius: 16,
+              distance: 5,
+              lightIntensity: 85,
+              darkIntensity: 18,
+              blur: 10
+            },
+            'porcelain-ceramic': {
+              name: 'Porcelain Ceramic',
+              bgColor: '#f1f5f9',
+              accentColor: '#2563eb',
+              radius: 28,
+              distance: 7,
+              lightIntensity: 85,
+              darkIntensity: 20,
+              blur: 16
+            },
+            'pure-snow': {
+              name: 'Pure Snow Clay',
+              bgColor: '#f8fafc',
+              accentColor: '#0ea5e9',
+              radius: 18,
+              distance: 4,
+              lightIntensity: 90,
+              darkIntensity: 15,
+              blur: 12
+            },
+            'alabaster-clean': {
+              name: 'Alabaster Minimal',
+              bgColor: '#f4f4f5',
+              accentColor: '#18181b',
+              radius: 12,
+              distance: 4,
+              lightIntensity: 80,
+              darkIntensity: 18,
+              blur: 10
+            },
+            'nordic-linen': {
+              name: 'Nordic Linen',
+              bgColor: '#dfd9ce',
+              accentColor: '#92400e',
+              radius: 10,
+              distance: 4,
+              lightIntensity: 65,
+              darkIntensity: 20,
+              blur: 8
+            },
+            'nord-frost': {
+              name: 'Nord Frost',
+              bgColor: '#e5e9f0',
+              accentColor: '#5e81ac',
+              radius: 8,
+              distance: 3,
+              lightIntensity: 32,
+              darkIntensity: 16,
+              blur: 7
+            },
+            'silver-chiffon': {
+              name: 'Silver Chiffon',
+              bgColor: '#e2e8f0',
+              accentColor: '#475569',
+              radius: 14,
+              distance: 4,
+              lightIntensity: 75,
+              darkIntensity: 18,
+              blur: 9
+            },
+            'retro-sharp': {
+              name: 'Retro Paper',
+              bgColor: '#f2efe9',
+              accentColor: '#e11d48',
+              radius: 4,
+              distance: 3,
+              lightIntensity: 50,
+              darkIntensity: 16,
+              blur: 0
+            },
+            'solarized-cream': {
+              name: 'Solarized Cream',
+              bgColor: '#fdf6e3',
+              accentColor: '#b58900',
+              radius: 6,
+              distance: 3,
+              lightIntensity: 32,
+              darkIntensity: 14,
+              blur: 6
+            },
+            'butter-cream': {
+              name: 'Butter Cream',
+              bgColor: '#fef3c7',
+              accentColor: '#b45309',
+              radius: 14,
+              distance: 4,
+              lightIntensity: 35,
+              darkIntensity: 15,
+              blur: 8
+            },
+            'cappuccino-foam': {
+              name: 'Cappuccino Foam',
+              bgColor: '#ede0d4',
+              accentColor: '#7f4f24',
+              radius: 16,
+              distance: 4,
+              lightIntensity: 45,
+              darkIntensity: 16,
+              blur: 9
+            },
+            'desert-caramel': {
+              name: 'Desert Caramel',
+              bgColor: '#c68b59',
+              accentColor: '#451a03',
+              radius: 8,
+              distance: 3,
+              lightIntensity: 25,
+              darkIntensity: 22,
+              blur: 7
+            },
+            'roasted-cocoa': {
+              name: 'Roasted Cocoa',
+              bgColor: '#351c14',
+              accentColor: '#fbbf24',
+              radius: 10,
+              distance: 3,
+              lightIntensity: 22,
+              darkIntensity: 60,
+              blur: 5
+            },
+            'espresso-mocha': {
+              name: 'Espresso Mocha',
+              bgColor: '#2b1d14',
+              accentColor: '#f59e0b',
+              radius: 10,
+              distance: 3,
+              lightIntensity: 18,
+              darkIntensity: 36,
+              blur: 7
+            },
+            'brutalist-concrete': {
+              name: 'Brutalist Concrete',
+              bgColor: '#78716c',
+              accentColor: '#f97316',
+              radius: 2,
+              distance: 5,
+              lightIntensity: 55,
+              darkIntensity: 75,
+              blur: 0
+            },
+            'brutalist-amber': {
+              name: 'Brutalist Amber',
+              bgColor: '#f59e0b',
+              accentColor: '#1e1b4b',
+              radius: 2,
+              distance: 6,
+              lightIntensity: 65,
+              darkIntensity: 75,
+              blur: 0
+            },
+            'hard-canary': {
+              name: 'Hard Canary Yellow',
+              bgColor: '#facc15',
+              accentColor: '#09090b',
+              radius: 0,
+              distance: 5,
+              lightIntensity: 70,
+              darkIntensity: 80,
+              blur: 0
+            },
+            'hard-bubblegum': {
+              name: 'Hard Bubblegum Pop',
+              bgColor: '#f472b6',
+              accentColor: '#0f172a',
+              radius: 4,
+              distance: 6,
+              lightIntensity: 65,
+              darkIntensity: 75,
+              blur: 0
+            },
+            'hard-acid-lime': {
+              name: 'Hard Acid Lime',
+              bgColor: '#a3e635',
+              accentColor: '#14532d',
+              radius: 1,
+              distance: 5,
+              lightIntensity: 60,
+              darkIntensity: 75,
+              blur: 0
+            },
+            'hard-bauhaus-red': {
+              name: 'Hard Bauhaus Red',
+              bgColor: '#ef4444',
+              accentColor: '#000000',
+              radius: 0,
+              distance: 7,
+              lightIntensity: 60,
+              darkIntensity: 80,
+              blur: 0
+            },
+            'hard-blueprint': {
+              name: 'Hard Electric Blueprint',
+              bgColor: '#2563eb',
+              accentColor: '#fde047',
+              radius: 0,
+              distance: 7,
+              lightIntensity: 55,
+              darkIntensity: 85,
+              blur: 0
+            },
+            'hard-tangerine': {
+              name: 'Hard Tangerine Pop',
+              bgColor: '#fb923c',
+              accentColor: '#09090b',
+              radius: 3,
+              distance: 6,
+              lightIntensity: 60,
+              darkIntensity: 75,
+              blur: 0
+            },
+            'hard-arcade-cyan': {
+              name: 'Hard Arcade Cyan',
+              bgColor: '#38bdf8',
+              accentColor: '#0f172a',
+              radius: 6,
+              distance: 6,
+              lightIntensity: 65,
+              darkIntensity: 75,
+              blur: 0
+            },
+            'hard-toxic-mint': {
+              name: 'Hard Toxic Mint',
+              bgColor: '#34d399',
+              accentColor: '#064e3b',
+              radius: 2,
+              distance: 5,
+              lightIntensity: 65,
+              darkIntensity: 70,
+              blur: 0
+            },
+            'hard-ultraviolet': {
+              name: 'Hard Ultraviolet Pop',
+              bgColor: '#8b5cf6',
+              accentColor: '#facc15',
+              radius: 4,
+              distance: 6,
+              lightIntensity: 55,
+              darkIntensity: 80,
+              blur: 0
+            },
+            'hard-swiss-white': {
+              name: 'Hard Swiss Stark White',
+              bgColor: '#ffffff',
+              accentColor: '#e11d48',
+              radius: 0,
+              distance: 6,
+              lightIntensity: 80,
+              darkIntensity: 85,
+              blur: 0
+            },
+            'hard-parchment': {
+              name: 'Hard Parchment Blueprint',
+              bgColor: '#f6f1eb',
+              accentColor: '#1d4ed8',
+              radius: 2,
+              distance: 4,
+              lightIntensity: 60,
+              darkIntensity: 65,
+              blur: 0
+            },
+            'hard-hazard': {
+              name: 'Hard Industrial Hazard',
+              bgColor: '#eab308',
+              accentColor: '#000000',
+              radius: 0,
+              distance: 8,
+              lightIntensity: 65,
+              darkIntensity: 85,
+              blur: 0
+            },
+            'hard-gameboy': {
+              name: 'Hard Dot Matrix Handheld',
+              bgColor: '#8bac0f',
+              accentColor: '#0f380f',
+              radius: 4,
+              distance: 4,
+              lightIntensity: 50,
+              darkIntensity: 75,
+              blur: 0
+            },
+            'hard-steel': {
+              name: 'Hard Machined Steel',
+              bgColor: '#475569',
+              accentColor: '#38bdf8',
+              radius: 1,
+              distance: 5,
+              lightIntensity: 50,
+              darkIntensity: 80,
+              blur: 0
+            },
+            'hard-terminal-green': {
+              name: 'Hard CRT Terminal Green',
+              bgColor: '#052e16',
+              accentColor: '#22c55e',
+              radius: 0,
+              distance: 4,
+              lightIntensity: 45,
+              darkIntensity: 90,
+              blur: 0
+            },
+            'hard-cyber-black': {
+              name: 'Hard Cyber Void',
+              bgColor: '#121214',
+              accentColor: '#f43f5e',
+              radius: 0,
+              distance: 6,
+              lightIntensity: 45,
+              darkIntensity: 90,
+              blur: 0
+            },
+            'hard-midnight-navy': {
+              name: 'Hard Midnight Navy',
+              bgColor: '#0f172a',
+              accentColor: '#38bdf8',
+              radius: 2,
+              distance: 6,
+              lightIntensity: 45,
+              darkIntensity: 85,
+              blur: 0
+            },
+            'hard-blood-dark': {
+              name: 'Hard Blood Obsidian',
+              bgColor: '#260707',
+              accentColor: '#ef4444',
+              radius: 0,
+              distance: 6,
+              lightIntensity: 45,
+              darkIntensity: 85,
+              blur: 0
+            },
+            'hard-kawaii-lilac': {
+              name: 'Hard Kawaii Lilac',
+              bgColor: '#ddd6fe',
+              accentColor: '#6d28d9',
+              radius: 8,
+              distance: 6,
+              lightIntensity: 70,
+              darkIntensity: 70,
+              blur: 0
+            },
+            'hard-matcha': {
+              name: 'Hard Matcha Ceramic',
+              bgColor: '#d5dfc3',
+              accentColor: '#14532d',
+              radius: 2,
+              distance: 5,
+              lightIntensity: 65,
+              darkIntensity: 65,
+              blur: 0
+            },
+            'hard-teal-punch': {
+              name: 'Hard Teal Punch',
+              bgColor: '#0f766e',
+              accentColor: '#fef08a',
+              radius: 3,
+              distance: 6,
+              lightIntensity: 55,
+              darkIntensity: 80,
+              blur: 0
+            },
+            'hard-neon-coral': {
+              name: 'Hard Neon Coral',
+              bgColor: '#f43f5e',
+              accentColor: '#ffffff',
+              radius: 4,
+              distance: 7,
+              lightIntensity: 60,
+              darkIntensity: 80,
+              blur: 0
+            },
+            'hard-amber-slate': {
+              name: 'Hard Amber Slate',
+              bgColor: '#1c1917',
+              accentColor: '#f59e0b',
+              radius: 1,
+              distance: 5,
+              lightIntensity: 45,
+              darkIntensity: 85,
+              blur: 0
+            },
+            'hard-industrial-gray': {
+              name: 'Hard Industrial Gray',
+              bgColor: '#d1d5db',
+              accentColor: '#111827',
+              radius: 0,
+              distance: 6,
+              lightIntensity: 75,
+              darkIntensity: 80,
+              blur: 0
+            },
+            'hard-peach-punch': {
+              name: 'Hard Peach Punch',
+              bgColor: '#fed7aa',
+              accentColor: '#c2410c',
+              radius: 6,
+              distance: 5,
+              lightIntensity: 70,
+              darkIntensity: 70,
+              blur: 0
+            },
+            'solar-tangerine': {
+              name: 'Solar Tangerine',
+              bgColor: '#ea580c',
+              accentColor: '#fef08a',
+              radius: 34,
+              distance: 5,
+              lightIntensity: 38,
+              darkIntensity: 42,
+              blur: 12
+            },
+            'peach-fuzz': {
+              name: 'Peach Fuzz',
+              bgColor: '#fed7aa',
+              accentColor: '#c2410c',
+              radius: 16,
+              distance: 3,
+              lightIntensity: 28,
+              darkIntensity: 16,
+              blur: 7
+            },
+            'sunset-terracotta': {
+              name: 'Sunset Terracotta',
+              bgColor: '#8c3a27',
+              accentColor: '#fcd34d',
+              radius: 12,
+              distance: 3,
+              lightIntensity: 22,
+              darkIntensity: 28,
+              blur: 8
+            },
+            'vintage-rose': {
+              name: 'Vintage Rose',
+              bgColor: '#b85d68',
+              accentColor: '#ffe4e6',
+              radius: 14,
+              distance: 3,
+              lightIntensity: 22,
+              darkIntensity: 24,
+              blur: 8
+            },
+            'dusty-blush': {
+              name: 'Dusty Blush',
+              bgColor: '#ebdcd9',
+              accentColor: '#9f1239',
+              radius: 18,
+              distance: 5,
+              lightIntensity: 75,
+              darkIntensity: 20,
+              blur: 10
+            },
+            'sakura-blossom': {
+              name: 'Sakura Blossom',
+              bgColor: '#fce7f3',
+              accentColor: '#be123c',
+              radius: 18,
+              distance: 3,
+              lightIntensity: 30,
+              darkIntensity: 14,
+              blur: 8
+            },
+            'bubblegum-magenta': {
+              name: 'Bubblegum Magenta',
+              bgColor: '#db2777',
+              accentColor: '#fef08a',
+              radius: 30,
+              distance: 7,
+              lightIntensity: 42,
+              darkIntensity: 38,
+              blur: 15
+            },
+            'electric-coral': {
+              name: 'Electric Coral',
+              bgColor: '#f43f5e',
+              accentColor: '#ffffff',
+              radius: 20,
+              distance: 5,
+              lightIntensity: 40,
+              darkIntensity: 35,
+              blur: 10
+            },
+            'marshmallow-indigo': {
+              name: 'Marshmallow Indigo',
+              bgColor: '#4f46e5',
+              accentColor: '#fde047',
+              radius: 42,
+              distance: 8,
+              lightIntensity: 40,
+              darkIntensity: 48,
+              blur: 18
+            },
+            'lilac-cloud': {
+              name: 'Lilac Cloud',
+              bgColor: '#c4b5fd',
+              accentColor: '#4c1d95',
+              radius: 22,
+              distance: 4,
+              lightIntensity: 36,
+              darkIntensity: 22,
+              blur: 11
+            },
+            'lavender-dream': {
+              name: 'Lavender Dream',
+              bgColor: '#e2d9f3',
+              accentColor: '#6b21a8',
+              radius: 14,
+              distance: 3,
+              lightIntensity: 28,
+              darkIntensity: 18,
+              blur: 8
+            },
+            'sage-mint': {
+              name: 'Sage Mint',
+              bgColor: '#c8d6c0',
+              accentColor: '#166534',
+              radius: 18,
+              distance: 3,
+              lightIntensity: 24,
+              darkIntensity: 18,
+              blur: 7
+            },
+            'matcha-cream': {
+              name: 'Matcha Cream',
+              bgColor: '#dbe4d2',
+              accentColor: '#3f5622',
+              radius: 16,
+              distance: 3,
+              lightIntensity: 26,
+              darkIntensity: 18,
+              blur: 8
+            },
+            'eucalyptus-mist': {
+              name: 'Eucalyptus Mist',
+              bgColor: '#d4ded6',
+              accentColor: '#065f46',
+              radius: 16,
+              distance: 4,
+              lightIntensity: 70,
+              darkIntensity: 22,
+              blur: 9
+            },
+            'spearmint-gelato': {
+              name: 'Spearmint Gelato',
+              bgColor: '#6ee7b7',
+              accentColor: '#831843',
+              radius: 38,
+              distance: 6,
+              lightIntensity: 48,
+              darkIntensity: 28,
+              blur: 14
+            },
+            'pistachio-gelato': {
+              name: 'Pistachio Gelato',
+              bgColor: '#dcfce7',
+              accentColor: '#15803d',
+              radius: 20,
+              distance: 4,
+              lightIntensity: 45,
+              darkIntensity: 16,
+              blur: 10
+            },
+            'aqua-marine': {
+              name: 'Aqua Marine',
+              bgColor: '#cffafe',
+              accentColor: '#0369a1',
+              radius: 16,
+              distance: 3,
+              lightIntensity: 30,
+              darkIntensity: 16,
+              blur: 8
+            },
+            'sky-blue-pastel': {
+              name: 'Sky Blue Pastel',
+              bgColor: '#bae6fd',
+              accentColor: '#0369a1',
+              radius: 16,
+              distance: 4,
+              lightIntensity: 45,
+              darkIntensity: 18,
+              blur: 9
+            },
+            'cyber-cyan': {
+              name: 'Cyber Cyan',
+              bgColor: '#0891b2',
+              accentColor: '#fef08a',
+              radius: 18,
+              distance: 4,
+              lightIntensity: 35,
+              darkIntensity: 32,
+              blur: 6
+            },
+            'neon-lime': {
+              name: 'Neon Lime Pop',
+              bgColor: '#84cc16',
+              accentColor: '#1a2e05',
+              radius: 16,
+              distance: 4,
+              lightIntensity: 50,
+              darkIntensity: 30,
+              blur: 8
+            },
+            'sunburst-yellow': {
+              name: 'Sunburst Gold',
+              bgColor: '#eab308',
+              accentColor: '#172554',
+              radius: 14,
+              distance: 4,
+              lightIntensity: 55,
+              darkIntensity: 35,
+              blur: 8
+            },
+            'laguna-teal': {
+              name: 'Laguna Teal',
+              bgColor: '#134e4a',
+              accentColor: '#2dd4bf',
+              radius: 12,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 30,
+              blur: 8
+            },
+            'forest-emerald': {
+              name: 'Forest Emerald',
+              bgColor: '#1b4332',
+              accentColor: '#52b788',
+              radius: 10,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 30,
+              blur: 7
+            },
+            'matrix-terminal': {
+              name: 'Matrix CRT',
+              bgColor: '#052e16',
+              accentColor: '#22c55e',
+              radius: 4,
+              distance: 2,
+              lightIntensity: 40,
+              darkIntensity: 70,
+              blur: 2
+            },
+            'ocean-azure': {
+              name: 'Ocean Azure',
+              bgColor: '#1e3a5f',
+              accentColor: '#38bdf8',
+              radius: 14,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 30,
+              blur: 8
+            },
+            'abyssal-ocean': {
+              name: 'Abyssal Ocean',
+              bgColor: '#0e2a47',
+              accentColor: '#38bdf8',
+              radius: 16,
+              distance: 4,
+              lightIntensity: 22,
+              darkIntensity: 55,
+              blur: 10
+            },
+            'electric-cobalt': {
+              name: 'Electric Cobalt',
+              bgColor: '#1d3557',
+              accentColor: '#34d399',
+              radius: 10,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 30,
+              blur: 8
+            },
+            'nordic-slate': {
+              name: 'Nordic Slate',
+              bgColor: '#334155',
+              accentColor: '#60a5fa',
+              radius: 10,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 28,
+              blur: 8
+            },
+            'matte-titanium': {
+              name: 'Matte Titanium',
+              bgColor: '#1e293b',
+              accentColor: '#06b6d4',
+              radius: 12,
+              distance: 3,
+              lightIntensity: 22,
+              darkIntensity: 45,
+              blur: 7
+            },
+            'graphite-carbon': {
+              name: 'Graphite Studio',
+              bgColor: '#24272c',
+              accentColor: '#00f2fe',
+              radius: 12,
+              distance: 4,
+              lightIntensity: 18,
+              darkIntensity: 42,
+              blur: 8
+            },
+            'royal-violet': {
+              name: 'Royal Violet',
+              bgColor: '#442759',
+              accentColor: '#f472b6',
+              radius: 16,
+              distance: 4,
+              lightIntensity: 20,
+              darkIntensity: 32,
+              blur: 9
+            },
+            'midnight-violet': {
+              name: 'Midnight Violet',
+              bgColor: '#3b0764',
+              accentColor: '#f43f5e',
+              radius: 24,
+              distance: 6,
+              lightIntensity: 32,
+              darkIntensity: 65,
+              blur: 14
+            },
+            'garnet-obsidian': {
+              name: 'Garnet Obsidian',
+              bgColor: '#450a0a',
+              accentColor: '#fb7185',
+              radius: 8,
+              distance: 4,
+              lightIntensity: 24,
+              darkIntensity: 70,
+              blur: 9
+            },
+            'crimson-vampire': {
+              name: 'Crimson Vampire',
+              bgColor: '#2a0808',
+              accentColor: '#ef4444',
+              radius: 10,
+              distance: 4,
+              lightIntensity: 18,
+              darkIntensity: 60,
+              blur: 8
+            },
+            'obsidian-gold': {
+              name: 'Obsidian Gold',
+              bgColor: '#1e1e24',
+              accentColor: '#f59e0b',
+              radius: 10,
+              distance: 4,
+              lightIntensity: 16,
+              darkIntensity: 48,
+              blur: 8
+            },
+            'synth-slate': {
+              name: 'Synthwave Slate',
+              bgColor: '#2b2d42',
+              accentColor: '#ff007f',
+              radius: 12,
+              distance: 5,
+              lightIntensity: 22,
+              darkIntensity: 38,
+              blur: 9
+            },
+            'synthwave-sunset': {
+              name: 'Synthwave Sunset',
+              bgColor: '#262335',
+              accentColor: '#ff7b00',
+              radius: 14,
+              distance: 4,
+              lightIntensity: 20,
+              darkIntensity: 32,
+              blur: 9
+            },
+            'tokyo-night': {
+              name: 'Tokyo Night',
+              bgColor: '#1a1b26',
+              accentColor: '#7aa2f7',
+              radius: 12,
+              distance: 3,
+              lightIntensity: 18,
+              darkIntensity: 38,
+              blur: 8
+            },
+            'catppuccin-mocha': {
+              name: 'Catppuccin Mocha',
+              bgColor: '#1e1e2e',
+              accentColor: '#cba6f7',
+              radius: 14,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 35,
+              blur: 8
+            },
+            'dracula-classic': {
+              name: 'Dracula Classic',
+              bgColor: '#282a36',
+              accentColor: '#ff79c6',
+              radius: 10,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 32,
+              blur: 7
+            },
+            'monokai-charcoal': {
+              name: 'Monokai Charcoal',
+              bgColor: '#2d2a2e',
+              accentColor: '#ffd866',
+              radius: 10,
+              distance: 3,
+              lightIntensity: 18,
+              darkIntensity: 34,
+              blur: 7
+            },
+            'cyberpunk-neon': {
+              name: 'Cyberpunk Neon',
+              bgColor: '#12131a',
+              accentColor: '#fcee0a',
+              radius: 6,
+              distance: 3,
+              lightIntensity: 15,
+              darkIntensity: 45,
+              blur: 6
+            },
+            'midnight-onyx': {
+              name: 'Midnight Onyx',
+              bgColor: '#18181b',
+              accentColor: '#a855f7',
+              radius: 12,
+              distance: 3,
+              lightIntensity: 16,
+              darkIntensity: 45,
+              blur: 7
+            },
+            'oled-black': {
+              name: 'OLED Void',
+              bgColor: '#09090b',
+              accentColor: '#38bdf8',
+              radius: 8,
+              distance: 3,
+              lightIntensity: 14,
+              darkIntensity: 65,
+              blur: 6
+            },
+            'atomic-tangerine': {
+              name: 'Atomic Tangerine',
+              bgColor: '#151922',
+              accentColor: '#ff6b35',
+              radius: 12,
+              distance: 3,
+              lightIntensity: 20,
+              darkIntensity: 42,
+              blur: 8
+            },
+            'matcha-pistachio': {
+              name: 'Matcha Cream',
+              bgColor: '#dce5d8',
+              accentColor: '#2d6a4f',
+              radius: 16,
+              distance: 4,
+              lightIntensity: 65,
+              darkIntensity: 18,
+              blur: 10
+            },
+            'velvet-amethyst': {
+              name: 'Velvet Amethyst',
+              bgColor: '#241829',
+              accentColor: '#e0aaff',
+              radius: 14,
+              distance: 4,
+              lightIntensity: 22,
+              darkIntensity: 48,
+              blur: 9
+            },
+            'golden-dunes': {
+              name: 'Golden Dunes',
+              bgColor: '#d9c5b2',
+              accentColor: '#b05b3b',
+              radius: 10,
+              distance: 4,
+              lightIntensity: 55,
+              darkIntensity: 16,
+              blur: 8
+            },
+            'glacial-teal': {
+              name: 'Glacial Teal',
+              bgColor: '#11222c',
+              accentColor: '#00f5d4',
+              radius: 12,
+              distance: 3,
+              lightIntensity: 22,
+              darkIntensity: 45,
+              blur: 8
+            },
+            'soft-gray': {
+              name: 'Warm Clay (Default)',
+              bgColor: '#e8dfd5',
+              accentColor: '#d97706',
+              radius: 5,
+              distance: 4,
+              lightIntensity: 39,
+              darkIntensity: 5,
+              blur: 9
+            }
+          };
+
+          function deriveRealisticShadows(bgColor, lightIntensity = 20, darkIntensity = 20) {
+            const rgb = hexToRgb(bgColor);
+            const lum = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255.0;
+
+            // Realistic specular light highlight (blended with pure white)
+            let lFactor;
+            if (lum < 0.25) {
+              lFactor = (lightIntensity / 100.0) * 0.45;
+            } else if (lum < 0.55) {
+              lFactor = (lightIntensity / 100.0) * 0.65;
+            } else {
+              lFactor = (lightIntensity / 100.0) * 0.95;
+            }
+            lFactor = Math.min(0.95, Math.max(0.03, lFactor));
+
+            const lightR = Math.min(255, Math.round(rgb.r + (255 - rgb.r) * lFactor));
+            const lightG = Math.min(255, Math.round(rgb.g + (255 - rgb.g) * lFactor));
+            const lightB = Math.min(255, Math.round(rgb.b + (255 - rgb.b) * lFactor));
+
+            // Realistic ambient occlusion shadow (blended with pure black)
+            let dFactor;
+            if (lum < 0.25) {
+              dFactor = (darkIntensity / 100.0) * 0.75;
+            } else if (lum < 0.55) {
+              dFactor = (darkIntensity / 100.0) * 0.95;
+            } else {
+              dFactor = (darkIntensity / 100.0) * 1.15;
+            }
+            dFactor = Math.min(0.95, Math.max(0.03, dFactor));
+
+            const darkR = Math.max(0, Math.round(rgb.r * (1.0 - dFactor)));
+            const darkG = Math.max(0, Math.round(rgb.g * (1.0 - dFactor)));
+            const darkB = Math.max(0, Math.round(rgb.b * (1.0 - dFactor)));
+
+            const deepFactor = Math.min(0.98, dFactor * 1.35);
+            const deepR = Math.max(0, Math.round(rgb.r * (1.0 - deepFactor)));
+            const deepG = Math.max(0, Math.round(rgb.g * (1.0 - deepFactor)));
+            const deepB = Math.max(0, Math.round(rgb.b * (1.0 - deepFactor)));
+
+            return {
+              shadowLight: rgbToHex(lightR, lightG, lightB),
+              shadowDark: rgbToHex(darkR, darkG, darkB),
+              shadowDarkDeep: rgbToHex(deepR, deepG, deepB)
+            };
+          }
+
+          function computePresetShadow(bgColor, lightIntensity = 20, darkIntensity = 20, distance = 3, blur = 8) {
+            const d = Math.max(2, Math.round(distance * 0.75));
+            const b = blur;
+            const maxDark = (blur === 0) ? 0.85 : 0.55;
+            const maxLight = (blur === 0) ? 0.85 : 0.65;
+            const darkAlpha = Math.min(maxDark, Math.max(0.12, (darkIntensity / 100.0) * 1.1));
+            const lightAlpha = Math.min(maxLight, Math.max(0.10, (lightIntensity / 100.0) * 1.1));
+            if (blur === 0) {
+              return `${d}px ${d}px 0px rgba(0, 0, 0, ${darkAlpha.toFixed(2)}), -${d}px -${d}px 0px rgba(255, 255, 255, ${lightAlpha.toFixed(2)})`;
+            }
+            return `${d}px ${d}px ${b}px rgba(0, 0, 0, ${darkAlpha.toFixed(2)}), -${d}px -${d}px ${b}px rgba(255, 255, 255, ${lightAlpha.toFixed(2)})`;
+          }
+
+          function lightenHex(hex, percent) {
+            const rgb = hexToRgb(hex);
+            const factor = percent / 100;
+            return rgbToHex(
+              rgb.r + (255 - rgb.r) * factor,
+              rgb.g + (255 - rgb.g) * factor,
+              rgb.b + (255 - rgb.b) * factor
+            );
+          }
+
+          function darkenHex(hex, percent) {
+            const rgb = hexToRgb(hex);
+            const factor = 1 - (percent / 100);
+            return rgbToHex(rgb.r * factor, rgb.g * factor, rgb.b * factor);
+          }
+
+          function getLuminance(r, g, b) {
+            const a = [r, g, b].map(v => {
+              v /= 255;
+              return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+            });
+            return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+          }
+
+          function getContrastRatio(lum1, lum2) {
+            const lighter = Math.max(lum1, lum2);
+            const darker = Math.min(lum1, lum2);
+            return (lighter + 0.05) / (darker + 0.05);
+          }
+
+          function deriveHarmonicTypography(bgHex) {
+            const rgb = hexToRgb(bgHex);
+            const bgLum = getLuminance(rgb.r, rgb.g, rgb.b);
+            const hsl = hexToHsl(bgHex);
+
+            const contrastWhite = (1.0 + 0.05) / (bgLum + 0.05);
+            const contrastBlack = (bgLum + 0.05) / (0.0 + 0.05);
+
+            // Harmonic undertone saturation (keeps text naturally keyed to the base clay)
+            const harmSat = Math.min(0.22, Math.max(0.06, hsl.s * 0.45));
+            const useDarkText = contrastBlack >= contrastWhite;
+
+            let textPrimary, textSecondary, textMuted, textDisabled;
+
+            if (useDarkText) {
+              // Dark text mode (on light, beige, caramel, mint backgrounds)
+              textPrimary = hslToHex(hsl.h, harmSat, 0.09);
+
+              // Search lightness for secondary text (minimum contrast 5.5:1)
+              let secL = 0.09;
+              for (let l = 12; l <= 45; l++) {
+                const testHex = hslToHex(hsl.h, harmSat, l / 100);
+                const testRgb = hexToRgb(testHex);
+                const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
+                if (getContrastRatio(bgLum, testLum) >= 5.5) {
+                  secL = l / 100;
+                } else {
+                  break;
+                }
+              }
+              textSecondary = hslToHex(hsl.h, harmSat, secL);
+
+              // Search lightness for muted text (guaranteed WCAG AA >= 4.5:1)
+              let mutedL = secL;
+              for (let l = Math.round(secL * 100); l <= 55; l++) {
+                const testHex = hslToHex(hsl.h, harmSat, l / 100);
+                const testRgb = hexToRgb(testHex);
+                const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
+                if (getContrastRatio(bgLum, testLum) >= 4.5) {
+                  mutedL = l / 100;
+                } else {
+                  break;
+                }
+              }
+              textMuted = hslToHex(hsl.h, harmSat, mutedL);
+
+              // Search lightness for disabled text (minimum contrast 2.4:1)
+              let disL = mutedL;
+              for (let l = Math.round(mutedL * 100); l <= 75; l++) {
+                const testHex = hslToHex(hsl.h, harmSat, l / 100);
+                const testRgb = hexToRgb(testHex);
+                const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
+                if (getContrastRatio(bgLum, testLum) >= 2.4) {
+                  disL = l / 100;
+                } else {
+                  break;
+                }
+              }
+              textDisabled = hslToHex(hsl.h, harmSat, disL);
+            } else {
+              // Light text mode (on dark, navy, emerald, terracotta, violet backgrounds)
+              textPrimary = hslToHex(hsl.h, harmSat * 0.5, 0.96);
+
+              // Search lightness for secondary text (minimum contrast 5.5:1)
+              let secL = 0.96;
+              for (let l = 92; l >= 50; l--) {
+                const testHex = hslToHex(hsl.h, harmSat, l / 100);
+                const testRgb = hexToRgb(testHex);
+                const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
+                if (getContrastRatio(bgLum, testLum) >= 5.5) {
+                  secL = l / 100;
+                } else {
+                  break;
+                }
+              }
+              textSecondary = hslToHex(hsl.h, harmSat, secL);
+
+              // Search lightness for muted text (guaranteed WCAG AA >= 4.5:1)
+              let mutedL = secL;
+              for (let l = Math.round(secL * 100); l >= 40; l--) {
+                const testHex = hslToHex(hsl.h, harmSat, l / 100);
+                const testRgb = hexToRgb(testHex);
+                const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
+                if (getContrastRatio(bgLum, testLum) >= 4.5) {
+                  mutedL = l / 100;
+                } else {
+                  break;
+                }
+              }
+              textMuted = hslToHex(hsl.h, harmSat, mutedL);
+
+              // Search lightness for disabled text (minimum contrast 2.4:1)
+              let disL = mutedL;
+              for (let l = Math.round(mutedL * 100); l >= 20; l--) {
+                const testHex = hslToHex(hsl.h, harmSat, l / 100);
+                const testRgb = hexToRgb(testHex);
+                const testLum = getLuminance(testRgb.r, testRgb.g, testRgb.b);
+                if (getContrastRatio(bgLum, testLum) >= 2.4) {
+                  disL = l / 100;
+                } else {
+                  break;
+                }
+              }
+              textDisabled = hslToHex(hsl.h, harmSat, disL);
+            }
+
+            return {
+              textPrimary,
+              textSecondary,
+              textMuted,
+              textDisabled
+            };
+          }
+
+          function applyTheme(bgColor, accentColor, save = false, neo = null) {
+            if (!bgColor) bgColor = '#e8dfd5';
+            if (!accentColor) accentColor = '#d97706';
+            if (!bgColor.startsWith('#')) bgColor = '#' + bgColor;
+            if (!accentColor.startsWith('#')) accentColor = '#' + accentColor;
+
+            // Resolve Neumorphism Parameters (Radius, Distance, Light/Dark Intensity, Blur)
+            const radius = (neo && typeof neo.radius !== 'undefined')
+              ? parseInt(neo.radius, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.radius !== 'undefined') ? parseInt(state.config.theme.radius, 10) : 5);
+
+            const distance = Math.min(10, Math.max(1, (neo && typeof neo.distance !== 'undefined')
+              ? parseInt(neo.distance, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined') ? parseInt(state.config.theme.distance, 10) : 3)));
+
+            const lightIntensity = (neo && typeof neo.lightIntensity !== 'undefined')
+              ? parseInt(neo.lightIntensity, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.lightIntensity !== 'undefined')
+                ? parseInt(state.config.theme.lightIntensity, 10)
+                : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined')
+                  ? parseInt(state.config.theme.intensity, 10) : 22));
+
+            const darkIntensity = (neo && typeof neo.darkIntensity !== 'undefined')
+              ? parseInt(neo.darkIntensity, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.darkIntensity !== 'undefined')
+                ? parseInt(state.config.theme.darkIntensity, 10)
+                : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined')
+                  ? parseInt(state.config.theme.intensity, 10) : 6));
+
+            const blur = (neo && typeof neo.blur !== 'undefined')
+              ? parseInt(neo.blur, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.blur !== 'undefined') ? parseInt(state.config.theme.blur, 10) : 10);
+
+            const avgIntensity = Math.round((lightIntensity + darkIntensity) / 2);
+
+            // Compute Chromatic Shadows: exact lighter tint for top and darker shade for bottom
+            const chromatic = deriveRealisticShadows(bgColor, lightIntensity, darkIntensity);
+            const shadowLight = chromatic.shadowLight;
+            const shadowDark = chromatic.shadowDark;
+            const shadowDarkDeep = chromatic.shadowDarkDeep;
+
+            // Dynamic WCAG-compliant harmonic typography system (guaranteed >= 4.5:1 contrast)
+            const typography = deriveHarmonicTypography(bgColor);
+            const textPrimary = typography.textPrimary;
+            const textSecondary = typography.textSecondary;
+            const textMuted = typography.textMuted;
+            const textDisabled = typography.textDisabled;
+
+            // Derived accent color shades
+            const accRgb = hexToRgb(accentColor);
+            const accLight = lightenHex(accentColor, 20);
+            const accPastel = lightenHex(accentColor, 45);
+            const accSuperPastel = lightenHex(accentColor, 60);
+            const accDark = darkenHex(accentColor, 18);
+            const accDeep = darkenHex(accentColor, 35);
+            const deepRgb = hexToRgb(accDeep);
+
+            const accGlow = `0 4px 16px rgba(${accRgb.r}, ${accRgb.g}, ${accRgb.b}, 0.45)`;
+            const accGradient = `linear-gradient(135deg, ${accLight} 0%, ${accentColor} 100%)`;
+            const accTroughGrad = accentColor;
+            const accTroughShadow = `inset 0 2px 4px rgba(0, 0, 0, 0.35), 0 0 10px ${accentColor}`;
+
+            const root = document.documentElement;
+            root.style.setProperty('--bg-color', bgColor);
+            root.style.setProperty('--surface-color', bgColor);
+            root.style.setProperty('--shadow-light', shadowLight);
+            root.style.setProperty('--shadow-dark', shadowDark);
+            root.style.setProperty('--shadow-dark-deep', shadowDarkDeep);
+            root.style.setProperty('--text-primary', textPrimary);
+            root.style.setProperty('--text-secondary', textSecondary);
+            root.style.setProperty('--text-muted', textMuted);
+            root.style.setProperty('--text-disabled', textDisabled);
+
+            root.style.setProperty('--accent-primary', accentColor);
+            root.style.setProperty('--accent-light', accLight);
+            root.style.setProperty('--accent-pastel', accPastel);
+            root.style.setProperty('--accent-dark', accDark);
+            root.style.setProperty('--accent-deep', accDeep);
+            root.style.setProperty('--accent-glow', accGlow);
+            root.style.setProperty('--accent-gradient', accGradient);
+            root.style.setProperty('--accent-trough-gradient', accTroughGrad);
+            root.style.setProperty('--accent-trough-shadow', accTroughShadow);
+
+            // Dynamic theme-matching scrollbar variables
+            root.style.setProperty('--scrollbar-thumb', shadowDark);
+            root.style.setProperty('--scrollbar-thumb-hover', accentColor);
+            root.style.setProperty('--bg-hover', shadowDark);
+
+            // Apply dynamic Neumorphism core parameters
+            root.style.setProperty('--neo-radius', `${radius}px`);
+            root.style.setProperty('--neo-dist', `${distance}px`);
+            root.style.setProperty('--neo-blur', `${blur}px`);
+            root.style.setProperty('--neo-light-intensity', `${lightIntensity}%`);
+            root.style.setProperty('--neo-dark-intensity', `${darkIntensity}%`);
+            root.style.setProperty('--neo-intensity', `${avgIntensity}%`);
+
+            // Sync state
+            if (!state.config.theme) {
+              state.config.theme = {};
+            }
+            state.config.theme.bgColor = bgColor;
+            state.config.theme.accentColor = accentColor;
+            state.config.theme.radius = radius;
+            state.config.theme.distance = distance;
+            state.config.theme.lightIntensity = lightIntensity;
+            state.config.theme.darkIntensity = darkIntensity;
+            state.config.theme.intensity = avgIntensity;
+            state.config.theme.blur = blur;
+
+            // Persist to localStorage immediately
+            try {
+              localStorage.setItem('ahk_theme', JSON.stringify({
+                bgColor,
+                accentColor,
+                radius,
+                distance,
+                lightIntensity,
+                darkIntensity,
+                intensity: avgIntensity,
+                blur
+              }));
+            } catch (e) { }
+
+            // Sync input controls if present
+            if (themeBgColorPicker) themeBgColorPicker.value = bgColor;
+            if (themeBgHex) themeBgHex.value = bgColor.toUpperCase();
+            if (themeAccentColorPicker) themeAccentColorPicker.value = accentColor;
+            if (themeAccentHex) themeAccentHex.value = accentColor.toUpperCase();
+
+            if (themeSliderRadius) {
+              themeSliderRadius.value = radius;
+              updateSliderProgress(themeSliderRadius);
+              if (badgeRadius) badgeRadius.textContent = `${radius}px`;
+            }
+            if (themeSliderDistance) {
+              themeSliderDistance.value = distance;
+              updateSliderProgress(themeSliderDistance);
+              if (badgeDistance) badgeDistance.textContent = `${distance}px`;
+            }
+            if (themeSliderLightIntensity) {
+              themeSliderLightIntensity.value = lightIntensity;
+              updateSliderProgress(themeSliderLightIntensity);
+              if (badgeLightIntensity) badgeLightIntensity.textContent = `${lightIntensity}%`;
+            }
+            if (themeSliderDarkIntensity) {
+              themeSliderDarkIntensity.value = darkIntensity;
+              updateSliderProgress(themeSliderDarkIntensity);
+              if (badgeDarkIntensity) badgeDarkIntensity.textContent = `${darkIntensity}%`;
+            }
+            if (themeSliderBlur) {
+              themeSliderBlur.value = blur;
+              updateSliderProgress(themeSliderBlur);
+              if (badgeBlur) badgeBlur.textContent = `${blur}px`;
+            }
+
+            const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
+            if (themeOsdIconOnly) {
+              themeOsdIconOnly.checked = !!(state.config && state.config.theme && (state.config.theme.osdIconOnly === 1 || state.config.theme.osdIconOnly === true));
+            }
+
+            // Refresh all neumorphic sliders so track fills dynamically adapt to the active theme colors
+            document.querySelectorAll('.neumorphic-slider').forEach(sl => {
+              updateSliderProgress(sl);
+            });
+
+            updateActivePresetChips();
+
+            if (save) {
+              syncConfig();
+            }
+          }
+
+          function getCurrentThemeColors(preferDom = true) {
+            let bg = '';
+            let acc = '';
+
+            if (preferDom) {
+              if (themeBgHex && /^#[0-9A-Fa-f]{6}$/i.test(themeBgHex.value.trim())) {
+                bg = themeBgHex.value.trim();
+              } else if (themeBgColorPicker && /^#[0-9A-Fa-f]{6}$/i.test(themeBgColorPicker.value)) {
+                bg = themeBgColorPicker.value;
+              }
+
+              if (themeAccentHex && /^#[0-9A-Fa-f]{6}$/i.test(themeAccentHex.value.trim())) {
+                acc = themeAccentHex.value.trim();
+              } else if (themeAccentColorPicker && /^#[0-9A-Fa-f]{6}$/i.test(themeAccentColorPicker.value)) {
+                acc = themeAccentColorPicker.value;
+              }
+            }
+
+            if (!bg) {
+              bg = (state.config && state.config.theme && state.config.theme.bgColor)
+                || document.documentElement.style.getPropertyValue('--bg-color')
+                || '#e8dfd5';
+            }
+
+            if (!acc) {
+              acc = (state.config && state.config.theme && state.config.theme.accentColor)
+                || document.documentElement.style.getPropertyValue('--accent-primary')
+                || '#d97706';
+            }
+
+            const radius = (preferDom && themeSliderRadius)
+              ? parseInt(themeSliderRadius.value, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.radius !== 'undefined') ? parseInt(state.config.theme.radius, 10) : 5);
+
+            const distance = Math.min(10, Math.max(1, (preferDom && themeSliderDistance)
+              ? parseInt(themeSliderDistance.value, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.distance !== 'undefined') ? parseInt(state.config.theme.distance, 10) : 3)));
+
+            const lightIntensity = (preferDom && themeSliderLightIntensity)
+              ? parseInt(themeSliderLightIntensity.value, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.lightIntensity !== 'undefined')
+                ? parseInt(state.config.theme.lightIntensity, 10)
+                : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 22));
+
+            const darkIntensity = (preferDom && themeSliderDarkIntensity)
+              ? parseInt(themeSliderDarkIntensity.value, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.darkIntensity !== 'undefined')
+                ? parseInt(state.config.theme.darkIntensity, 10)
+                : ((state.config && state.config.theme && typeof state.config.theme.intensity !== 'undefined') ? parseInt(state.config.theme.intensity, 10) : 6));
+
+            const blur = (preferDom && themeSliderBlur)
+              ? parseInt(themeSliderBlur.value, 10)
+              : ((state.config && state.config.theme && typeof state.config.theme.blur !== 'undefined') ? parseInt(state.config.theme.blur, 10) : 10);
+
+            return {
+              bg: bg.trim(),
+              acc: acc.trim(),
+              radius,
+              distance,
+              lightIntensity,
+              darkIntensity,
+              intensity: Math.round((lightIntensity + darkIntensity) / 2),
+              blur
+            };
+          }
+
+          function getNeoSliderValues() {
+            return {
+              radius: themeSliderRadius ? parseInt(themeSliderRadius.value, 10) : 22,
+              distance: themeSliderDistance ? parseInt(themeSliderDistance.value, 10) : 3,
+              lightIntensity: themeSliderLightIntensity ? parseInt(themeSliderLightIntensity.value, 10) : 18,
+              darkIntensity: themeSliderDarkIntensity ? parseInt(themeSliderDarkIntensity.value, 10) : 18,
+              blur: themeSliderBlur ? parseInt(themeSliderBlur.value, 10) : 8
+            };
+          }
+
+          function getCustomThemePresets() {
+            if (state.config && state.config.theme && Array.isArray(state.config.theme.customPresets)) {
+              return state.config.theme.customPresets;
+            }
+            try {
+              const cached = localStorage.getItem('ahk_custom_theme_presets');
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed)) {
+                  if (!state.config.theme) state.config.theme = {};
+                  state.config.theme.customPresets = parsed;
+                  return parsed;
+                }
+              }
+            } catch (e) { }
+            return [];
+          }
+
+          function renderCuratedPresets() {
+            const grid = document.getElementById('bgSwatchesGrid');
+            if (!grid) return;
+
+            grid.innerHTML = '';
+            const currentColors = getCurrentThemeColors(true);
+
+            Object.entries(THEME_PRESETS).forEach(([key, preset]) => {
+              if (key === 'soft-gray') return;
+
+              const chip = document.createElement('button');
+              chip.type = 'button';
+              chip.className = 'theme-swatch-chip theme-card-chip';
+              chip.dataset.preset = key;
+              chip.dataset.color = preset.bgColor;
+              chip.title = `${preset.name} (Background: ${preset.bgColor}, Accent: ${preset.accentColor || currentColors.acc})`;
+              chip.setAttribute('aria-label', preset.name);
+              chip.style.backgroundColor = preset.bgColor;
+              chip.style.borderColor = preset.accentColor || currentColors.acc;
+              chip.style.color = preset.accentColor || currentColors.acc;
+              chip.style.borderRadius = `${Math.min(24, Math.max(0, typeof preset.radius !== 'undefined' ? preset.radius : 10))}px`;
+              chip.style.boxShadow = computePresetShadow(
+                preset.bgColor,
+                preset.lightIntensity,
+                preset.darkIntensity,
+                preset.distance,
+                preset.blur
+              );
+
+              chip.innerHTML = `
         <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
       `;
 
-      grid.appendChild(chip);
-    });
+              grid.appendChild(chip);
+            });
 
-    updateActivePresetChips();
-  }
+            updateActivePresetChips();
+          }
 
-  function updateActivePresetChips() {
-    const currentColors = getCurrentThemeColors(true);
-    const currentSliders = getNeoSliderValues();
+          function updateActivePresetChips() {
+            const currentColors = getCurrentThemeColors(true);
+            const currentSliders = getNeoSliderValues();
 
-    // Check curated swatches
-    document.querySelectorAll('#bgSwatchesGrid .theme-swatch-chip').forEach(chip => {
-      const presetKey = chip.dataset.preset;
-      const preset = presetKey ? THEME_PRESETS[presetKey] : null;
-      let isMatch = false;
-      if (preset) {
-        isMatch = (
-          preset.bgColor.toLowerCase() === currentColors.bg.toLowerCase() &&
-          (preset.accentColor || currentColors.acc).toLowerCase() === currentColors.acc.toLowerCase() &&
-          parseInt(preset.radius, 10) === currentSliders.radius &&
-          parseInt(preset.distance, 10) === currentSliders.distance &&
-          parseInt(preset.blur, 10) === currentSliders.blur &&
-          parseInt(preset.lightIntensity, 10) === currentSliders.lightIntensity &&
-          parseInt(preset.darkIntensity, 10) === currentSliders.darkIntensity
-        );
-        chip.style.backgroundColor = preset.bgColor;
-        chip.style.borderColor = preset.accentColor || currentColors.acc;
-        chip.style.color = preset.accentColor || currentColors.acc;
-        chip.style.borderRadius = `${Math.min(24, Math.max(0, typeof preset.radius !== 'undefined' ? preset.radius : 10))}px`;
-        chip.style.boxShadow = computePresetShadow(preset.bgColor, preset.lightIntensity, preset.darkIntensity, preset.distance, preset.blur);
-      } else if (chip.dataset.color) {
-        isMatch = (chip.dataset.color.toLowerCase() === currentColors.bg.toLowerCase());
-      }
-      chip.classList.toggle('active', isMatch);
-    });
+            // Check curated swatches
+            document.querySelectorAll('#bgSwatchesGrid .theme-swatch-chip').forEach(chip => {
+              const presetKey = chip.dataset.preset;
+              const preset = presetKey ? THEME_PRESETS[presetKey] : null;
+              let isMatch = false;
+              if (preset) {
+                isMatch = (
+                  preset.bgColor.toLowerCase() === currentColors.bg.toLowerCase() &&
+                  (preset.accentColor || currentColors.acc).toLowerCase() === currentColors.acc.toLowerCase() &&
+                  parseInt(preset.radius, 10) === currentSliders.radius &&
+                  parseInt(preset.distance, 10) === currentSliders.distance &&
+                  parseInt(preset.blur, 10) === currentSliders.blur &&
+                  parseInt(preset.lightIntensity, 10) === currentSliders.lightIntensity &&
+                  parseInt(preset.darkIntensity, 10) === currentSliders.darkIntensity
+                );
+                chip.style.backgroundColor = preset.bgColor;
+                chip.style.borderColor = preset.accentColor || currentColors.acc;
+                chip.style.color = preset.accentColor || currentColors.acc;
+                chip.style.borderRadius = `${Math.min(24, Math.max(0, typeof preset.radius !== 'undefined' ? preset.radius : 10))}px`;
+                chip.style.boxShadow = computePresetShadow(preset.bgColor, preset.lightIntensity, preset.darkIntensity, preset.distance, preset.blur);
+              } else if (chip.dataset.color) {
+                isMatch = (chip.dataset.color.toLowerCase() === currentColors.bg.toLowerCase());
+              }
+              chip.classList.toggle('active', isMatch);
+            });
 
-    document.querySelectorAll('#accentSwatchesGrid .theme-swatch-chip').forEach(chip => {
-      chip.classList.toggle('active', chip.dataset.color.toLowerCase() === currentColors.acc.toLowerCase());
-    });
+            document.querySelectorAll('#accentSwatchesGrid .theme-swatch-chip').forEach(chip => {
+              chip.classList.toggle('active', chip.dataset.color.toLowerCase() === currentColors.acc.toLowerCase());
+            });
 
-    // Check custom presets
-    const presets = getCustomThemePresets();
-    document.querySelectorAll('#customPresetsGrid .custom-preset-chip').forEach(chip => {
-      const p = presets.find(item => item.id === chip.dataset.presetId);
-      if (!p) {
-        chip.classList.remove('active');
-        return;
-      }
-      const isMatch = (
-        p.bgColor.toLowerCase() === currentColors.bg.toLowerCase() &&
-        p.accentColor.toLowerCase() === currentColors.acc.toLowerCase() &&
-        parseInt(p.radius, 10) === currentSliders.radius &&
-        parseInt(p.distance, 10) === currentSliders.distance &&
-        parseInt(p.blur, 10) === currentSliders.blur &&
-        (typeof p.lightIntensity === 'undefined' || parseInt(p.lightIntensity, 10) === currentSliders.lightIntensity) &&
-        (typeof p.darkIntensity === 'undefined' || parseInt(p.darkIntensity, 10) === currentSliders.darkIntensity)
-      );
-      chip.classList.toggle('active', isMatch);
-    });
-  }
+            // Check custom presets
+            const presets = getCustomThemePresets();
+            document.querySelectorAll('#customPresetsGrid .custom-preset-chip').forEach(chip => {
+              const p = presets.find(item => item.id === chip.dataset.presetId);
+              if (!p) {
+                chip.classList.remove('active');
+                return;
+              }
+              const isMatch = (
+                p.bgColor.toLowerCase() === currentColors.bg.toLowerCase() &&
+                p.accentColor.toLowerCase() === currentColors.acc.toLowerCase() &&
+                parseInt(p.radius, 10) === currentSliders.radius &&
+                parseInt(p.distance, 10) === currentSliders.distance &&
+                parseInt(p.blur, 10) === currentSliders.blur &&
+                (typeof p.lightIntensity === 'undefined' || parseInt(p.lightIntensity, 10) === currentSliders.lightIntensity) &&
+                (typeof p.darkIntensity === 'undefined' || parseInt(p.darkIntensity, 10) === currentSliders.darkIntensity)
+              );
+              chip.classList.toggle('active', isMatch);
+            });
+          }
 
-  function renderCustomPresets() {
-    const grid = document.getElementById('customPresetsGrid');
-    if (!grid) return;
+          function renderCustomPresets() {
+            const grid = document.getElementById('customPresetsGrid');
+            if (!grid) return;
 
-    const presets = getCustomThemePresets();
-    grid.innerHTML = '';
+            const presets = getCustomThemePresets();
+            grid.innerHTML = '';
 
-    if (presets.length === 0) {
-      grid.innerHTML = '<span class="empty-custom-presets-hint">No custom presets saved yet. Adjust colors & sliders above, name your preset, and click Save Preset!</span>';
-      return;
-    }
+            if (presets.length === 0) {
+              grid.innerHTML = '<span class="empty-custom-presets-hint">No custom presets saved yet. Adjust colors & sliders above, name your preset, and click Save Preset!</span>';
+              return;
+            }
 
-    const currentColors = getCurrentThemeColors();
-    const currentSliders = getNeoSliderValues();
+            const currentColors = getCurrentThemeColors();
+            const currentSliders = getNeoSliderValues();
 
-    presets.forEach(p => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'theme-swatch-chip theme-card-chip custom-preset-chip';
-      chip.dataset.presetId = p.id;
-      chip.title = `${p.name} (Background: ${p.bgColor}, Accent: ${p.accentColor}, Radius: ${p.radius}px, Blur: ${p.blur}px)`;
-      chip.setAttribute('aria-label', p.name);
-      chip.style.backgroundColor = p.bgColor;
-      chip.style.borderColor = p.accentColor;
-      chip.style.color = p.accentColor;
-      chip.style.borderRadius = `${Math.min(22, Math.max(0, typeof p.radius !== 'undefined' ? p.radius : 10))}px`;
-      chip.style.boxShadow = computePresetShadow(
-        p.bgColor,
-        (typeof p.lightIntensity !== 'undefined') ? p.lightIntensity : 20,
-        (typeof p.darkIntensity !== 'undefined') ? p.darkIntensity : 20,
-        (typeof p.distance !== 'undefined') ? p.distance : 3,
-        (typeof p.blur !== 'undefined') ? p.blur : 8
-      );
+            presets.forEach(p => {
+              const chip = document.createElement('button');
+              chip.type = 'button';
+              chip.className = 'theme-swatch-chip theme-card-chip custom-preset-chip';
+              chip.dataset.presetId = p.id;
+              chip.title = `${p.name} (Background: ${p.bgColor}, Accent: ${p.accentColor}, Radius: ${p.radius}px, Blur: ${p.blur}px)`;
+              chip.setAttribute('aria-label', p.name);
+              chip.style.backgroundColor = p.bgColor;
+              chip.style.borderColor = p.accentColor;
+              chip.style.color = p.accentColor;
+              chip.style.borderRadius = `${Math.min(22, Math.max(0, typeof p.radius !== 'undefined' ? p.radius : 10))}px`;
+              chip.style.boxShadow = computePresetShadow(
+                p.bgColor,
+                (typeof p.lightIntensity !== 'undefined') ? p.lightIntensity : 20,
+                (typeof p.darkIntensity !== 'undefined') ? p.darkIntensity : 20,
+                (typeof p.distance !== 'undefined') ? p.distance : 3,
+                (typeof p.blur !== 'undefined') ? p.blur : 8
+              );
 
-      const isMatch = (
-        p.bgColor.toLowerCase() === currentColors.bg.toLowerCase() &&
-        p.accentColor.toLowerCase() === currentColors.acc.toLowerCase() &&
-        parseInt(p.radius, 10) === currentSliders.radius &&
-        parseInt(p.distance, 10) === currentSliders.distance &&
-        parseInt(p.blur, 10) === currentSliders.blur &&
-        (typeof p.lightIntensity === 'undefined' || parseInt(p.lightIntensity, 10) === currentSliders.lightIntensity) &&
-        (typeof p.darkIntensity === 'undefined' || parseInt(p.darkIntensity, 10) === currentSliders.darkIntensity)
-      );
+              const isMatch = (
+                p.bgColor.toLowerCase() === currentColors.bg.toLowerCase() &&
+                p.accentColor.toLowerCase() === currentColors.acc.toLowerCase() &&
+                parseInt(p.radius, 10) === currentSliders.radius &&
+                parseInt(p.distance, 10) === currentSliders.distance &&
+                parseInt(p.blur, 10) === currentSliders.blur &&
+                (typeof p.lightIntensity === 'undefined' || parseInt(p.lightIntensity, 10) === currentSliders.lightIntensity) &&
+                (typeof p.darkIntensity === 'undefined' || parseInt(p.darkIntensity, 10) === currentSliders.darkIntensity)
+              );
 
-      if (isMatch) {
-        chip.classList.add('active');
-      }
+              if (isMatch) {
+                chip.classList.add('active');
+              }
 
-      chip.innerHTML = `
+              chip.innerHTML = `
         <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
         <span class="btn-delete-preset" data-delete-id="${p.id}" title="Delete preset">&times;</span>
       `;
 
-      chip.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-delete-preset')) return;
+              chip.addEventListener('click', (e) => {
+                if (e.target.closest('.btn-delete-preset')) return;
 
-        applyTheme(p.bgColor, p.accentColor, true, {
-          radius: p.radius,
-          distance: p.distance,
-          lightIntensity: p.lightIntensity,
-          darkIntensity: p.darkIntensity,
-          blur: p.blur
-        });
+                applyTheme(p.bgColor, p.accentColor, true, {
+                  radius: p.radius,
+                  distance: p.distance,
+                  lightIntensity: p.lightIntensity,
+                  darkIntensity: p.darkIntensity,
+                  blur: p.blur
+                });
 
-        updateActivePresetChips();
-      });
+                updateActivePresetChips();
+              });
 
-      const btnDelete = chip.querySelector('.btn-delete-preset');
-      if (btnDelete) {
-        btnDelete.addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteCustomPreset(p.id);
-        });
-      }
+              const btnDelete = chip.querySelector('.btn-delete-preset');
+              if (btnDelete) {
+                btnDelete.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  deleteCustomPreset(p.id);
+                });
+              }
 
-      grid.appendChild(chip);
-    });
-  }
-
-  function saveCurrentCustomPreset() {
-    const input = document.getElementById('inputCustomPresetName');
-    const nameVal = input ? input.value.trim() : '';
-
-    if (!state.config.theme) state.config.theme = {};
-    let presets = getCustomThemePresets();
-
-    const name = nameVal || `Custom Theme ${presets.length + 1}`;
-    const current = getCurrentThemeColors();
-    const sliders = getNeoSliderValues();
-
-    const existingIndex = presets.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
-    const newPreset = {
-      id: (existingIndex >= 0) ? presets[existingIndex].id : ('custom_' + Date.now()),
-      name: name,
-      bgColor: current.bg,
-      accentColor: current.acc,
-      radius: sliders.radius,
-      distance: sliders.distance,
-      lightIntensity: sliders.lightIntensity,
-      darkIntensity: sliders.darkIntensity,
-      blur: sliders.blur
-    };
-
-    if (existingIndex >= 0) {
-      presets[existingIndex] = newPreset;
-    } else {
-      presets.push(newPreset);
-    }
-
-    state.config.theme.customPresets = presets;
-
-    try {
-      localStorage.setItem('ahk_custom_theme_presets', JSON.stringify(presets));
-    } catch (e) { }
-
-    syncConfig();
-
-    if (input) input.value = '';
-
-    renderCustomPresets();
-    updateActivePresetChips();
-
-    const btnSave = document.getElementById('btnSaveCustomPreset');
-    if (btnSave) {
-      const origText = btnSave.innerHTML;
-      btnSave.classList.add('btn-saved');
-      btnSave.innerHTML = '<span>SAVED!</span>';
-      setTimeout(() => {
-        btnSave.classList.remove('btn-saved');
-        btnSave.innerHTML = origText;
-      }, 1200);
-    }
-  }
-
-  function deleteCustomPreset(id) {
-    if (!state.config.theme) state.config.theme = {};
-    let presets = getCustomThemePresets();
-    presets = presets.filter(p => p.id !== id);
-    state.config.theme.customPresets = presets;
-
-    try {
-      localStorage.setItem('ahk_custom_theme_presets', JSON.stringify(presets));
-    } catch (e) { }
-
-    syncConfig();
-    renderCustomPresets();
-    updateActivePresetChips();
-  }
-
-  // ============================================================================
-  // Event Listeners & Initialization
-  // ============================================================================
-
-  function initListeners() {
-    // Master Switch
-    mainEngineSwitch.addEventListener('click', toggleMasterEngine);
-    if (mainEngineSwitch) {
-      mainEngineSwitch.addEventListener('click', toggleMasterEngine);
-    }
-
-    // Profile Management Listeners
-    if (profileSelect) {
-      profileSelect.addEventListener('change', (e) => {
-        switchProfile(e.target.value);
-      });
-    }
-    if (btnAddProfile) {
-      btnAddProfile.addEventListener('click', () => {
-        openProfileModal('add');
-      });
-    }
-    const btnEditProfile = document.getElementById('btnEditProfile');
-    if (btnEditProfile) {
-      btnEditProfile.addEventListener('click', () => {
-        openProfileModal('edit');
-      });
-    }
-    const btnLockProfile = document.getElementById('btnLockProfile');
-    if (btnLockProfile && !btnLockProfile.dataset.bound) {
-      btnLockProfile.dataset.bound = 'true';
-      btnLockProfile.addEventListener('click', () => {
-        const isCurrentlyLocked = !!(state.config && (state.config.profileLocked === 1 || state.config.profileLocked === true));
-        state.config.profileLocked = isCurrentlyLocked ? 0 : 1;
-        updateProfileLockButton();
-        const curProfile = (state.config && state.config.activeProfile) || 'Default';
-        showToast(state.config.profileLocked ? `Profile "${curProfile}" Locked (Auto-switch suspended)` : `Profile "${curProfile}" Unlocked (Auto-switch active)`);
-        syncConfig();
-      });
-    }
-    if (btnRenameProfile) {
-      btnRenameProfile.addEventListener('click', () => {
-        openProfileModal('rename');
-      });
-    }
-    if (btnDeleteProfile) {
-      btnDeleteProfile.addEventListener('click', () => {
-        openProfileModal('delete');
-      });
-    }
-    const btnScrollProfilesLeft = document.getElementById('btnScrollProfilesLeft');
-    const btnScrollProfilesRight = document.getElementById('btnScrollProfilesRight');
-    const lgsProfilesTrack = document.getElementById('lgsProfilesTrack');
-    const lgsCarouselWrap = document.querySelector('.lgs-carousel-wrap');
-
-    if (btnScrollProfilesLeft && lgsProfilesTrack) {
-      btnScrollProfilesLeft.addEventListener('click', () => {
-        lgsProfilesTrack.scrollBy({ left: -220, behavior: 'smooth' });
-        setTimeout(updateProfilesScrollButtons, 220);
-      });
-    }
-    if (btnScrollProfilesRight && lgsProfilesTrack) {
-      btnScrollProfilesRight.addEventListener('click', () => {
-        lgsProfilesTrack.scrollBy({ left: 220, behavior: 'smooth' });
-        setTimeout(updateProfilesScrollButtons, 220);
-      });
-    }
-    if (lgsProfilesTrack) {
-      lgsProfilesTrack.addEventListener('scroll', () => {
-        updateProfilesScrollButtons();
-      });
-
-      const handleProfilesWheel = (e) => {
-        if (e.deltaY) {
-          e.preventDefault();
-          lgsProfilesTrack.scrollLeft += e.deltaY;
-          updateProfilesScrollButtons();
-        }
-      };
-      lgsProfilesTrack.addEventListener('wheel', handleProfilesWheel, { passive: false });
-      if (lgsCarouselWrap) {
-        lgsCarouselWrap.addEventListener('wheel', handleProfilesWheel, { passive: false });
-      }
-
-      // Profiles Ribbon (Left-Mouse Hold & Drag Horizontal Scrolling)
-      let isProfilesDragging = false;
-      let profilesStartX = 0;
-      let profilesScrollLeft = 0;
-
-      const onProfilesMouseDown = (e) => {
-        if (e.button !== 0) return; // Left mouse button only
-        if (e.target.closest('.lgs-scroll-btn')) return; // Allow clicking scroll buttons
-
-        // Only initiate drag if profiles track has scrollable overflow
-        if (lgsProfilesTrack.scrollWidth <= lgsProfilesTrack.clientWidth + 2) return;
-
-        isProfilesDragging = true;
-        hasProfilesDragged = false;
-        profilesStartX = e.pageX;
-        profilesScrollLeft = lgsProfilesTrack.scrollLeft;
-      };
-
-      if (lgsCarouselWrap) {
-        lgsCarouselWrap.addEventListener('mousedown', onProfilesMouseDown);
-      } else {
-        lgsProfilesTrack.addEventListener('mousedown', onProfilesMouseDown);
-      }
-
-      window.addEventListener('mousemove', (e) => {
-        if (!isProfilesDragging) return;
-        const walk = e.pageX - profilesStartX;
-        if (Math.abs(walk) > 4) {
-          if (!hasProfilesDragged) {
-            hasProfilesDragged = true;
-            lgsProfilesTrack.classList.add('is-dragging');
-            if (lgsCarouselWrap) lgsCarouselWrap.classList.add('is-dragging');
+              grid.appendChild(chip);
+            });
           }
-          lgsProfilesTrack.scrollLeft = profilesScrollLeft - walk;
-          updateProfilesScrollButtons();
-        }
-      });
 
-      const endProfilesDrag = () => {
-        if (isProfilesDragging) {
-          isProfilesDragging = false;
-          lgsProfilesTrack.classList.remove('is-dragging');
-          if (lgsCarouselWrap) lgsCarouselWrap.classList.remove('is-dragging');
-          if (hasProfilesDragged) {
-            setTimeout(() => {
-              hasProfilesDragged = false;
-            }, 80);
-          }
-        }
-      };
+          function saveCurrentCustomPreset() {
+            const input = document.getElementById('inputCustomPresetName');
+            const nameVal = input ? input.value.trim() : '';
 
-      window.addEventListener('mouseup', endProfilesDrag);
-      window.addEventListener('blur', endProfilesDrag);
+            if (!state.config.theme) state.config.theme = {};
+            let presets = getCustomThemePresets();
 
-      // Capture-phase click interceptor on carousel wrapper to guarantee no card switch upon releasing drag
-      const interceptProfilesClick = (e) => {
-        if (hasProfilesDragged) {
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-        }
-      };
-      if (lgsCarouselWrap) {
-        lgsCarouselWrap.addEventListener('click', interceptProfilesClick, true);
-      }
-      lgsProfilesTrack.addEventListener('click', interceptProfilesClick, true);
-    }
-    const profileSearchInput = document.getElementById('profileSearchInput');
-    if (profileSearchInput) {
-      profileSearchInput.addEventListener('input', () => {
-        renderProfilesRibbon();
-      });
-    }
-    const btnBrowseProfileExe = document.getElementById('btnBrowseProfileExe');
-    if (btnBrowseProfileExe) {
-      btnBrowseProfileExe.addEventListener('click', () => {
-        sendToAhk('browseProfileApp');
-      });
-    }
-    const btnRescanRunningApps = document.getElementById('btnRescanRunningApps');
-    if (btnRescanRunningApps) {
-      btnRescanRunningApps.addEventListener('click', () => {
-        const list = document.getElementById('runningAppsList');
-        if (list) list.innerHTML = '<div class="apps-empty-state">Rescanning open windows...</div>';
-        sendToAhk('getRunningApps');
-      });
-    }
-    const runningAppsFilterInput = document.getElementById('runningAppsFilterInput');
-    if (runningAppsFilterInput) {
-      runningAppsFilterInput.addEventListener('input', () => {
-        renderRunningAppsList();
-      });
-    }
-    const profSwitchAutoSwitch = document.getElementById('profSwitchAutoSwitch');
-    if (profSwitchAutoSwitch) {
-      profSwitchAutoSwitch.addEventListener('change', () => {
-        updateProfileTriggerModeUI(profSwitchAutoSwitch.checked ? modalLastActiveTrigger : 'off');
-      });
-    }
-    const chipTriggerFocus = document.getElementById('chipTriggerFocus');
-    if (chipTriggerFocus) {
-      chipTriggerFocus.addEventListener('click', (e) => {
-        e.stopPropagation();
-        updateProfileTriggerModeUI('focus');
-      });
-    }
-    const chipTriggerHover = document.getElementById('chipTriggerHover');
-    if (chipTriggerHover) {
-      chipTriggerHover.addEventListener('click', (e) => {
-        e.stopPropagation();
-        updateProfileTriggerModeUI('hover');
-      });
-    }
-    if (btnConfirmProfileModal) {
-      btnConfirmProfileModal.addEventListener('click', handleProfileModalConfirm);
-    }
-    if (btnCancelProfileModal) {
-      btnCancelProfileModal.addEventListener('click', closeProfileModal);
-    }
-    if (btnCloseProfileModal) {
-      btnCloseProfileModal.addEventListener('click', closeProfileModal);
-    }
-    if (profileNameInput) {
-      profileNameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') handleProfileModalConfirm();
-        else if (e.key === 'Escape') closeProfileModal();
-      });
-    }
+            const name = nameVal || `Custom Theme ${presets.length + 1}`;
+            const current = getCurrentThemeColors();
+            const sliders = getNeoSliderValues();
 
-    // Tab Bar (Smooth Drag & Wheel Horizontal Scroll + Responsive Buttons)
-    let isTabsDragging = false;
-    let tabsStartX = 0;
-    let tabsScrollLeft = 0;
-    let hasTabsDragged = false;
+            const existingIndex = presets.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+            const newPreset = {
+              id: (existingIndex >= 0) ? presets[existingIndex].id : ('custom_' + Date.now()),
+              name: name,
+              bgColor: current.bg,
+              accentColor: current.acc,
+              radius: sliders.radius,
+              distance: sliders.distance,
+              lightIntensity: sliders.lightIntensity,
+              darkIntensity: sliders.darkIntensity,
+              blur: sliders.blur
+            };
 
-    segmentedBar.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
-      isTabsDragging = true;
-      hasTabsDragged = false;
-      tabsStartX = e.pageX - segmentedBar.offsetLeft;
-      tabsScrollLeft = segmentedBar.scrollLeft;
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (!isTabsDragging) return;
-      const x = e.pageX - segmentedBar.offsetLeft;
-      const walk = (x - tabsStartX);
-      if (Math.abs(walk) > 4) {
-        hasTabsDragged = true;
-        segmentedBar.scrollLeft = tabsScrollLeft - walk;
-        updateTabsScrollButtons();
-      }
-    });
-
-    window.addEventListener('mouseup', () => {
-      isTabsDragging = false;
-    });
-
-    segmentedBar.addEventListener('click', (e) => {
-      if (hasTabsDragged) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-      const btn = e.target.closest('.segment-btn');
-      if (!btn) return;
-      switchTab(btn.dataset.tab);
-    });
-
-    segmentedBar.addEventListener('scroll', () => {
-      updateTabsScrollButtons();
-    });
-
-    const handleTabsWheel = (e) => {
-      if (e.deltaY) {
-        e.preventDefault();
-        segmentedBar.scrollLeft += e.deltaY;
-        updateTabsScrollButtons();
-      }
-    };
-    segmentedBar.addEventListener('wheel', handleTabsWheel, { passive: false });
-
-    const segmentedWrap = document.querySelector('.segmented-control-wrapper');
-    if (segmentedWrap) {
-      segmentedWrap.addEventListener('wheel', handleTabsWheel, { passive: false });
-    }
-
-    const btnScrollTabsLeft = document.getElementById('btnScrollTabsLeft');
-    const btnScrollTabsRight = document.getElementById('btnScrollTabsRight');
-    if (btnScrollTabsLeft) {
-      btnScrollTabsLeft.addEventListener('click', () => {
-        segmentedBar.scrollBy({ left: -220, behavior: 'smooth' });
-        setTimeout(updateTabsScrollButtons, 220);
-      });
-    }
-    if (btnScrollTabsRight) {
-      btnScrollTabsRight.addEventListener('click', () => {
-        segmentedBar.scrollBy({ left: 220, behavior: 'smooth' });
-        setTimeout(updateTabsScrollButtons, 220);
-      });
-    }
-
-    if (window.ResizeObserver) {
-      const tabsObserver = new ResizeObserver(() => {
-        updateTabsScrollButtons();
-        updateProfilesScrollButtons();
-      });
-      tabsObserver.observe(segmentedBar);
-      tabsObserver.observe(document.body);
-    }
-
-    window.addEventListener('resize', () => {
-      updateSegmentedGlider(true);
-      updateProfileGlider(true);
-      updateProfilesScrollButtons();
-      updateTabsScrollButtons();
-    });
-
-    // Text Expander Listeners
-    teBtnSubmit.addEventListener('click', submitTextExpander);
-    teToggleMultiline.addEventListener('click', () => toggleMultiline());
-    teSearchFilter.addEventListener('input', renderTextExpander);
-
-    // Global click delegate for switching profile when clicking a profile badge on any script card
-    document.addEventListener('click', (e) => {
-      const badge = e.target.closest('.item-profile-badge');
-      if (badge && badge.dataset.switchProfile) {
-        e.stopPropagation();
-        e.preventDefault();
-        const targetProfile = badge.dataset.switchProfile;
-        if (state.config && state.config.activeProfile !== targetProfile) {
-          switchProfile(targetProfile);
-        }
-      }
-    }, true);
-
-    teInputTrigger.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        if (state.isMultiline) teTextareaOutput.focus();
-        else if (!teInputOutput.value.trim()) teInputOutput.focus();
-        else submitTextExpander();
-      }
-    });
-
-    teInputOutput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submitTextExpander();
-    });
-
-    // Key Remapper Pure Key Combination Recorders
-    krBtnSubmit.addEventListener('click', submitKeyRemapper);
-    setupKeyCombinationBox(krSourceBox, krInputSource, krBtnClearSource, krTargetBox, submitKeyRemapper);
-    setupKeyCombinationBox(krTargetBox, krInputTarget, krBtnClearTarget, null, submitKeyRemapper);
-
-    // App Launcher Listeners
-    if (alTypeString) {
-      alTypeString.addEventListener('click', () => setAlTriggerType('string'));
-    }
-    if (alTypeHotkey) {
-      alTypeHotkey.addEventListener('click', () => setAlTriggerType('hotkey'));
-    }
-    if (alBtnSubmit) {
-      alBtnSubmit.addEventListener('click', submitAppLauncher);
-    }
-    if (alInputTrigger) {
-      alInputTrigger.addEventListener('keydown', handleAlTriggerKeydown);
-    }
-    if (alBtnBrowse) {
-      alBtnBrowse.addEventListener('click', (e) => {
-        e.preventDefault();
-        sendToAhk('browseApp');
-      });
-    }
-
-    if (alOutputBox) {
-      alOutputBox.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        alOutputBox.style.boxShadow = 'var(--inset-deep), inset 0 0 0 1.5px var(--accent-primary)';
-      });
-      alOutputBox.addEventListener('dragleave', () => {
-        alOutputBox.style.boxShadow = '';
-      });
-      alOutputBox.addEventListener('drop', (e) => {
-        e.preventDefault();
-        alOutputBox.style.boxShadow = '';
-        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
-          const file = e.dataTransfer.files[0];
-          if (file.path) {
-            alInputTarget.value = file.path;
-            const nameNoExt = file.name.replace(/\.[^/.]+$/, '');
-            if (!alInputName.value.trim()) {
-              alInputName.value = nameNoExt;
+            if (existingIndex >= 0) {
+              presets[existingIndex] = newPreset;
+            } else {
+              presets.push(newPreset);
             }
-            alInputTarget.focus();
-          }
-        }
-      });
-    }
 
-    if (alInputTarget) {
-      alInputTarget.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') submitAppLauncher();
-      });
-    }
+            state.config.theme.customPresets = presets;
 
-    if (alInputName) {
-      alInputName.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') submitAppLauncher();
-      });
-    }
+            try {
+              localStorage.setItem('ahk_custom_theme_presets', JSON.stringify(presets));
+            } catch (e) { }
 
-    // Window Dragging
-    function handleDragStart(e) {
-      if (
-        e.target.closest('button') ||
-        e.target.closest('#btnStats') ||
-        e.target.closest('.squircle-btn') ||
-        e.target.closest('input') ||
-        e.target.closest('textarea') ||
-        e.target.closest('select') ||
-        e.target.closest('.resize-handle') ||
-        e.target.closest('.shortcut-card') ||
-        e.target.closest('.macro-step-chip') ||
-        e.target.closest('.macro-timeline-track') ||
-        e.target.closest('.macro-inject-btn') ||
-        e.target.closest('[draggable="true"]') ||
-        e.target.closest('#headerSleepCountdown') ||
-        e.target.closest('.sleep-countdown-pill') ||
-        e.target.closest('#mainEngineSwitch') ||
-        e.target.closest('.vertical-rocker') ||
-        e.target.closest('.lgs-profile-card') ||
-        e.target.closest('.lgs-profiles-bar')
-      ) return;
-      sendToAhk('startDrag');
-    }
+            syncConfig();
 
-    dragHeader.addEventListener('mousedown', handleDragStart);
-    dragHeader.addEventListener('dblclick', (e) => {
-      if (
-        e.target.closest('#headerSleepCountdown') ||
-        e.target.closest('.sleep-countdown-pill') ||
-        e.target.closest('#mainEngineSwitch') ||
-        e.target.closest('.vertical-rocker') ||
-        e.target.closest('.lgs-profile-card') ||
-        e.target.closest('.lgs-profiles-bar') ||
-        e.target.closest('button') ||
-        e.target.closest('input')
-      ) return;
-      sendToAhk('maximize');
-    });
-    appCard.addEventListener('mousedown', (e) => {
-      if (
-        e.target === appCard ||
-        e.target.classList.contains('inputs-section') ||
-        e.target.classList.contains('input-hints') ||
-        e.target.classList.contains('list-section') ||
-        e.target.classList.contains('modules-container')
-      ) {
-        handleDragStart(e);
-      }
-    });
+            if (input) input.value = '';
 
-    // Window Resizing via handles
-    document.querySelectorAll('.resize-handle').forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        sendToAhk('startResize', { dir: handle.dataset.direction });
-      });
-    });
+            renderCustomPresets();
+            updateActivePresetChips();
 
-    // Window Controls
-    if (btnMinimize) btnMinimize.addEventListener('click', () => sendToAhk('minimize'));
-    if (btnMaximize) btnMaximize.addEventListener('click', () => sendToAhk('maximize'));
-    if (btnClose) btnClose.addEventListener('click', () => sendToAhk('close'));
-    if (btnRefresh) btnRefresh.addEventListener('click', () => sendToAhk('reload'));
-    if (btnExport) {
-      btnExport.addEventListener('click', () => sendToAhk('openConfig'));
-    }
-    if (btnHelp) {
-      btnHelp.addEventListener('click', () => {
-        const modal = document.getElementById('infoModal');
-        if (modal) modal.classList.remove('hidden-field');
-      });
-    }
-
-    const btnCloseModal = document.getElementById('btnCloseModal');
-    if (btnCloseModal) {
-      btnCloseModal.addEventListener('click', () => {
-        const modal = document.getElementById('infoModal');
-        if (modal) modal.classList.add('hidden-field');
-      });
-    }
-
-    const infoModal = document.getElementById('infoModal');
-    if (infoModal) {
-      infoModal.addEventListener('click', (e) => {
-        if (e.target === infoModal) {
-          infoModal.classList.add('hidden-field');
-        }
-      });
-    }
-
-    // Theme Settings Listeners
-    if (btnTheme) {
-      btnTheme.addEventListener('click', () => {
-        if (themeModal) {
-          const current = getCurrentThemeColors(false);
-          if (themeBgColorPicker) themeBgColorPicker.value = current.bg;
-          if (themeBgHex) themeBgHex.value = current.bg.toUpperCase();
-          if (themeAccentColorPicker) themeAccentColorPicker.value = current.acc;
-          if (themeAccentHex) themeAccentHex.value = current.acc.toUpperCase();
-
-          if (themeSliderRadius) {
-            themeSliderRadius.value = current.radius;
-            updateSliderProgress(themeSliderRadius);
-            if (badgeRadius) badgeRadius.textContent = `${current.radius}px`;
-          }
-          if (themeSliderDistance) {
-            themeSliderDistance.value = current.distance;
-            updateSliderProgress(themeSliderDistance);
-            if (badgeDistance) badgeDistance.textContent = `${current.distance}px`;
-          }
-          if (themeSliderLightIntensity) {
-            themeSliderLightIntensity.value = current.lightIntensity;
-            updateSliderProgress(themeSliderLightIntensity);
-            if (badgeLightIntensity) badgeLightIntensity.textContent = `${current.lightIntensity}%`;
-          }
-          if (themeSliderDarkIntensity) {
-            themeSliderDarkIntensity.value = current.darkIntensity;
-            updateSliderProgress(themeSliderDarkIntensity);
-            if (badgeDarkIntensity) badgeDarkIntensity.textContent = `${current.darkIntensity}%`;
-          }
-          if (themeSliderBlur) {
-            themeSliderBlur.value = current.blur;
-            updateSliderProgress(themeSliderBlur);
-            if (badgeBlur) badgeBlur.textContent = `${current.blur}px`;
+            const btnSave = document.getElementById('btnSaveCustomPreset');
+            if (btnSave) {
+              const origText = btnSave.innerHTML;
+              btnSave.classList.add('btn-saved');
+              btnSave.innerHTML = '<span>SAVED!</span>';
+              setTimeout(() => {
+                btnSave.classList.remove('btn-saved');
+                btnSave.innerHTML = origText;
+              }, 1200);
+            }
           }
 
-          renderCuratedPresets();
-          updateActivePresetChips();
-          renderCustomPresets();
+          function deleteCustomPreset(id) {
+            if (!state.config.theme) state.config.theme = {};
+            let presets = getCustomThemePresets();
+            presets = presets.filter(p => p.id !== id);
+            state.config.theme.customPresets = presets;
 
-          themeModal.classList.remove('hidden-field');
-        }
-      });
-    }
+            try {
+              localStorage.setItem('ahk_custom_theme_presets', JSON.stringify(presets));
+            } catch (e) { }
 
-    if (btnCloseThemeModal) {
-      btnCloseThemeModal.addEventListener('click', () => {
-        syncConfig();
-        if (themeModal) themeModal.classList.add('hidden-field');
-      });
-    }
+            syncConfig();
+            renderCustomPresets();
+            updateActivePresetChips();
+          }
 
-    const btnBackThemeModal = document.getElementById('btnBackThemeModal');
-    if (btnBackThemeModal) {
-      btnBackThemeModal.addEventListener('click', () => {
-        syncConfig();
-        if (themeModal) themeModal.classList.add('hidden-field');
-      });
-    }
+          // ============================================================================
+          // Event Listeners & Initialization
+          // ============================================================================
 
-    if (themeModal) {
-      themeModal.addEventListener('click', (e) => {
-        if (e.target === themeModal) {
-          syncConfig();
-          themeModal.classList.add('hidden-field');
-        }
-      });
-    }
+          function initListeners() {
+            // Master Switch
+            mainEngineSwitch.addEventListener('click', toggleMasterEngine);
+            if (mainEngineSwitch) {
+              mainEngineSwitch.addEventListener('click', toggleMasterEngine);
+            }
 
-    // Active Items Count button click -> opens Active Scripts Overview Modal
-    const btnStats = document.getElementById('btnStats');
-    if (btnStats) {
-      btnStats.addEventListener('click', () => {
-        openActiveScriptsModal();
-      });
-    }
+            // Profile Management Listeners
+            if (profileSelect) {
+              profileSelect.addEventListener('change', (e) => {
+                switchProfile(e.target.value);
+              });
+            }
+            if (btnAddProfile) {
+              btnAddProfile.addEventListener('click', () => {
+                openProfileModal('add');
+              });
+            }
+            const btnEditProfile = document.getElementById('btnEditProfile');
+            if (btnEditProfile) {
+              btnEditProfile.addEventListener('click', () => {
+                openProfileModal('edit');
+              });
+            }
+            const btnLockProfile = document.getElementById('btnLockProfile');
+            if (btnLockProfile && !btnLockProfile.dataset.bound) {
+              btnLockProfile.dataset.bound = 'true';
+              btnLockProfile.addEventListener('click', () => {
+                const isCurrentlyLocked = !!(state.config && (state.config.profileLocked === 1 || state.config.profileLocked === true));
+                state.config.profileLocked = isCurrentlyLocked ? 0 : 1;
+                updateProfileLockButton();
+                const curProfile = (state.config && state.config.activeProfile) || 'Default';
+                showToast(state.config.profileLocked ? `Profile "${curProfile}" Locked (Auto-switch suspended)` : `Profile "${curProfile}" Unlocked (Auto-switch active)`);
+                syncConfig();
+              });
+            }
+            if (btnRenameProfile) {
+              btnRenameProfile.addEventListener('click', () => {
+                openProfileModal('rename');
+              });
+            }
+            if (btnDeleteProfile) {
+              btnDeleteProfile.addEventListener('click', () => {
+                openProfileModal('delete');
+              });
+            }
+            const btnScrollProfilesLeft = document.getElementById('btnScrollProfilesLeft');
+            const btnScrollProfilesRight = document.getElementById('btnScrollProfilesRight');
+            const lgsProfilesTrack = document.getElementById('lgsProfilesTrack');
+            const lgsCarouselWrap = document.querySelector('.lgs-carousel-wrap');
 
-    const btnCloseActiveScriptsModal = document.getElementById('btnCloseActiveScriptsModal');
-    if (btnCloseActiveScriptsModal) {
-      btnCloseActiveScriptsModal.addEventListener('click', () => {
-        closeActiveScriptsModal();
-      });
-    }
+            if (btnScrollProfilesLeft && lgsProfilesTrack) {
+              btnScrollProfilesLeft.addEventListener('click', () => {
+                lgsProfilesTrack.scrollBy({ left: -220, behavior: 'smooth' });
+                setTimeout(updateProfilesScrollButtons, 220);
+              });
+            }
+            if (btnScrollProfilesRight && lgsProfilesTrack) {
+              btnScrollProfilesRight.addEventListener('click', () => {
+                lgsProfilesTrack.scrollBy({ left: 220, behavior: 'smooth' });
+                setTimeout(updateProfilesScrollButtons, 220);
+              });
+            }
+            if (lgsProfilesTrack) {
+              lgsProfilesTrack.addEventListener('scroll', () => {
+                updateProfilesScrollButtons();
+              });
 
-    const activeScriptsModal = document.getElementById('activeScriptsModal');
-    if (activeScriptsModal) {
-      activeScriptsModal.addEventListener('click', (e) => {
-        if (e.target === activeScriptsModal) {
-          closeActiveScriptsModal();
-        }
-      });
-    }
+              const handleProfilesWheel = (e) => {
+                if (e.deltaY) {
+                  e.preventDefault();
+                  lgsProfilesTrack.scrollLeft += e.deltaY;
+                  updateProfilesScrollButtons();
+                }
+              };
+              lgsProfilesTrack.addEventListener('wheel', handleProfilesWheel, { passive: false });
+              if (lgsCarouselWrap) {
+                lgsCarouselWrap.addEventListener('wheel', handleProfilesWheel, { passive: false });
+              }
 
-    // Quick Sleep / Hibernate Countdown Header Cancel Button
-    const btnHeaderCancelSleep = document.getElementById('btnHeaderCancelSleep');
-    if (btnHeaderCancelSleep) {
-      btnHeaderCancelSleep.addEventListener('click', (e) => {
-        e.stopPropagation();
-        sendToAhk('cancelSleepTimer');
-        handleSleepTimerState({ active: false });
-        showToast('Countdown cancelled', 'info');
-      });
-    }
+              // Profiles Ribbon (Left-Mouse Hold & Drag Horizontal Scrolling)
+              let isProfilesDragging = false;
+              let profilesStartX = 0;
+              let profilesScrollLeft = 0;
 
-    // Background Swatches - Auto-save immediately with curated preset parameters
-    if (bgSwatchesGrid) {
-      bgSwatchesGrid.addEventListener('click', (e) => {
-        const chip = e.target.closest('.theme-swatch-chip');
-        if (!chip) return;
-        const presetKey = chip.dataset.preset;
-        const preset = presetKey ? THEME_PRESETS[presetKey] : null;
-        const current = getCurrentThemeColors(true);
-        if (preset) {
-          applyTheme(preset.bgColor, preset.accentColor || current.acc, true, {
-            radius: preset.radius,
-            distance: preset.distance,
-            lightIntensity: preset.lightIntensity,
-            darkIntensity: preset.darkIntensity,
-            blur: preset.blur
-          });
-        } else if (chip.dataset.color) {
-          applyTheme(chip.dataset.color, current.acc, true, getNeoSliderValues());
-        }
-        updateActivePresetChips();
-      });
-    }
+              const onProfilesMouseDown = (e) => {
+                if (e.button !== 0) return; // Left mouse button only
+                if (e.target.closest('.lgs-scroll-btn')) return; // Allow clicking scroll buttons
 
-    // Custom Background Color Picker & Hex Input with real-time bidirectional synchronization
-    if (themeBgColorPicker) {
-      themeBgColorPicker.addEventListener('input', (e) => {
-        const color = e.target.value;
-        if (themeBgHex) themeBgHex.value = color.toUpperCase();
-        const current = getCurrentThemeColors(true);
-        applyTheme(color, current.acc, false, getNeoSliderValues());
-      });
-      themeBgColorPicker.addEventListener('change', (e) => {
-        const color = e.target.value;
-        if (themeBgHex) themeBgHex.value = color.toUpperCase();
-        const current = getCurrentThemeColors(true);
-        applyTheme(color, current.acc, true, getNeoSliderValues());
-      });
-    }
+                // Only initiate drag if profiles track has scrollable overflow
+                if (lgsProfilesTrack.scrollWidth <= lgsProfilesTrack.clientWidth + 2) return;
 
-    if (themeBgHex) {
-      const handleBgHex = (save = false) => {
-        let val = themeBgHex.value.trim();
-        if (!val.startsWith('#') && val.length > 0) val = '#' + val;
-        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-          if (themeBgColorPicker) themeBgColorPicker.value = val;
-          const current = getCurrentThemeColors(true);
-          applyTheme(val, current.acc, save, getNeoSliderValues());
-        }
-      };
-      themeBgHex.addEventListener('input', () => handleBgHex(false));
-      themeBgHex.addEventListener('change', () => handleBgHex(true));
-    }
+                isProfilesDragging = true;
+                hasProfilesDragged = false;
+                profilesStartX = e.pageX;
+                profilesScrollLeft = lgsProfilesTrack.scrollLeft;
+              };
 
-    // Accent Swatches - Auto-save immediately
-    if (accentSwatchesGrid) {
-      accentSwatchesGrid.addEventListener('click', (e) => {
-        const chip = e.target.closest('.theme-swatch-chip');
-        if (!chip) return;
-        const color = chip.dataset.color;
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, color, true, getNeoSliderValues());
-      });
-    }
+              if (lgsCarouselWrap) {
+                lgsCarouselWrap.addEventListener('mousedown', onProfilesMouseDown);
+              } else {
+                lgsProfilesTrack.addEventListener('mousedown', onProfilesMouseDown);
+              }
 
-    // Custom Accent Color Picker & Hex Input with real-time bidirectional synchronization
-    if (themeAccentColorPicker) {
-      themeAccentColorPicker.addEventListener('input', (e) => {
-        const color = e.target.value;
-        if (themeAccentHex) themeAccentHex.value = color.toUpperCase();
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, color, false, getNeoSliderValues());
-      });
-      themeAccentColorPicker.addEventListener('change', (e) => {
-        const color = e.target.value;
-        if (themeAccentHex) themeAccentHex.value = color.toUpperCase();
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, color, true, getNeoSliderValues());
-      });
-    }
+              window.addEventListener('mousemove', (e) => {
+                if (!isProfilesDragging) return;
+                const walk = e.pageX - profilesStartX;
+                if (Math.abs(walk) > 4) {
+                  if (!hasProfilesDragged) {
+                    hasProfilesDragged = true;
+                    lgsProfilesTrack.classList.add('is-dragging');
+                    if (lgsCarouselWrap) lgsCarouselWrap.classList.add('is-dragging');
+                  }
+                  lgsProfilesTrack.scrollLeft = profilesScrollLeft - walk;
+                  updateProfilesScrollButtons();
+                }
+              });
 
-    if (themeAccentHex) {
-      const handleAccHex = (save = false) => {
-        let val = themeAccentHex.value.trim();
-        if (!val.startsWith('#') && val.length > 0) val = '#' + val;
-        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-          if (themeAccentColorPicker) themeAccentColorPicker.value = val;
-          const current = getCurrentThemeColors(true);
-          applyTheme(current.bg, val, save, getNeoSliderValues());
-        }
-      };
-      themeAccentHex.addEventListener('input', () => handleAccHex(false));
-      themeAccentHex.addEventListener('change', () => handleAccHex(true));
-    }
+              const endProfilesDrag = () => {
+                if (isProfilesDragging) {
+                  isProfilesDragging = false;
+                  lgsProfilesTrack.classList.remove('is-dragging');
+                  if (lgsCarouselWrap) lgsCarouselWrap.classList.remove('is-dragging');
+                  if (hasProfilesDragged) {
+                    setTimeout(() => {
+                      hasProfilesDragged = false;
+                    }, 80);
+                  }
+                }
+              };
 
-    // Neumorphism Sliders Listeners (Live Preview on Input, Save on Change)
-    if (themeSliderRadius) {
-      themeSliderRadius.addEventListener('input', () => {
-        const val = parseInt(themeSliderRadius.value, 10);
-        if (badgeRadius) badgeRadius.textContent = `${val}px`;
-        updateSliderProgress(themeSliderRadius);
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), radius: val });
-      });
-      themeSliderRadius.addEventListener('change', () => {
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, true, getNeoSliderValues());
-      });
-    }
+              window.addEventListener('mouseup', endProfilesDrag);
+              window.addEventListener('blur', endProfilesDrag);
 
-    if (themeSliderDistance) {
-      themeSliderDistance.addEventListener('input', () => {
-        const val = parseInt(themeSliderDistance.value, 10);
-        if (badgeDistance) badgeDistance.textContent = `${val}px`;
-        updateSliderProgress(themeSliderDistance);
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), distance: val });
-      });
-      themeSliderDistance.addEventListener('change', () => {
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, true, getNeoSliderValues());
-      });
-    }
+              // Capture-phase click interceptor on carousel wrapper to guarantee no card switch upon releasing drag
+              const interceptProfilesClick = (e) => {
+                if (hasProfilesDragged) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.stopImmediatePropagation();
+                }
+              };
+              if (lgsCarouselWrap) {
+                lgsCarouselWrap.addEventListener('click', interceptProfilesClick, true);
+              }
+              lgsProfilesTrack.addEventListener('click', interceptProfilesClick, true);
+            }
+            const profileSearchInput = document.getElementById('profileSearchInput');
+            if (profileSearchInput) {
+              profileSearchInput.addEventListener('input', () => {
+                renderProfilesRibbon();
+              });
+            }
+            const btnBrowseProfileExe = document.getElementById('btnBrowseProfileExe');
+            if (btnBrowseProfileExe) {
+              btnBrowseProfileExe.addEventListener('click', () => {
+                sendToAhk('browseProfileApp');
+              });
+            }
+            const btnRescanRunningApps = document.getElementById('btnRescanRunningApps');
+            if (btnRescanRunningApps) {
+              btnRescanRunningApps.addEventListener('click', () => {
+                const list = document.getElementById('runningAppsList');
+                if (list) list.innerHTML = '<div class="apps-empty-state">Rescanning open windows...</div>';
+                sendToAhk('getRunningApps');
+              });
+            }
+            const runningAppsFilterInput = document.getElementById('runningAppsFilterInput');
+            if (runningAppsFilterInput) {
+              runningAppsFilterInput.addEventListener('input', () => {
+                renderRunningAppsList();
+              });
+            }
+            const profSwitchAutoSwitch = document.getElementById('profSwitchAutoSwitch');
+            if (profSwitchAutoSwitch) {
+              profSwitchAutoSwitch.addEventListener('change', () => {
+                updateProfileTriggerModeUI(profSwitchAutoSwitch.checked ? modalLastActiveTrigger : 'off');
+              });
+            }
+            const chipTriggerFocus = document.getElementById('chipTriggerFocus');
+            if (chipTriggerFocus) {
+              chipTriggerFocus.addEventListener('click', (e) => {
+                e.stopPropagation();
+                updateProfileTriggerModeUI('focus');
+              });
+            }
+            const chipTriggerHover = document.getElementById('chipTriggerHover');
+            if (chipTriggerHover) {
+              chipTriggerHover.addEventListener('click', (e) => {
+                e.stopPropagation();
+                updateProfileTriggerModeUI('hover');
+              });
+            }
+            if (btnConfirmProfileModal) {
+              btnConfirmProfileModal.addEventListener('click', handleProfileModalConfirm);
+            }
+            if (btnCancelProfileModal) {
+              btnCancelProfileModal.addEventListener('click', closeProfileModal);
+            }
+            if (btnCloseProfileModal) {
+              btnCloseProfileModal.addEventListener('click', closeProfileModal);
+            }
+            if (profileNameInput) {
+              profileNameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') handleProfileModalConfirm();
+                else if (e.key === 'Escape') closeProfileModal();
+              });
+            }
 
-    if (themeSliderLightIntensity) {
-      themeSliderLightIntensity.addEventListener('input', () => {
-        const val = parseInt(themeSliderLightIntensity.value, 10);
-        if (badgeLightIntensity) badgeLightIntensity.textContent = `${val}%`;
-        updateSliderProgress(themeSliderLightIntensity);
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), lightIntensity: val });
-      });
-      themeSliderLightIntensity.addEventListener('change', () => {
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, true, getNeoSliderValues());
-      });
-    }
+            // Tab Bar (Smooth Drag & Wheel Horizontal Scroll + Responsive Buttons)
+            let isTabsDragging = false;
+            let tabsStartX = 0;
+            let tabsScrollLeft = 0;
+            let hasTabsDragged = false;
 
-    if (themeSliderDarkIntensity) {
-      themeSliderDarkIntensity.addEventListener('input', () => {
-        const val = parseInt(themeSliderDarkIntensity.value, 10);
-        if (badgeDarkIntensity) badgeDarkIntensity.textContent = `${val}%`;
-        updateSliderProgress(themeSliderDarkIntensity);
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), darkIntensity: val });
-      });
-      themeSliderDarkIntensity.addEventListener('change', () => {
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, true, getNeoSliderValues());
-      });
-    }
+            segmentedBar.addEventListener('mousedown', (e) => {
+              if (e.button !== 0) return;
+              isTabsDragging = true;
+              hasTabsDragged = false;
+              tabsStartX = e.pageX - segmentedBar.offsetLeft;
+              tabsScrollLeft = segmentedBar.scrollLeft;
+            });
 
-    if (themeSliderBlur) {
-      themeSliderBlur.addEventListener('input', () => {
-        const val = parseInt(themeSliderBlur.value, 10);
-        if (badgeBlur) badgeBlur.textContent = `${val}px`;
-        updateSliderProgress(themeSliderBlur);
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), blur: val });
-      });
-      themeSliderBlur.addEventListener('change', () => {
-        const current = getCurrentThemeColors(true);
-        applyTheme(current.bg, current.acc, true, getNeoSliderValues());
-      });
-    }
+            window.addEventListener('mousemove', (e) => {
+              if (!isTabsDragging) return;
+              const x = e.pageX - segmentedBar.offsetLeft;
+              const walk = (x - tabsStartX);
+              if (Math.abs(walk) > 4) {
+                hasTabsDragged = true;
+                segmentedBar.scrollLeft = tabsScrollLeft - walk;
+                updateTabsScrollButtons();
+              }
+            });
 
-    const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
-    if (themeOsdIconOnly && !themeOsdIconOnly.dataset.bound) {
-      themeOsdIconOnly.dataset.bound = 'true';
-      themeOsdIconOnly.addEventListener('change', () => {
-        if (!state.config.theme) state.config.theme = {};
-        state.config.theme.osdIconOnly = themeOsdIconOnly.checked ? 1 : 0;
-        syncConfig();
-        const curProf = state.config.activeProfile || 'Default';
-        sendToAhk('showProfileOsd', { profile: curProf });
-      });
-    }
+            window.addEventListener('mouseup', () => {
+              isTabsDragging = false;
+            });
 
-    // Reset Theme to Default Preset (Warm Clay)
-    if (btnResetTheme) {
-      btnResetTheme.addEventListener('click', () => {
-        const def = THEME_PRESETS['custom-default'] || THEME_PRESETS['soft-gray'];
-        applyTheme(def.bgColor, def.accentColor, true, {
-          radius: def.radius,
-          distance: def.distance,
-          lightIntensity: def.lightIntensity,
-          darkIntensity: def.darkIntensity,
-          blur: def.blur
-        });
-        showToast('Theme reset to default (Warm Clay)', 'info');
-      });
-    }
+            segmentedBar.addEventListener('click', (e) => {
+              if (hasTabsDragged) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+              const btn = e.target.closest('.segment-btn');
+              if (!btn) return;
+              switchTab(btn.dataset.tab);
+            });
 
-    // Save / Apply Theme (Fully fixes Apply & Save button)
-    if (btnSaveTheme) {
-      btnSaveTheme.addEventListener('click', () => {
-        const current = getCurrentThemeColors(true);
-        const sliders = getNeoSliderValues();
+            segmentedBar.addEventListener('scroll', () => {
+              updateTabsScrollButtons();
+            });
 
-        // 1. Apply theme variables & persist
-        applyTheme(current.bg, current.acc, true, sliders);
+            const handleTabsWheel = (e) => {
+              if (e.deltaY) {
+                e.preventDefault();
+                segmentedBar.scrollLeft += e.deltaY;
+                updateTabsScrollButtons();
+              }
+            };
+            segmentedBar.addEventListener('wheel', handleTabsWheel, { passive: false });
 
-        // 2. Explicitly ensure state.config.theme has everything
-        if (!state.config.theme) state.config.theme = {};
-        state.config.theme.bgColor = current.bg;
-        state.config.theme.accentColor = current.acc;
-        state.config.theme.radius = sliders.radius;
-        state.config.theme.distance = sliders.distance;
-        state.config.theme.lightIntensity = sliders.lightIntensity;
-        state.config.theme.darkIntensity = sliders.darkIntensity;
-        state.config.theme.intensity = Math.round((sliders.lightIntensity + sliders.darkIntensity) / 2);
-        state.config.theme.blur = sliders.blur;
+            const segmentedWrap = document.querySelector('.segmented-control-wrapper');
+            if (segmentedWrap) {
+              segmentedWrap.addEventListener('wheel', handleTabsWheel, { passive: false });
+            }
 
-        // 3. Persist to localStorage & AutoHotkey
-        try {
-          localStorage.setItem('ahk_theme', JSON.stringify({
-            bgColor: current.bg,
-            accentColor: current.acc,
-            radius: sliders.radius,
-            distance: sliders.distance,
-            lightIntensity: sliders.lightIntensity,
-            darkIntensity: sliders.darkIntensity,
-            intensity: Math.round((sliders.lightIntensity + sliders.darkIntensity) / 2),
-            blur: sliders.blur,
-            customPresets: state.config.theme.customPresets || []
-          }));
-        } catch (e) { }
+            const btnScrollTabsLeft = document.getElementById('btnScrollTabsLeft');
+            const btnScrollTabsRight = document.getElementById('btnScrollTabsRight');
+            if (btnScrollTabsLeft) {
+              btnScrollTabsLeft.addEventListener('click', () => {
+                segmentedBar.scrollBy({ left: -220, behavior: 'smooth' });
+                setTimeout(updateTabsScrollButtons, 220);
+              });
+            }
+            if (btnScrollTabsRight) {
+              btnScrollTabsRight.addEventListener('click', () => {
+                segmentedBar.scrollBy({ left: 220, behavior: 'smooth' });
+                setTimeout(updateTabsScrollButtons, 220);
+              });
+            }
 
-        syncConfig();
+            if (window.ResizeObserver) {
+              const tabsObserver = new ResizeObserver(() => {
+                updateTabsScrollButtons();
+                updateProfilesScrollButtons();
+              });
+              tabsObserver.observe(segmentedBar);
+              tabsObserver.observe(document.body);
+            }
 
-        // 4. Positive visual feedback
-        showToast('Theme applied and saved successfully!', 'success');
+            window.addEventListener('resize', () => {
+              updateSegmentedGlider(true);
+              updateProfileGlider(true);
+              updateProfilesScrollButtons();
+              updateTabsScrollButtons();
+            });
 
-        const btnSpan = btnSaveTheme.querySelector('span');
-        const origText = btnSpan ? btnSpan.textContent : 'APPLY';
-        if (btnSpan) btnSpan.textContent = 'SAVED!';
-        btnSaveTheme.classList.add('btn-saved');
+            // Text Expander Listeners
+            teBtnSubmit.addEventListener('click', submitTextExpander);
+            teToggleMultiline.addEventListener('click', () => toggleMultiline());
+            teSearchFilter.addEventListener('input', renderTextExpander);
 
-        setTimeout(() => {
-          if (btnSpan) btnSpan.textContent = origText;
-          btnSaveTheme.classList.remove('btn-saved');
-          if (themeModal) themeModal.classList.add('hidden-field');
-        }, 350);
-      });
-    }
+            // Global click delegate for switching profile when clicking a profile badge on any script card
+            document.addEventListener('click', (e) => {
+              const badge = e.target.closest('.item-profile-badge');
+              if (badge && badge.dataset.switchProfile) {
+                e.stopPropagation();
+                e.preventDefault();
+                const targetProfile = badge.dataset.switchProfile;
+                if (state.config && state.config.activeProfile !== targetProfile) {
+                  switchProfile(targetProfile);
+                }
+              }
+            }, true);
 
-    // Save Custom Theme Preset Listeners
-    if (btnSaveCustomPreset) {
-      btnSaveCustomPreset.addEventListener('click', saveCurrentCustomPreset);
-    }
-    if (inputCustomPresetName) {
-      inputCustomPresetName.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          saveCurrentCustomPreset();
-        }
-      });
-    }
+            teInputTrigger.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                if (state.isMultiline) teTextareaOutput.focus();
+                else if (!teInputOutput.value.trim()) teInputOutput.focus();
+                else submitTextExpander();
+              }
+            });
 
-    initMacroRecorder();
-    initScreenScanner();
-    initFolderCreator();
-    initProfileContextMenu();
-    initScriptContextMenu();
+            teInputOutput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') submitTextExpander();
+            });
 
-    // Global listener to ensure gesture, hot corner, and radial action dropdowns are immediately fresh when focused/clicked
-    document.addEventListener('focusin', (e) => {
-      const sel = e.target;
-      if (sel && sel.tagName === 'SELECT' && (
-        sel.classList.contains('mg-action-select') ||
-        sel.classList.contains('rm-slice-select') ||
-        sel.id.startsWith('hcSelect') ||
-        sel.id === 'rmCenterActionSelect'
-      )) {
-        populateActionSelect(sel, sel.value);
-      }
-    });
-  }
+            // Key Remapper Pure Key Combination Recorders
+            krBtnSubmit.addEventListener('click', submitKeyRemapper);
+            setupKeyCombinationBox(krSourceBox, krInputSource, krBtnClearSource, krTargetBox, submitKeyRemapper);
+            setupKeyCombinationBox(krTargetBox, krInputTarget, krBtnClearTarget, null, submitKeyRemapper);
 
-  function updateMaximizeButtonState(isMax) {
-    const btn = document.getElementById('btnMaximize');
-    const svg = document.getElementById('svgMaximizeIcon');
-    if (!btn) return;
-    btn.title = isMax ? 'Restore Window' : 'Maximize Window';
-    document.body.classList.toggle('window-maximized', Boolean(isMax));
-    if (svg) {
-      if (isMax) {
-        svg.innerHTML = `
+            // App Launcher Listeners
+            if (alTypeString) {
+              alTypeString.addEventListener('click', () => setAlTriggerType('string'));
+            }
+            if (alTypeHotkey) {
+              alTypeHotkey.addEventListener('click', () => setAlTriggerType('hotkey'));
+            }
+            if (alBtnSubmit) {
+              alBtnSubmit.addEventListener('click', submitAppLauncher);
+            }
+            if (alInputTrigger) {
+              alInputTrigger.addEventListener('keydown', handleAlTriggerKeydown);
+            }
+            if (alBtnBrowse) {
+              alBtnBrowse.addEventListener('click', (e) => {
+                e.preventDefault();
+                sendToAhk('browseApp');
+              });
+            }
+
+            if (alOutputBox) {
+              alOutputBox.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                alOutputBox.style.boxShadow = 'var(--inset-deep), inset 0 0 0 1.5px var(--accent-primary)';
+              });
+              alOutputBox.addEventListener('dragleave', () => {
+                alOutputBox.style.boxShadow = '';
+              });
+              alOutputBox.addEventListener('drop', (e) => {
+                e.preventDefault();
+                alOutputBox.style.boxShadow = '';
+                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                  const file = e.dataTransfer.files[0];
+                  if (file.path) {
+                    alInputTarget.value = file.path;
+                    const nameNoExt = file.name.replace(/\.[^/.]+$/, '');
+                    if (!alInputName.value.trim()) {
+                      alInputName.value = nameNoExt;
+                    }
+                    alInputTarget.focus();
+                  }
+                }
+              });
+            }
+
+            if (alInputTarget) {
+              alInputTarget.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') submitAppLauncher();
+              });
+            }
+
+            if (alInputName) {
+              alInputName.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') submitAppLauncher();
+              });
+            }
+
+            // Window Dragging
+            function handleDragStart(e) {
+              if (
+                e.target.closest('button') ||
+                e.target.closest('#btnStats') ||
+                e.target.closest('.squircle-btn') ||
+                e.target.closest('input') ||
+                e.target.closest('textarea') ||
+                e.target.closest('select') ||
+                e.target.closest('.resize-handle') ||
+                e.target.closest('.shortcut-card') ||
+                e.target.closest('.macro-step-chip') ||
+                e.target.closest('.macro-timeline-track') ||
+                e.target.closest('.macro-inject-btn') ||
+                e.target.closest('[draggable="true"]') ||
+                e.target.closest('#headerSleepCountdown') ||
+                e.target.closest('.sleep-countdown-pill') ||
+                e.target.closest('#mainEngineSwitch') ||
+                e.target.closest('.vertical-rocker') ||
+                e.target.closest('.lgs-profile-card') ||
+                e.target.closest('.lgs-profiles-bar')
+              ) return;
+              sendToAhk('startDrag');
+            }
+
+            dragHeader.addEventListener('mousedown', handleDragStart);
+            dragHeader.addEventListener('dblclick', (e) => {
+              if (
+                e.target.closest('#headerSleepCountdown') ||
+                e.target.closest('.sleep-countdown-pill') ||
+                e.target.closest('#mainEngineSwitch') ||
+                e.target.closest('.vertical-rocker') ||
+                e.target.closest('.lgs-profile-card') ||
+                e.target.closest('.lgs-profiles-bar') ||
+                e.target.closest('button') ||
+                e.target.closest('input')
+              ) return;
+              sendToAhk('maximize');
+            });
+            appCard.addEventListener('mousedown', (e) => {
+              if (
+                e.target === appCard ||
+                e.target.classList.contains('inputs-section') ||
+                e.target.classList.contains('input-hints') ||
+                e.target.classList.contains('list-section') ||
+                e.target.classList.contains('modules-container')
+              ) {
+                handleDragStart(e);
+              }
+            });
+
+            // Window Resizing via handles
+            document.querySelectorAll('.resize-handle').forEach(handle => {
+              handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                sendToAhk('startResize', { dir: handle.dataset.direction });
+              });
+            });
+
+            // Window Controls
+            if (btnMinimize) btnMinimize.addEventListener('click', () => sendToAhk('minimize'));
+            if (btnMaximize) btnMaximize.addEventListener('click', () => sendToAhk('maximize'));
+            if (btnClose) btnClose.addEventListener('click', () => sendToAhk('close'));
+            if (btnRefresh) btnRefresh.addEventListener('click', () => sendToAhk('reload'));
+            if (btnExport) {
+              btnExport.addEventListener('click', () => sendToAhk('openConfig'));
+            }
+            if (btnHelp) {
+              btnHelp.addEventListener('click', () => {
+                const modal = document.getElementById('infoModal');
+                if (modal) modal.classList.remove('hidden-field');
+              });
+            }
+
+            const btnCloseModal = document.getElementById('btnCloseModal');
+            if (btnCloseModal) {
+              btnCloseModal.addEventListener('click', () => {
+                const modal = document.getElementById('infoModal');
+                if (modal) modal.classList.add('hidden-field');
+              });
+            }
+
+            const infoModal = document.getElementById('infoModal');
+            if (infoModal) {
+              infoModal.addEventListener('click', (e) => {
+                if (e.target === infoModal) {
+                  infoModal.classList.add('hidden-field');
+                }
+              });
+            }
+
+            // Theme Settings Listeners
+            if (btnTheme) {
+              btnTheme.addEventListener('click', () => {
+                if (themeModal) {
+                  const current = getCurrentThemeColors(false);
+                  if (themeBgColorPicker) themeBgColorPicker.value = current.bg;
+                  if (themeBgHex) themeBgHex.value = current.bg.toUpperCase();
+                  if (themeAccentColorPicker) themeAccentColorPicker.value = current.acc;
+                  if (themeAccentHex) themeAccentHex.value = current.acc.toUpperCase();
+
+                  if (themeSliderRadius) {
+                    themeSliderRadius.value = current.radius;
+                    updateSliderProgress(themeSliderRadius);
+                    if (badgeRadius) badgeRadius.textContent = `${current.radius}px`;
+                  }
+                  if (themeSliderDistance) {
+                    themeSliderDistance.value = current.distance;
+                    updateSliderProgress(themeSliderDistance);
+                    if (badgeDistance) badgeDistance.textContent = `${current.distance}px`;
+                  }
+                  if (themeSliderLightIntensity) {
+                    themeSliderLightIntensity.value = current.lightIntensity;
+                    updateSliderProgress(themeSliderLightIntensity);
+                    if (badgeLightIntensity) badgeLightIntensity.textContent = `${current.lightIntensity}%`;
+                  }
+                  if (themeSliderDarkIntensity) {
+                    themeSliderDarkIntensity.value = current.darkIntensity;
+                    updateSliderProgress(themeSliderDarkIntensity);
+                    if (badgeDarkIntensity) badgeDarkIntensity.textContent = `${current.darkIntensity}%`;
+                  }
+                  if (themeSliderBlur) {
+                    themeSliderBlur.value = current.blur;
+                    updateSliderProgress(themeSliderBlur);
+                    if (badgeBlur) badgeBlur.textContent = `${current.blur}px`;
+                  }
+
+                  renderCuratedPresets();
+                  updateActivePresetChips();
+                  renderCustomPresets();
+
+                  themeModal.classList.remove('hidden-field');
+                }
+              });
+            }
+
+            if (btnCloseThemeModal) {
+              btnCloseThemeModal.addEventListener('click', () => {
+                syncConfig();
+                if (themeModal) themeModal.classList.add('hidden-field');
+              });
+            }
+
+            const btnBackThemeModal = document.getElementById('btnBackThemeModal');
+            if (btnBackThemeModal) {
+              btnBackThemeModal.addEventListener('click', () => {
+                syncConfig();
+                if (themeModal) themeModal.classList.add('hidden-field');
+              });
+            }
+
+            if (themeModal) {
+              themeModal.addEventListener('click', (e) => {
+                if (e.target === themeModal) {
+                  syncConfig();
+                  themeModal.classList.add('hidden-field');
+                }
+              });
+            }
+
+            // Active Items Count button click -> opens Active Scripts Overview Modal
+            const btnStats = document.getElementById('btnStats');
+            if (btnStats) {
+              btnStats.addEventListener('click', () => {
+                openActiveScriptsModal();
+              });
+            }
+
+            const btnCloseActiveScriptsModal = document.getElementById('btnCloseActiveScriptsModal');
+            if (btnCloseActiveScriptsModal) {
+              btnCloseActiveScriptsModal.addEventListener('click', () => {
+                closeActiveScriptsModal();
+              });
+            }
+
+            const activeScriptsModal = document.getElementById('activeScriptsModal');
+            if (activeScriptsModal) {
+              activeScriptsModal.addEventListener('click', (e) => {
+                if (e.target === activeScriptsModal) {
+                  closeActiveScriptsModal();
+                }
+              });
+            }
+
+            // Quick Sleep / Hibernate Countdown Header Cancel Button
+            const btnHeaderCancelSleep = document.getElementById('btnHeaderCancelSleep');
+            if (btnHeaderCancelSleep) {
+              btnHeaderCancelSleep.addEventListener('click', (e) => {
+                e.stopPropagation();
+                sendToAhk('cancelSleepTimer');
+                handleSleepTimerState({ active: false });
+                showToast('Countdown cancelled', 'info');
+              });
+            }
+
+            // Background Swatches - Auto-save immediately with curated preset parameters
+            if (bgSwatchesGrid) {
+              bgSwatchesGrid.addEventListener('click', (e) => {
+                const chip = e.target.closest('.theme-swatch-chip');
+                if (!chip) return;
+                const presetKey = chip.dataset.preset;
+                const preset = presetKey ? THEME_PRESETS[presetKey] : null;
+                const current = getCurrentThemeColors(true);
+                if (preset) {
+                  applyTheme(preset.bgColor, preset.accentColor || current.acc, true, {
+                    radius: preset.radius,
+                    distance: preset.distance,
+                    lightIntensity: preset.lightIntensity,
+                    darkIntensity: preset.darkIntensity,
+                    blur: preset.blur
+                  });
+                } else if (chip.dataset.color) {
+                  applyTheme(chip.dataset.color, current.acc, true, getNeoSliderValues());
+                }
+                updateActivePresetChips();
+              });
+            }
+
+            // Custom Background Color Picker & Hex Input with real-time bidirectional synchronization
+            if (themeBgColorPicker) {
+              themeBgColorPicker.addEventListener('input', (e) => {
+                const color = e.target.value;
+                if (themeBgHex) themeBgHex.value = color.toUpperCase();
+                const current = getCurrentThemeColors(true);
+                applyTheme(color, current.acc, false, getNeoSliderValues());
+              });
+              themeBgColorPicker.addEventListener('change', (e) => {
+                const color = e.target.value;
+                if (themeBgHex) themeBgHex.value = color.toUpperCase();
+                const current = getCurrentThemeColors(true);
+                applyTheme(color, current.acc, true, getNeoSliderValues());
+              });
+            }
+
+            if (themeBgHex) {
+              const handleBgHex = (save = false) => {
+                let val = themeBgHex.value.trim();
+                if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+                if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                  if (themeBgColorPicker) themeBgColorPicker.value = val;
+                  const current = getCurrentThemeColors(true);
+                  applyTheme(val, current.acc, save, getNeoSliderValues());
+                }
+              };
+              themeBgHex.addEventListener('input', () => handleBgHex(false));
+              themeBgHex.addEventListener('change', () => handleBgHex(true));
+            }
+
+            // Accent Swatches - Auto-save immediately
+            if (accentSwatchesGrid) {
+              accentSwatchesGrid.addEventListener('click', (e) => {
+                const chip = e.target.closest('.theme-swatch-chip');
+                if (!chip) return;
+                const color = chip.dataset.color;
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, color, true, getNeoSliderValues());
+              });
+            }
+
+            // Custom Accent Color Picker & Hex Input with real-time bidirectional synchronization
+            if (themeAccentColorPicker) {
+              themeAccentColorPicker.addEventListener('input', (e) => {
+                const color = e.target.value;
+                if (themeAccentHex) themeAccentHex.value = color.toUpperCase();
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, color, false, getNeoSliderValues());
+              });
+              themeAccentColorPicker.addEventListener('change', (e) => {
+                const color = e.target.value;
+                if (themeAccentHex) themeAccentHex.value = color.toUpperCase();
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, color, true, getNeoSliderValues());
+              });
+            }
+
+            if (themeAccentHex) {
+              const handleAccHex = (save = false) => {
+                let val = themeAccentHex.value.trim();
+                if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+                if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                  if (themeAccentColorPicker) themeAccentColorPicker.value = val;
+                  const current = getCurrentThemeColors(true);
+                  applyTheme(current.bg, val, save, getNeoSliderValues());
+                }
+              };
+              themeAccentHex.addEventListener('input', () => handleAccHex(false));
+              themeAccentHex.addEventListener('change', () => handleAccHex(true));
+            }
+
+            // Neumorphism Sliders Listeners (Live Preview on Input, Save on Change)
+            if (themeSliderRadius) {
+              themeSliderRadius.addEventListener('input', () => {
+                const val = parseInt(themeSliderRadius.value, 10);
+                if (badgeRadius) badgeRadius.textContent = `${val}px`;
+                updateSliderProgress(themeSliderRadius);
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), radius: val });
+              });
+              themeSliderRadius.addEventListener('change', () => {
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, true, getNeoSliderValues());
+              });
+            }
+
+            if (themeSliderDistance) {
+              themeSliderDistance.addEventListener('input', () => {
+                const val = parseInt(themeSliderDistance.value, 10);
+                if (badgeDistance) badgeDistance.textContent = `${val}px`;
+                updateSliderProgress(themeSliderDistance);
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), distance: val });
+              });
+              themeSliderDistance.addEventListener('change', () => {
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, true, getNeoSliderValues());
+              });
+            }
+
+            if (themeSliderLightIntensity) {
+              themeSliderLightIntensity.addEventListener('input', () => {
+                const val = parseInt(themeSliderLightIntensity.value, 10);
+                if (badgeLightIntensity) badgeLightIntensity.textContent = `${val}%`;
+                updateSliderProgress(themeSliderLightIntensity);
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), lightIntensity: val });
+              });
+              themeSliderLightIntensity.addEventListener('change', () => {
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, true, getNeoSliderValues());
+              });
+            }
+
+            if (themeSliderDarkIntensity) {
+              themeSliderDarkIntensity.addEventListener('input', () => {
+                const val = parseInt(themeSliderDarkIntensity.value, 10);
+                if (badgeDarkIntensity) badgeDarkIntensity.textContent = `${val}%`;
+                updateSliderProgress(themeSliderDarkIntensity);
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), darkIntensity: val });
+              });
+              themeSliderDarkIntensity.addEventListener('change', () => {
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, true, getNeoSliderValues());
+              });
+            }
+
+            if (themeSliderBlur) {
+              themeSliderBlur.addEventListener('input', () => {
+                const val = parseInt(themeSliderBlur.value, 10);
+                if (badgeBlur) badgeBlur.textContent = `${val}px`;
+                updateSliderProgress(themeSliderBlur);
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, false, { ...getNeoSliderValues(), blur: val });
+              });
+              themeSliderBlur.addEventListener('change', () => {
+                const current = getCurrentThemeColors(true);
+                applyTheme(current.bg, current.acc, true, getNeoSliderValues());
+              });
+            }
+
+            const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
+            if (themeOsdIconOnly && !themeOsdIconOnly.dataset.bound) {
+              themeOsdIconOnly.dataset.bound = 'true';
+              themeOsdIconOnly.addEventListener('change', () => {
+                if (!state.config.theme) state.config.theme = {};
+                state.config.theme.osdIconOnly = themeOsdIconOnly.checked ? 1 : 0;
+                syncConfig();
+                const curProf = state.config.activeProfile || 'Default';
+                sendToAhk('showProfileOsd', { profile: curProf });
+              });
+            }
+
+            // Reset Theme to Default Preset (Warm Clay)
+            if (btnResetTheme) {
+              btnResetTheme.addEventListener('click', () => {
+                const def = THEME_PRESETS['custom-default'] || THEME_PRESETS['soft-gray'];
+                applyTheme(def.bgColor, def.accentColor, true, {
+                  radius: def.radius,
+                  distance: def.distance,
+                  lightIntensity: def.lightIntensity,
+                  darkIntensity: def.darkIntensity,
+                  blur: def.blur
+                });
+                showToast('Theme reset to default (Warm Clay)', 'info');
+              });
+            }
+
+            // Save / Apply Theme (Fully fixes Apply & Save button)
+            if (btnSaveTheme) {
+              btnSaveTheme.addEventListener('click', () => {
+                const current = getCurrentThemeColors(true);
+                const sliders = getNeoSliderValues();
+
+                // 1. Apply theme variables & persist
+                applyTheme(current.bg, current.acc, true, sliders);
+
+                // 2. Explicitly ensure state.config.theme has everything
+                if (!state.config.theme) state.config.theme = {};
+                state.config.theme.bgColor = current.bg;
+                state.config.theme.accentColor = current.acc;
+                state.config.theme.radius = sliders.radius;
+                state.config.theme.distance = sliders.distance;
+                state.config.theme.lightIntensity = sliders.lightIntensity;
+                state.config.theme.darkIntensity = sliders.darkIntensity;
+                state.config.theme.intensity = Math.round((sliders.lightIntensity + sliders.darkIntensity) / 2);
+                state.config.theme.blur = sliders.blur;
+
+                // 3. Persist to localStorage & AutoHotkey
+                try {
+                  localStorage.setItem('ahk_theme', JSON.stringify({
+                    bgColor: current.bg,
+                    accentColor: current.acc,
+                    radius: sliders.radius,
+                    distance: sliders.distance,
+                    lightIntensity: sliders.lightIntensity,
+                    darkIntensity: sliders.darkIntensity,
+                    intensity: Math.round((sliders.lightIntensity + sliders.darkIntensity) / 2),
+                    blur: sliders.blur,
+                    customPresets: state.config.theme.customPresets || []
+                  }));
+                } catch (e) { }
+
+                syncConfig();
+
+                // 4. Positive visual feedback
+                showToast('Theme applied and saved successfully!', 'success');
+
+                const btnSpan = btnSaveTheme.querySelector('span');
+                const origText = btnSpan ? btnSpan.textContent : 'APPLY';
+                if (btnSpan) btnSpan.textContent = 'SAVED!';
+                btnSaveTheme.classList.add('btn-saved');
+
+                setTimeout(() => {
+                  if (btnSpan) btnSpan.textContent = origText;
+                  btnSaveTheme.classList.remove('btn-saved');
+                  if (themeModal) themeModal.classList.add('hidden-field');
+                }, 350);
+              });
+            }
+
+            // Save Custom Theme Preset Listeners
+            if (btnSaveCustomPreset) {
+              btnSaveCustomPreset.addEventListener('click', saveCurrentCustomPreset);
+            }
+            if (inputCustomPresetName) {
+              inputCustomPresetName.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  saveCurrentCustomPreset();
+                }
+              });
+            }
+
+            initMacroRecorder();
+            initScreenScanner();
+            initFolderCreator();
+            initProfileContextMenu();
+            initScriptContextMenu();
+
+            // Global listener to ensure gesture, hot corner, and radial action dropdowns are immediately fresh when focused/clicked
+            document.addEventListener('focusin', (e) => {
+              const sel = e.target;
+              if (sel && sel.tagName === 'SELECT' && (
+                sel.classList.contains('mg-action-select') ||
+                sel.classList.contains('rm-slice-select') ||
+                sel.id.startsWith('hcSelect') ||
+                sel.id === 'rmCenterActionSelect'
+              )) {
+                populateActionSelect(sel, sel.value);
+              }
+            });
+          }
+
+          function updateMaximizeButtonState(isMax) {
+            const btn = document.getElementById('btnMaximize');
+            const svg = document.getElementById('svgMaximizeIcon');
+            if (!btn) return;
+            btn.title = isMax ? 'Restore Window' : 'Maximize Window';
+            document.body.classList.toggle('window-maximized', Boolean(isMax));
+            if (svg) {
+              if (isMax) {
+                svg.innerHTML = `
           <rect x="7" y="3" width="13" height="13" rx="1.5" ry="1.5"></rect>
           <path d="M4 7h1v10a1.5 1.5 0 0 0 1.5 1.5H17v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"></path>
         `;
-      } else {
-        svg.innerHTML = `<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>`;
-      }
-    }
-  }
-
-  // Quick Sleep / Hibernate Live Countdown State Handler
-  function handleSleepTimerState(msg) {
-    const pill = document.getElementById('headerSleepCountdown');
-    const modeEl = document.getElementById('headerSleepMode');
-    const digitsEl = document.getElementById('headerSleepDigits');
-    const iconEl = document.getElementById('headerSleepIcon');
-    const cardBadge = document.getElementById('wmSleepStatusBadge');
-
-    if (!pill) return;
-
-    if (msg && (msg.active === 1 || msg.active === true)) {
-      pill.classList.remove('hidden-field');
-      const isHib = (msg.mode === 'Hibernate');
-      if (modeEl) {
-        modeEl.textContent = isHib ? 'HIBERNATE' : 'SLEEP';
-      }
-      if (iconEl) {
-        if (isHib) {
-          iconEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10M18.4 6.6L12 12m-6.4-5.4L12 12m0 0v10m6.4-3.4L12 12m-6.4 3.4L12 12"></path></svg>`;
-        } else {
-          iconEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
-        }
-      }
-      const sec = Math.max(0, parseInt(msg.secondsLeft, 10) || 0);
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);
-      const s = sec % 60;
-      let timeStr = '';
-      if (h > 0) {
-        timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-      } else {
-        timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-      }
-      if (digitsEl) {
-        digitsEl.textContent = timeStr;
-      }
-      if (cardBadge) {
-        cardBadge.textContent = `${isHib ? 'Hibernate' : 'Sleep'} in ${timeStr} (Click to Cancel)`;
-        cardBadge.style.color = 'var(--accent-primary)';
-        cardBadge.style.cursor = 'pointer';
-      }
-    } else {
-      pill.classList.add('hidden-field');
-      if (cardBadge) {
-        const isHibMode = (state.config && state.config.windowManager && (state.config.windowManager.sleepMode === 'hibernate' || state.config.windowManager.sleepModeHibernate));
-        const timerVal = (state.config && state.config.windowManager && state.config.windowManager.sleepTimer) || 0;
-        cardBadge.textContent = timerVal > 0 ? `${timerVal}m Timer Active` : (isHibMode ? 'Instant Hibernate' : 'Instant Sleep');
-        cardBadge.style.color = 'var(--text-muted)';
-        cardBadge.style.cursor = 'default';
-      }
-    }
-  }
-
-  // Handle IPC Messages from AHK
-  function onAhkMessage(event) {
-    try {
-      const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-
-      if (msg.type === 'sleepTimerState') {
-        handleSleepTimerState(msg);
-        return;
-      }
-
-      if (msg.type === 'windowStateChanged' || msg.action === 'windowStateChanged') {
-        updateMaximizeButtonState(Boolean(msg.isMaximized));
-        return;
-      }
-
-      if (msg.type === 'init' || msg.type === 'updateState') {
-        if (typeof msg.isMaximized === 'boolean') {
-          updateMaximizeButtonState(msg.isMaximized);
-        }
-        if (typeof msg.enabled === 'boolean') state.enabled = msg.enabled;
-        if (msg.config) {
-          state.config = msg.config;
-          ensureProfilesConfig(state.config);
-          if (msg.type === 'init') {
-            state.activeTab = 'textExpander';
-          } else if (msg.config.activeTab) {
-            state.activeTab = msg.config.activeTab;
-          }
-          if (msg.config.theme && msg.config.theme.bgColor && msg.config.theme.accentColor) {
-            applyTheme(
-              msg.config.theme.bgColor,
-              msg.config.theme.accentColor,
-              false,
-              {
-                radius: msg.config.theme.radius,
-                distance: msg.config.theme.distance,
-                lightIntensity: msg.config.theme.lightIntensity,
-                darkIntensity: msg.config.theme.darkIntensity,
-                intensity: msg.config.theme.intensity,
-                blur: msg.config.theme.blur
+              } else {
+                svg.innerHTML = `<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>`;
               }
-            );
-            renderCustomPresets();
+            }
+          }
+
+          // Quick Sleep / Hibernate Live Countdown State Handler
+          function handleSleepTimerState(msg) {
+            const pill = document.getElementById('headerSleepCountdown');
+            const modeEl = document.getElementById('headerSleepMode');
+            const digitsEl = document.getElementById('headerSleepDigits');
+            const iconEl = document.getElementById('headerSleepIcon');
+            const cardBadge = document.getElementById('wmSleepStatusBadge');
+
+            if (!pill) return;
+
+            if (msg && (msg.active === 1 || msg.active === true)) {
+              pill.classList.remove('hidden-field');
+              const isHib = (msg.mode === 'Hibernate');
+              if (modeEl) {
+                modeEl.textContent = isHib ? 'HIBERNATE' : 'SLEEP';
+              }
+              if (iconEl) {
+                if (isHib) {
+                  iconEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10M18.4 6.6L12 12m-6.4-5.4L12 12m0 0v10m6.4-3.4L12 12m-6.4 3.4L12 12"></path></svg>`;
+                } else {
+                  iconEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
+                }
+              }
+              const sec = Math.max(0, parseInt(msg.secondsLeft, 10) || 0);
+              const h = Math.floor(sec / 3600);
+              const m = Math.floor((sec % 3600) / 60);
+              const s = sec % 60;
+              let timeStr = '';
+              if (h > 0) {
+                timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+              } else {
+                timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+              }
+              if (digitsEl) {
+                digitsEl.textContent = timeStr;
+              }
+              if (cardBadge) {
+                cardBadge.textContent = `${isHib ? 'Hibernate' : 'Sleep'} in ${timeStr} (Click to Cancel)`;
+                cardBadge.style.color = 'var(--accent-primary)';
+                cardBadge.style.cursor = 'pointer';
+              }
+            } else {
+              pill.classList.add('hidden-field');
+              if (cardBadge) {
+                const isHibMode = (state.config && state.config.windowManager && (state.config.windowManager.sleepMode === 'hibernate' || state.config.windowManager.sleepModeHibernate));
+                const timerVal = (state.config && state.config.windowManager && state.config.windowManager.sleepTimer) || 0;
+                cardBadge.textContent = timerVal > 0 ? `${timerVal}m Timer Active` : (isHibMode ? 'Instant Hibernate' : 'Instant Sleep');
+                cardBadge.style.color = 'var(--text-muted)';
+                cardBadge.style.cursor = 'default';
+              }
+            }
+          }
+
+          // Handle IPC Messages from AHK
+          function onAhkMessage(event) {
             try {
-              localStorage.setItem('ahk_theme', JSON.stringify({
-                bgColor: msg.config.theme.bgColor,
-                accentColor: msg.config.theme.accentColor,
-                radius: msg.config.theme.radius,
-                distance: msg.config.theme.distance,
-                lightIntensity: msg.config.theme.lightIntensity,
-                darkIntensity: msg.config.theme.darkIntensity,
-                intensity: msg.config.theme.intensity,
-                blur: msg.config.theme.blur,
-                customPresets: msg.config.theme.customPresets || []
-              }));
-              if (Array.isArray(msg.config.theme.customPresets)) {
-                localStorage.setItem('ahk_custom_theme_presets', JSON.stringify(msg.config.theme.customPresets));
+              const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+              if (msg.type === 'sleepTimerState') {
+                handleSleepTimerState(msg);
+                return;
               }
-            } catch (e) { }
-          }
-        }
-        if (typeof msg.autoClickerRunning === 'boolean') {
-          updateAutoClickerUi(msg.autoClickerRunning);
-        }
-        isInitialized = true;
-        renderAll(false);
-      } else if (msg.type === 'runningAppsList') {
-        renderRunningAppsList(msg.apps || []);
-      } else if (msg.type === 'profileAppSelected') {
-        const profInputExe = document.getElementById('profInputExe');
-        if (profInputExe && msg.exe) {
-          const cur = profInputExe.value.split(',').map(s => s.trim()).filter(Boolean);
-          if (!cur.some(x => x.toLowerCase() === msg.exe.toLowerCase())) {
-            cur.push(msg.exe);
-            profInputExe.value = cur.join(', ');
-          }
-          if (profileModalMode === 'add' && profileNameInput && !profileNameInput.value.trim() && msg.name) {
-            profileNameInput.value = msg.name.charAt(0).toUpperCase() + msg.name.slice(1);
-          }
-          renderRunningAppsList();
-        }
-      } else if (msg.type === 'profileAutoSwitched') {
-        if (msg.activeProfile && state.config && state.config.profiles && state.config.profiles[msg.activeProfile]) {
-          switchProfile(msg.activeProfile, false);
-        }
-      } else if (msg.type === 'autoClickerState') {
-        updateAutoClickerUi(msg.running);
-      } else if (msg.type === 'mouseCountdownState') {
-        mouseCountdownActive = Boolean(msg.active);
-        mouseCountdownSeconds = msg.seconds || 0;
-        updateMouseRecorderUI();
-      } else if (msg.type === 'mouseRecordingState') {
-        mouseRecordingActive = Boolean(msg.recording);
-        updateMouseRecorderUI();
-      } else if (msg.type === 'mousePlaybackState') {
-        mousePlaybackActive = Boolean(msg.playing);
-        mousePlaybackScriptId = msg.scriptId || '';
-        updateMouseRecorderUI();
-        if (!mousePlaybackActive) {
-          for (const [sId, info] of activeRunningScreenTriggers.entries()) {
-            if (info.action === 'mouseScript') {
-              if (info.timer) clearTimeout(info.timer);
-              activeRunningScreenTriggers.delete(sId);
+
+              if (msg.type === 'windowStateChanged' || msg.action === 'windowStateChanged') {
+                updateMaximizeButtonState(Boolean(msg.isMaximized));
+                return;
+              }
+
+              if (msg.type === 'init' || msg.type === 'updateState') {
+                if (typeof msg.isMaximized === 'boolean') {
+                  updateMaximizeButtonState(msg.isMaximized);
+                }
+                if (typeof msg.enabled === 'boolean') state.enabled = msg.enabled;
+                if (msg.config) {
+                  state.config = msg.config;
+                  ensureProfilesConfig(state.config);
+                  if (msg.type === 'init') {
+                    state.activeTab = 'textExpander';
+                  } else if (msg.config.activeTab) {
+                    state.activeTab = msg.config.activeTab;
+                  }
+                  if (msg.config.theme && msg.config.theme.bgColor && msg.config.theme.accentColor) {
+                    applyTheme(
+                      msg.config.theme.bgColor,
+                      msg.config.theme.accentColor,
+                      false,
+                      {
+                        radius: msg.config.theme.radius,
+                        distance: msg.config.theme.distance,
+                        lightIntensity: msg.config.theme.lightIntensity,
+                        darkIntensity: msg.config.theme.darkIntensity,
+                        intensity: msg.config.theme.intensity,
+                        blur: msg.config.theme.blur
+                      }
+                    );
+                    renderCustomPresets();
+                    try {
+                      localStorage.setItem('ahk_theme', JSON.stringify({
+                        bgColor: msg.config.theme.bgColor,
+                        accentColor: msg.config.theme.accentColor,
+                        radius: msg.config.theme.radius,
+                        distance: msg.config.theme.distance,
+                        lightIntensity: msg.config.theme.lightIntensity,
+                        darkIntensity: msg.config.theme.darkIntensity,
+                        intensity: msg.config.theme.intensity,
+                        blur: msg.config.theme.blur,
+                        customPresets: msg.config.theme.customPresets || []
+                      }));
+                      if (Array.isArray(msg.config.theme.customPresets)) {
+                        localStorage.setItem('ahk_custom_theme_presets', JSON.stringify(msg.config.theme.customPresets));
+                      }
+                    } catch (e) { }
+                  }
+                }
+                if (typeof msg.autoClickerRunning === 'boolean') {
+                  updateAutoClickerUi(msg.autoClickerRunning);
+                }
+                isInitialized = true;
+                renderAll(false);
+              } else if (msg.type === 'runningAppsList') {
+                renderRunningAppsList(msg.apps || []);
+              } else if (msg.type === 'profileAppSelected') {
+                const profInputExe = document.getElementById('profInputExe');
+                if (profInputExe && msg.exe) {
+                  const cur = profInputExe.value.split(',').map(s => s.trim()).filter(Boolean);
+                  if (!cur.some(x => x.toLowerCase() === msg.exe.toLowerCase())) {
+                    cur.push(msg.exe);
+                    profInputExe.value = cur.join(', ');
+                  }
+                  if (profileModalMode === 'add' && profileNameInput && !profileNameInput.value.trim() && msg.name) {
+                    profileNameInput.value = msg.name.charAt(0).toUpperCase() + msg.name.slice(1);
+                  }
+                  renderRunningAppsList();
+                }
+              } else if (msg.type === 'profileAutoSwitched') {
+                if (msg.activeProfile && state.config && state.config.profiles && state.config.profiles[msg.activeProfile]) {
+                  switchProfile(msg.activeProfile, false);
+                }
+              } else if (msg.type === 'autoClickerState') {
+                updateAutoClickerUi(msg.running);
+              } else if (msg.type === 'mouseCountdownState') {
+                mouseCountdownActive = Boolean(msg.active);
+                mouseCountdownSeconds = msg.seconds || 0;
+                updateMouseRecorderUI();
+              } else if (msg.type === 'mouseRecordingState') {
+                mouseRecordingActive = Boolean(msg.recording);
+                updateMouseRecorderUI();
+              } else if (msg.type === 'mousePlaybackState') {
+                mousePlaybackActive = Boolean(msg.playing);
+                mousePlaybackScriptId = msg.scriptId || '';
+                updateMouseRecorderUI();
+                if (!mousePlaybackActive) {
+                  for (const [sId, info] of activeRunningScreenTriggers.entries()) {
+                    if (info.action === 'mouseScript') {
+                      if (info.timer) clearTimeout(info.timer);
+                      activeRunningScreenTriggers.delete(sId);
+                    }
+                  }
+                }
+                renderMouseScriptsList();
+                renderScreenScannerList();
+                updateScreenScannerEngineStatus();
+                updateMseModalPlaybackState(mousePlaybackActive);
+              } else if (msg.type === 'mouseRecordedPath') {
+                mouseRecordingActive = false;
+                if (!state.config.autoClicker) state.config.autoClicker = {};
+                if (!Array.isArray(state.config.autoClicker.items)) state.config.autoClicker.items = [];
+                const events = Array.isArray(msg.events) ? msg.events : [];
+                if (events.length > 0) {
+                  const items = state.config.autoClicker.items;
+                  const nextHk = getNextMouseShortcut(items);
+                  const newScript = {
+                    id: 'mr-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+                    name: `Mouse Path ${items.length + 1}`,
+                    trigger: nextHk,
+                    triggerType: 'hotkey',
+                    enabled: 1,
+                    events: events,
+                    speed: state.config.autoClicker.playbackSpeed || 1.0,
+                    origin: state.config.autoClicker.originMode || 'absolute',
+                    loop: state.config.autoClicker.playbackLoop || 1,
+                    playbackInfinite: state.config.autoClicker.playbackInfinite || 0,
+                    clicksOnly: state.config.autoClicker.clicksOnly || 0,
+                    humanize: state.config.autoClicker.humanize || 0,
+                    bezier: state.config.autoClicker.bezier || 0,
+                    emergencyStop: (state.config.autoClicker.emergencyStop !== undefined) ? state.config.autoClicker.emergencyStop : 1,
+                    countdown: state.config.autoClicker.countdown || 0,
+                    createdAt: Date.now()
+                  };
+                  items.push(newScript);
+                  state.config.autoClicker.recordedPath = events;
+                  saveCurrentProfileState();
+                  syncConfig();
+                  renderMouseScriptsList();
+                  updateMouseRecorderStats(events);
+                  updateMouseRecorderUI();
+                  const trigDisplay = nextHk ? ` (${formatKeyDisplay(nextHk)})` : ' (No shortcut)';
+                  showToast(`Saved "${newScript.name}" with ${events.length} actions${trigDisplay}`);
+                } else {
+                  updateMouseRecorderUI();
+                  showToast('Recording ended (no events captured)');
+                }
+              } else if (msg.type === 'appSelected') {
+                if (msg.path && alInputTarget) {
+                  alInputTarget.value = msg.path;
+                  if (alInputName && (!alInputName.value.trim() || alInputName.value === 'Launch') && msg.name) {
+                    alInputName.value = msg.name;
+                  }
+                  alInputTarget.focus();
+                }
+              } else if (msg.type === 'folderSelected') {
+                if (msg.path && fcInputCustomPath) {
+                  fcInputCustomPath.value = msg.path;
+                  fcInputCustomPath.focus();
+                }
+              } else if (msg.type === 'activeAppVolumeChanged') {
+                if (msg.name) {
+                  activeAppState.name = msg.name;
+                  if (wmAppTargetBadge) {
+                    wmAppTargetBadge.textContent = `Active: ${msg.name}`;
+                  }
+                }
+                if (msg.pid) {
+                  activeAppState.pid = msg.pid;
+                }
+                if (typeof msg.volume === 'number') {
+                  if (msg.volume >= 0) {
+                    activeAppState.volume = msg.volume;
+                    if (wmAppVolumeSlider) {
+                      wmAppVolumeSlider.value = msg.volume;
+                      updateSliderProgress(wmAppVolumeSlider);
+                    }
+                    if (wmAppVolumeValue) {
+                      wmAppVolumeValue.textContent = `${msg.volume}%`;
+                    }
+                  } else if (msg.volume === -1 && wmAppVolumeValue) {
+                    wmAppVolumeValue.textContent = 'No Audio';
+                  }
+                }
+                if (typeof msg.muted !== 'undefined') {
+                  activeAppState.muted = Boolean(msg.muted);
+                  if (wmBtnMuteActiveAppText) {
+                    wmBtnMuteActiveAppText.textContent = activeAppState.muted ? 'Unmute App' : 'Mute App';
+                  }
+                  if (wmBtnMuteActiveApp) {
+                    wmBtnMuteActiveApp.classList.toggle('is-muted', activeAppState.muted);
+                  }
+                }
+              } else if (msg.type === 'macroStepRecorded') {
+                if (macroState.isRecording) {
+                  const delay = macroState.useStandardDelays
+                    ? macroState.standardDelay
+                    : ((typeof msg.delay === 'number' && !isNaN(msg.delay)) ? msg.delay : 50);
+                  addMacroStep(msg.action, msg.key, delay);
+                }
+              } else if (msg.type === 'macroRecordingStopped') {
+                if (macroState.isRecording) {
+                  stopMacroRecording();
+                }
+              } else if (msg.type === 'colorFormatChanged') {
+                const sel = document.getElementById('wmSelectColorFormat');
+                if (sel) sel.value = msg.format;
+                if (state.config && state.config.windowManager) {
+                  state.config.windowManager.colorFormat = msg.format;
+                }
+                showToast(`Color format changed to ${msg.format}`, 'info');
+              } else if (msg.type === 'colorPicked') {
+                if (msg.target === 'screenScannerPixel') {
+                  const inp = document.getElementById('ssInputPixelColor');
+                  const chip = document.getElementById('ssPixelChip');
+                  if (inp) inp.value = msg.hex || msg.color;
+                  if (chip) chip.style.background = msg.hex || msg.color;
+                  showToast(`Screen Scanner Color Set: ${msg.hex || msg.color}`, 'success');
+                } else if (msg.target === 'screenScannerPoint') {
+                  const ptX = document.getElementById('ssPointX');
+                  const ptY = document.getElementById('ssPointY');
+                  const ptCol = document.getElementById('ssInputPointColor');
+                  const chip = document.getElementById('ssPointChip');
+                  if (ptX && typeof msg.x === 'number') ptX.value = msg.x;
+                  if (ptY && typeof msg.y === 'number') ptY.value = msg.y;
+                  if (ptCol) ptCol.value = msg.hex || msg.color;
+                  if (chip) chip.style.background = msg.hex || msg.color;
+                  showToast(`Point Set: (${msg.x}, ${msg.y}) - ${msg.hex || msg.color}`, 'success');
+                } else {
+                  showToast(`Color Picked & Copied: ${msg.color}`, 'success');
+                }
+              } else if (msg.type === 'screenScanTestResult') {
+                const btn = document.getElementById('ssBtnTestScan');
+                if (btn) btn.disabled = false;
+                if (msg.id) {
+                  const card = document.querySelector(`.shortcut-card[data-id="${msg.id}"]`);
+                  if (card) {
+                    if (msg.found) {
+                      card.classList.add('is-match-success');
+                      setTimeout(() => card.classList.remove('is-match-success'), 2000);
+                    }
+                  }
+                }
+                if (msg.found) {
+                  showToast(`Match FOUND at (${msg.x}, ${msg.y}) in ${msg.elapsedMs}ms!`, 'success');
+                } else {
+                  showToast(`No match found on screen (${msg.elapsedMs}ms). Check coordinates or tolerance.`, 'warning');
+                }
+              } else if (msg.type === 'screenScannerImageSelected') {
+                const inp = document.getElementById('ssInputImagePath');
+                if (inp) {
+                  inp.value = msg.path || '';
+                  updateScreenScannerImagePreview(msg.path);
+                }
+                showToast('Template image selected', 'success');
+              } else if (msg.type === 'screenSnipSaved') {
+                const inp = document.getElementById('ssInputImagePath');
+                if (inp) {
+                  inp.value = msg.path || '';
+                  updateScreenScannerImagePreview(msg.path);
+                }
+                showToast(`Screen area snipped (${msg.width}x${msg.height})!`, 'success');
+              } else if (msg.type === 'screenRegionSelected') {
+                const bX1 = document.getElementById('ssBoxX1');
+                const bY1 = document.getElementById('ssBoxY1');
+                const bX2 = document.getElementById('ssBoxX2');
+                const bY2 = document.getElementById('ssBoxY2');
+                if (bX1) bX1.value = msg.x1;
+                if (bY1) bY1.value = msg.y1;
+                if (bX2) bX2.value = msg.x2;
+                if (bY2) bY2.value = msg.y2;
+                showToast(`Bounding Box: [${msg.x1}, ${msg.y1}] to [${msg.x2}, ${msg.y2}]`, 'info');
+              } else if (msg.type === 'screenScannerTriggered') {
+                const id = msg.id;
+                const mouseScriptId = msg.mouseScriptId || '';
+                const macroId = msg.macroId || '';
+                const duration = msg.durationMs || 2500;
+
+                if (id) {
+                  if (activeRunningScreenTriggers.has(id)) {
+                    const prev = activeRunningScreenTriggers.get(id);
+                    if (prev.timer) clearTimeout(prev.timer);
+                  }
+
+                  let timer = null;
+                  if (msg.action !== 'mouseScript') {
+                    timer = setTimeout(() => {
+                      activeRunningScreenTriggers.delete(id);
+                      renderScreenScannerList();
+                      renderMouseScriptsList();
+                      updateScreenScannerEngineStatus();
+                      updateGlobalIndicators();
+                    }, Math.min(Math.max(duration, 1500), 5000));
+                  }
+
+                  activeRunningScreenTriggers.set(id, {
+                    name: msg.name,
+                    action: msg.action,
+                    mouseScriptId: mouseScriptId,
+                    macroId: macroId,
+                    startTime: Date.now(),
+                    timer: timer
+                  });
+                }
+
+                renderScreenScannerList();
+                renderMouseScriptsList();
+                updateScreenScannerEngineStatus();
+                updateGlobalIndicators();
+                showToast(`Visual Trigger Running: ${msg.name || 'Screen Scanner'} (${msg.action})`, 'success');
+              } else if (msg.type === 'screenScannerMasterState') {
+                if (Array.isArray(msg.activeItemIds)) {
+                  activeScanningScreenTriggers = new Set(msg.activeItemIds);
+                } else if (!msg.running) {
+                  activeScanningScreenTriggers.clear();
+                }
+                renderScreenScannerList();
+                updateScreenScannerMasterUI(msg.running);
+                updateGlobalIndicators();
+              } else if (msg.type === 'screenScannerScanningStarted') {
+                if (msg.id) activeScanningScreenTriggers.add(msg.id);
+                renderScreenScannerList();
+                updateScreenScannerEngineStatus();
+                updateGlobalIndicators();
+                showToast(`Scan Started: ${msg.name || 'Visual Trigger'} (${msg.repeatRule || 'Active'}) • Press shortcut to stop`, 'info');
+              } else if (msg.type === 'screenScannerScanningStopped') {
+                if (msg.id) activeScanningScreenTriggers.delete(msg.id);
+                renderScreenScannerList();
+                updateScreenScannerEngineStatus();
+                updateGlobalIndicators();
+                const reasonStr = (msg.reason === 'completedOnce') ? 'Completed & Finished (Once)' : 'Stopped';
+                showToast(`Scan Stopped: ${msg.name || 'Visual Trigger'} (${reasonStr})`, 'info');
+              } else if (msg.type === 'screenScannerItemDisabled') {
+                if (state.config && state.config.screenScanner && Array.isArray(state.config.screenScanner.items)) {
+                  const itm = state.config.screenScanner.items.find(x => x.id === msg.id);
+                  if (itm) {
+                    itm.enabled = 0;
+                    renderScreenScannerList();
+                    updateGlobalIndicators();
+                  }
+                }
+              } else if (msg.type === 'moduleEvent') {
+                if (msg.message) {
+                  showToast(msg.message, msg.isError ? 'error' : 'info');
+                }
+              }
+            } catch (err) {
+              console.error('Error handling AHK message:', err);
             }
           }
-        }
-        renderMouseScriptsList();
-        renderScreenScannerList();
-        updateScreenScannerEngineStatus();
-        updateMseModalPlaybackState(mousePlaybackActive);
-      } else if (msg.type === 'mouseRecordedPath') {
-        mouseRecordingActive = false;
-        if (!state.config.autoClicker) state.config.autoClicker = {};
-        if (!Array.isArray(state.config.autoClicker.items)) state.config.autoClicker.items = [];
-        const events = Array.isArray(msg.events) ? msg.events : [];
-        if (events.length > 0) {
-          const items = state.config.autoClicker.items;
-          const nextHk = getNextMouseShortcut(items);
-          const newScript = {
-            id: 'mr-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-            name: `Mouse Path ${items.length + 1}`,
-            trigger: nextHk,
-            triggerType: 'hotkey',
-            enabled: 1,
-            events: events,
-            speed: state.config.autoClicker.playbackSpeed || 1.0,
-            origin: state.config.autoClicker.originMode || 'absolute',
-            loop: state.config.autoClicker.playbackLoop || 1,
-            playbackInfinite: state.config.autoClicker.playbackInfinite || 0,
-            clicksOnly: state.config.autoClicker.clicksOnly || 0,
-            humanize: state.config.autoClicker.humanize || 0,
-            bezier: state.config.autoClicker.bezier || 0,
-            emergencyStop: (state.config.autoClicker.emergencyStop !== undefined) ? state.config.autoClicker.emergencyStop : 1,
-            countdown: state.config.autoClicker.countdown || 0,
-            createdAt: Date.now()
-          };
-          items.push(newScript);
-          state.config.autoClicker.recordedPath = events;
-          saveCurrentProfileState();
-          syncConfig();
-          renderMouseScriptsList();
-          updateMouseRecorderStats(events);
-          updateMouseRecorderUI();
-          const trigDisplay = nextHk ? ` (${formatKeyDisplay(nextHk)})` : ' (No shortcut)';
-          showToast(`Saved "${newScript.name}" with ${events.length} actions${trigDisplay}`);
-        } else {
-          updateMouseRecorderUI();
-          showToast('Recording ended (no events captured)');
-        }
-      } else if (msg.type === 'appSelected') {
-        if (msg.path && alInputTarget) {
-          alInputTarget.value = msg.path;
-          if (alInputName && (!alInputName.value.trim() || alInputName.value === 'Launch') && msg.name) {
-            alInputName.value = msg.name;
-          }
-          alInputTarget.focus();
-        }
-      } else if (msg.type === 'folderSelected') {
-        if (msg.path && fcInputCustomPath) {
-          fcInputCustomPath.value = msg.path;
-          fcInputCustomPath.focus();
-        }
-      } else if (msg.type === 'activeAppVolumeChanged') {
-        if (msg.name) {
-          activeAppState.name = msg.name;
-          if (wmAppTargetBadge) {
-            wmAppTargetBadge.textContent = `Active: ${msg.name}`;
-          }
-        }
-        if (msg.pid) {
-          activeAppState.pid = msg.pid;
-        }
-        if (typeof msg.volume === 'number') {
-          if (msg.volume >= 0) {
-            activeAppState.volume = msg.volume;
-            if (wmAppVolumeSlider) {
-              wmAppVolumeSlider.value = msg.volume;
-              updateSliderProgress(wmAppVolumeSlider);
+
+          // Resilient AHK Bridge Initializer with Polling & Queue Flushing
+          function initAhkBridge() {
+            function tryConnect() {
+              if (window.chrome && window.chrome.webview) {
+                if (!window.__ahkBridgeReady) {
+                  window.__ahkBridgeReady = true;
+                  window.chrome.webview.addEventListener('message', onAhkMessage);
+                  flushAhkQueue();
+                  sendToAhk('getInitialState');
+                }
+                return true;
+              }
+              return false;
             }
-            if (wmAppVolumeValue) {
-              wmAppVolumeValue.textContent = `${msg.volume}%`;
-            }
-          } else if (msg.volume === -1 && wmAppVolumeValue) {
-            wmAppVolumeValue.textContent = 'No Audio';
-          }
-        }
-        if (typeof msg.muted !== 'undefined') {
-          activeAppState.muted = Boolean(msg.muted);
-          if (wmBtnMuteActiveAppText) {
-            wmBtnMuteActiveAppText.textContent = activeAppState.muted ? 'Unmute App' : 'Mute App';
-          }
-          if (wmBtnMuteActiveApp) {
-            wmBtnMuteActiveApp.classList.toggle('is-muted', activeAppState.muted);
-          }
-        }
-      } else if (msg.type === 'macroStepRecorded') {
-        if (macroState.isRecording) {
-          const delay = macroState.useStandardDelays
-            ? macroState.standardDelay
-            : ((typeof msg.delay === 'number' && !isNaN(msg.delay)) ? msg.delay : 50);
-          addMacroStep(msg.action, msg.key, delay);
-        }
-      } else if (msg.type === 'macroRecordingStopped') {
-        if (macroState.isRecording) {
-          stopMacroRecording();
-        }
-      } else if (msg.type === 'colorFormatChanged') {
-        const sel = document.getElementById('wmSelectColorFormat');
-        if (sel) sel.value = msg.format;
-        if (state.config && state.config.windowManager) {
-          state.config.windowManager.colorFormat = msg.format;
-        }
-        showToast(`Color format changed to ${msg.format}`, 'info');
-      } else if (msg.type === 'colorPicked') {
-        if (msg.target === 'screenScannerPixel') {
-          const inp = document.getElementById('ssInputPixelColor');
-          const chip = document.getElementById('ssPixelChip');
-          if (inp) inp.value = msg.hex || msg.color;
-          if (chip) chip.style.background = msg.hex || msg.color;
-          showToast(`Screen Scanner Color Set: ${msg.hex || msg.color}`, 'success');
-        } else if (msg.target === 'screenScannerPoint') {
-          const ptX = document.getElementById('ssPointX');
-          const ptY = document.getElementById('ssPointY');
-          const ptCol = document.getElementById('ssInputPointColor');
-          const chip = document.getElementById('ssPointChip');
-          if (ptX && typeof msg.x === 'number') ptX.value = msg.x;
-          if (ptY && typeof msg.y === 'number') ptY.value = msg.y;
-          if (ptCol) ptCol.value = msg.hex || msg.color;
-          if (chip) chip.style.background = msg.hex || msg.color;
-          showToast(`Point Set: (${msg.x}, ${msg.y}) - ${msg.hex || msg.color}`, 'success');
-        } else {
-          showToast(`Color Picked & Copied: ${msg.color}`, 'success');
-        }
-      } else if (msg.type === 'screenScanTestResult') {
-        const btn = document.getElementById('ssBtnTestScan');
-        if (btn) btn.disabled = false;
-        if (msg.id) {
-          const card = document.querySelector(`.shortcut-card[data-id="${msg.id}"]`);
-          if (card) {
-            if (msg.found) {
-              card.classList.add('is-match-success');
-              setTimeout(() => card.classList.remove('is-match-success'), 2000);
+
+            if (!tryConnect()) {
+              let attempts = 0;
+              const interval = setInterval(() => {
+                attempts++;
+                if (tryConnect() || attempts > 60) {
+                  clearInterval(interval);
+                }
+              }, 50);
             }
           }
-        }
-        if (msg.found) {
-          showToast(`Match FOUND at (${msg.x}, ${msg.y}) in ${msg.elapsedMs}ms!`, 'success');
-        } else {
-          showToast(`No match found on screen (${msg.elapsedMs}ms). Check coordinates or tolerance.`, 'warning');
-        }
-      } else if (msg.type === 'screenScannerImageSelected') {
-        const inp = document.getElementById('ssInputImagePath');
-        if (inp) {
-          inp.value = msg.path || '';
-          updateScreenScannerImagePreview(msg.path);
-        }
-        showToast('Template image selected', 'success');
-      } else if (msg.type === 'screenSnipSaved') {
-        const inp = document.getElementById('ssInputImagePath');
-        if (inp) {
-          inp.value = msg.path || '';
-          updateScreenScannerImagePreview(msg.path);
-        }
-        showToast(`Screen area snipped (${msg.width}x${msg.height})!`, 'success');
-      } else if (msg.type === 'screenRegionSelected') {
-        const bX1 = document.getElementById('ssBoxX1');
-        const bY1 = document.getElementById('ssBoxY1');
-        const bX2 = document.getElementById('ssBoxX2');
-        const bY2 = document.getElementById('ssBoxY2');
-        if (bX1) bX1.value = msg.x1;
-        if (bY1) bY1.value = msg.y1;
-        if (bX2) bX2.value = msg.x2;
-        if (bY2) bY2.value = msg.y2;
-        showToast(`Bounding Box: [${msg.x1}, ${msg.y1}] to [${msg.x2}, ${msg.y2}]`, 'info');
-      } else if (msg.type === 'screenScannerTriggered') {
-        const id = msg.id;
-        const mouseScriptId = msg.mouseScriptId || '';
-        const macroId = msg.macroId || '';
-        const duration = msg.durationMs || 2500;
 
-        if (id) {
-          if (activeRunningScreenTriggers.has(id)) {
-            const prev = activeRunningScreenTriggers.get(id);
-            if (prev.timer) clearTimeout(prev.timer);
-          }
-
-          let timer = null;
-          if (msg.action !== 'mouseScript') {
-            timer = setTimeout(() => {
-              activeRunningScreenTriggers.delete(id);
-              renderScreenScannerList();
-              renderMouseScriptsList();
-              updateScreenScannerEngineStatus();
-              updateGlobalIndicators();
-            }, Math.min(Math.max(duration, 1500), 5000));
-          }
-
-          activeRunningScreenTriggers.set(id, {
-            name: msg.name,
-            action: msg.action,
-            mouseScriptId: mouseScriptId,
-            macroId: macroId,
-            startTime: Date.now(),
-            timer: timer
-          });
-        }
-
-        renderScreenScannerList();
-        renderMouseScriptsList();
-        updateScreenScannerEngineStatus();
-        updateGlobalIndicators();
-        showToast(`Visual Trigger Running: ${msg.name || 'Screen Scanner'} (${msg.action})`, 'success');
-      } else if (msg.type === 'screenScannerItemDisabled') {
-        if (state.config && state.config.screenScanner && Array.isArray(state.config.screenScanner.items)) {
-          const itm = state.config.screenScanner.items.find(x => x.id === msg.id);
-          if (itm) {
-            itm.enabled = 0;
-            renderScreenScannerList();
+          function renderAll(shouldSync = false) {
+            ensureProfilesConfig(state.config);
+            if (state.config && state.config.theme) {
+              applyTheme(
+                state.config.theme.bgColor,
+                state.config.theme.accentColor,
+                false,
+                {
+                  radius: state.config.theme.radius,
+                  distance: state.config.theme.distance,
+                  lightIntensity: state.config.theme.lightIntensity,
+                  darkIntensity: state.config.theme.darkIntensity,
+                  intensity: state.config.theme.intensity,
+                  blur: state.config.theme.blur
+                }
+              );
+            }
+            renderProfileSelect();
+            updateSwitchUi();
+            switchTab(state.activeTab || 'textExpander', shouldSync);
+            renderTextExpander();
+            renderKeyRemapper();
+            initWindowManager();
+            initMouseGestures();
+            initRadialMenu();
+            renderAppLauncher();
+            renderFolderCreator();
+            initAutoClicker();
+            renderMacroRecorder();
+            renderScreenScanner();
             updateGlobalIndicators();
+            renderCuratedPresets();
+            renderCustomPresets();
+            updateAllFeatureProfileBadges();
           }
-        }
-      } else if (msg.type === 'moduleEvent') {
-        if (msg.message) {
-          showToast(msg.message, msg.isError ? 'error' : 'info');
-        }
-      }
-    } catch (err) {
-      console.error('Error handling AHK message:', err);
-    }
-  }
 
-  // Resilient AHK Bridge Initializer with Polling & Queue Flushing
-  function initAhkBridge() {
-    function tryConnect() {
-      if (window.chrome && window.chrome.webview) {
-        if (!window.__ahkBridgeReady) {
-          window.__ahkBridgeReady = true;
-          window.chrome.webview.addEventListener('message', onAhkMessage);
-          flushAhkQueue();
-          sendToAhk('getInitialState');
-        }
-        return true;
-      }
-      return false;
-    }
+          // Startup
+          initListeners();
+          renderAll(false);
+          requestAnimationFrame(() => {
+            updateSegmentedGlider(true);
+            updateProfileGlider(true);
+            updateTabsScrollButtons();
+            updateProfilesScrollButtons();
+          });
+          initAhkBridge();
 
-    if (!tryConnect()) {
-      let attempts = 0;
-      const interval = setInterval(() => {
-        attempts++;
-        if (tryConnect() || attempts > 60) {
-          clearInterval(interval);
-        }
-      }, 50);
-    }
-  }
-
-  function renderAll(shouldSync = false) {
-    ensureProfilesConfig(state.config);
-    if (state.config && state.config.theme) {
-      applyTheme(
-        state.config.theme.bgColor,
-        state.config.theme.accentColor,
-        false,
-        {
-          radius: state.config.theme.radius,
-          distance: state.config.theme.distance,
-          lightIntensity: state.config.theme.lightIntensity,
-          darkIntensity: state.config.theme.darkIntensity,
-          intensity: state.config.theme.intensity,
-          blur: state.config.theme.blur
-        }
-      );
-    }
-    renderProfileSelect();
-    updateSwitchUi();
-    switchTab(state.activeTab || 'textExpander', shouldSync);
-    renderTextExpander();
-    renderKeyRemapper();
-    initWindowManager();
-    initMouseGestures();
-    initRadialMenu();
-    renderAppLauncher();
-    renderFolderCreator();
-    initAutoClicker();
-    renderMacroRecorder();
-    renderScreenScanner();
-    updateGlobalIndicators();
-    renderCuratedPresets();
-    renderCustomPresets();
-    updateAllFeatureProfileBadges();
-  }
-
-  // Startup
-  initListeners();
-  renderAll(false);
-  requestAnimationFrame(() => {
-    updateSegmentedGlider(true);
-    updateProfileGlider(true);
-    updateTabsScrollButtons();
-    updateProfilesScrollButtons();
-  });
-  initAhkBridge();
-
-})();
+        })();

@@ -2686,10 +2686,29 @@
                 <span class="mg-col-subtitle">Real-time pattern recognition, image search, and pixel color trigger automation</span>
               </div>
             </div>
-            <div class="toggle-wrapper" title="Enable / Disable Screen Scanner">
-              <input class="toggle-checkbox" type="checkbox" id="ssMasterSwitch" checked>
-              <div class="toggle-container">
-                <div class="toggle-button"></div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <!-- Master Start/Stop Shortcut Display -->
+              <div class="ac-hotkey-display" id="ssMasterHotkeyBox" title="Click to record master shortcut (Default: F9)" style="height:36px; padding:0 12px; cursor:pointer;">
+                <svg class="hotkey-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                <span id="ssMasterHotkeyLabel">F9</span>
+              </div>
+
+              <!-- Master Start / Stop Scan Button -->
+              <button type="button" class="neumorphic-btn ac-toggle-btn ss-master-toggle-btn" id="btnToggleScreenScannerMaster" style="height:36px; padding:0 16px; font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span id="ssMasterToggleBtnText">START SCAN (F9)</span>
+              </button>
+
+              <!-- Master On/Off Toggle Switch -->
+              <div class="toggle-wrapper" title="Enable / Disable Screen Scanner">
+                <input class="toggle-checkbox" type="checkbox" id="ssMasterSwitch" checked>
+                <div class="toggle-container">
+                  <div class="toggle-button"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -2704,16 +2723,25 @@
               <div class="ac-setting-card" style="padding: 16px 18px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                   <span class="setting-title">Visual Trigger Setup</span>
-                  <span class="hint-tag" id="ssEngineStatusHint">Autonomous</span>
+                  <span class="hint-tag" id="ssEngineStatusHint">Ready (Press Shortcut to Scan)</span>
                 </div>
 
-                <div class="inputs-row" style="margin-bottom:12px;">
+                <div class="inputs-row" style="display:flex; gap:10px; margin-bottom:12px;">
                   <div class="inset-input-box" style="flex:1;">
                     <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
                       <line x1="7" y1="7" x2="7.01" y2="7"></line>
                     </svg>
                     <input type="text" id="ssInputName" placeholder="Trigger Name (e.g. Auto-Accept, Skip Ad)" autocomplete="off" spellcheck="false" />
+                  </div>
+                  <!-- Shortcut Hotkey Box -->
+                  <div class="inset-input-box key-combo-box" id="ssTriggerBox" style="flex:1; max-width:210px;" title="Click to record trigger shortcut">
+                    <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                      <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path>
+                    </svg>
+                    <input type="text" id="ssInputTrigger" class="key-combo-input" placeholder="Shortcut (e.g. F9)..." readonly autocomplete="off" spellcheck="false" />
+                    <button type="button" class="btn-combo-clear hidden-field" id="ssBtnClearTrigger" title="Clear">&times;</button>
                   </div>
                 </div>
 
@@ -3061,25 +3089,22 @@
                 </div>
               </div>
 
-              <!-- Card 6: Action Buttons -->
-              <div style="display:flex; gap:10px; align-items:center;">
-                <button class="neumorphic-btn btn-go" id="ssBtnAddTrigger" style="flex:2; height:42px; font-size:12px; font-weight:700;">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15" style="margin-right:6px;">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  <span>ADD VISUAL TRIGGER</span>
-                </button>
-                <button class="neumorphic-btn btn-chip" id="ssBtnTestScan" style="flex:1; height:42px; font-size:11px; font-weight:600; color:var(--accent);">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:5px;">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                  </svg>
-                  <span>TEST SCAN</span>
-                </button>
-              </div>
-
             </div>
 
+          </div>
+
+          <!-- Centered High-Visibility Action Buttons -->
+          <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin: 18px 0 16px 0; width:100%;">
+            <button class="neumorphic-btn ss-btn-add-primary" id="ssBtnAddTrigger" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" style="margin-right:8px;">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span id="ssBtnAddTriggerText">ADD VISUAL TRIGGER</span>
+            </button>
+            <button class="neumorphic-btn btn-chip hidden-field" id="ssBtnCancelEdit" type="button" style="height:44px; padding:0 22px; font-size:12px; font-weight:700; color:var(--text-muted);" title="Cancel editing">
+              <span>Cancel</span>
+            </button>
           </div>
 
           <!-- Active Visual Triggers List Section -->

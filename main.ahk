@@ -137,6 +137,7 @@ global g_IsExiting := false
 global g_ScreenScannerActive := false
 global g_ScreenScannerLastTriggerTime := Map()
 global g_ScreenScannerLastFoundState := Map()
+global g_ActiveScanningItems := Map()
 global g_ColorPickerTarget := ""
 
 LogMessage(msg) {
@@ -4756,7 +4757,7 @@ NotifyWebMousePlayback(isPlaying, scriptId := "") {
 ; ==============================================================================
 
 ApplyScreenScanner() {
-    global g_Config, g_ScreenScannerActive, g_IsEngineActive
+    global g_Config, g_ActiveScanningItems, g_ScreenScannerActive, g_IsEngineActive, g_ActiveHotkeys
 
     StopScreenScanner()
 
@@ -4770,52 +4771,227 @@ ApplyScreenScanner() {
     if (ss.Has("enabled") && (!ss["enabled"] || ss["enabled"] = "0"))
         return
 
-    if (!ss.Has("items") || !IsObject(ss["items"]) || ss["items"].Length = 0)
-        return
-
-    hasEnabled := false
-    for item in ss["items"] {
-        if (IsObject(item) && (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1)) {
-            hasEnabled := true
-            break
+    ; 1. Register Master Screen Scanner Hotkey (Default: F9)
+    masterHk := ss.Has("hotkey") ? Trim(ss["hotkey"]) : "F9"
+    if (masterHk != "") {
+        ahkHk := NormalizeHotkeyToAhk(masterHk)
+        if (ahkHk = "")
+            ahkHk := masterHk
+        safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
+        try {
+            HotIf()
+            Hotkey(safeHk, (*) => ToggleScreenScannerMaster(), "On")
+            g_ActiveHotkeys.Push(safeHk)
+        } catch as err {
+            LogMessage("Screen scanner master hotkey error for " . masterHk . ": " . err.Message)
         }
     }
 
-    if (!hasEnabled)
+    if (!ss.Has("items") || !IsObject(ss["items"]) || ss["items"].Length = 0)
         return
+
+    ; 2. Register individual shortcut triggers for each configured visual trigger item
+    for item in ss["items"] {
+        if (IsObject(item) && item.Has("trigger") && Trim(item["trigger"]) != "") {
+            isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1)
+            if (isEnabled && g_IsEngineActive) {
+                try {
+                    RegisterSingleScreenScannerTrigger(item)
+                } catch as err {
+                    LogMessage("Screen scanner hotkey error for " . item["trigger"] . ": " . err.Message)
+                }
+            }
+        }
+    }
+}
+
+ToggleScreenScannerMaster() {
+    global g_IsEngineActive, g_Config, g_ActiveScanningItems, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
+
+    if (!g_IsEngineActive)
+        return
+
+    ; If ALREADY scanning, toggle off and stop all scanning!
+    if (g_ScreenScannerActive && g_ActiveScanningItems.Count > 0) {
+        StopScreenScanner()
+        ShowMouseOSD("SCREEN SCANNER", "Scanning Stopped", false, 1200)
+        SoundBeep(450, 80)
+        NotifyWebScreenScannerMasterState(false)
+        return
+    }
+
+    ; Otherwise: Start scanning all enabled visual triggers!
+    if (!g_Config.Has("screenScanner"))
+        return
+    ss := g_Config["screenScanner"]
+    if (!ss.Has("items") || !IsObject(ss["items"]) || ss["items"].Length = 0) {
+        ShowMouseOSD("SCREEN SCANNER", "No Visual Triggers configured", false, 1500)
+        return
+    }
+
+    g_ActiveScanningItems.Clear()
+    enabledCount := 0
+    for item in ss["items"] {
+        if (IsObject(item) && (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1)) {
+            itemId := item.Has("id") ? item["id"] : ("ss-" . A_Index)
+            g_ActiveScanningItems[itemId] := item
+            g_ScreenScannerLastTriggerTime[itemId] := 0
+            g_ScreenScannerLastFoundState[itemId] := false
+            enabledCount++
+        }
+    }
+
+    if (enabledCount = 0) {
+        ShowMouseOSD("SCREEN SCANNER", "All Visual Triggers are disabled", false, 1500)
+        return
+    }
 
     rate := ss.Has("scanRate") ? Max(30, Integer(ss["scanRate"])) : 150
     g_ScreenScannerActive := true
     SetTimer(CheckScreenScannerRules, rate)
+
+    masterHk := ss.Has("hotkey") ? Trim(ss["hotkey"]) : "F9"
+    ShowMouseOSD("SCREEN SCANNER", "Scanning Started (" . enabledCount . " Triggers) • " . masterHk . " to stop", true, 1400)
+    SoundBeep(850, 100)
+    NotifyWebScreenScannerMasterState(true)
+}
+
+NotifyWebScreenScannerMasterState(isRunning) {
+    global g_Wv, g_ActiveScanningItems
+    if (!g_Wv)
+        return
+    activeIds := []
+    for k, v in g_ActiveScanningItems {
+        activeIds.Push(k)
+    }
+    try {
+        g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+            "type", "screenScannerMasterState",
+            "running", isRunning,
+            "count", g_ActiveScanningItems.Count,
+            "activeItemIds", activeIds
+        )))
+    }
+}
+
+RegisterSingleScreenScannerTrigger(item) {
+    global g_ActiveHotkeys
+    trig := Trim(item["trigger"])
+    if (trig = "")
+        return
+
+    ahkHk := NormalizeHotkeyToAhk(trig)
+    if (ahkHk = "")
+        ahkHk := trig
+
+    safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
+    HotIf()
+    Hotkey(safeHk, (*) => ToggleScreenScannerItem(item), "On")
+    g_ActiveHotkeys.Push(safeHk)
+}
+
+ToggleScreenScannerItem(item) {
+    global g_IsEngineActive, g_Config, g_ActiveScanningItems, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
+
+    if (!g_IsEngineActive)
+        return
+
+    itemId := item.Has("id") ? item["id"] : ""
+    if (itemId = "")
+        return
+
+    ruleName := (item.Has("name") && Trim(item["name"]) != "") ? item["name"] : "Visual Trigger"
+    repeatRule := item.Has("repeatRule") ? item["repeatRule"] : "debounce"
+
+    ; If this item is ALREADY scanning, pressing the same shortcut STOPS it immediately!
+    if (g_ActiveScanningItems.Has(itemId)) {
+        g_ActiveScanningItems.Delete(itemId)
+        if (g_ActiveScanningItems.Count = 0) {
+            StopScreenScanner()
+        }
+        ; If playback/macro was triggered by this rule, stop it
+        if (item.Has("actionType") && item["actionType"] = "mouseScript") {
+            try StopMousePlayback()
+        } else if (item.Has("actionType") && item["actionType"] = "macro") {
+            try StopAllMacros()
+        }
+        if (!item.Has("osdAlert") || item["osdAlert"] = true || item["osdAlert"] = 1) {
+            ShowMouseOSD("SCREEN SCANNER", ruleName . " (Scanner Stopped)", false, 1200)
+        }
+        if (item.Has("soundAlert") && (item["soundAlert"] = true || item["soundAlert"] = 1)) {
+            SoundBeep(450, 80)
+        }
+        if (g_Wv) {
+            try {
+                g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                    "type", "screenScannerScanningStopped",
+                    "id", itemId,
+                    "name", ruleName,
+                    "reason", "userStopped"
+                )))
+            }
+        }
+        NotifyWebScreenScannerMasterState(g_ScreenScannerActive && g_ActiveScanningItems.Count > 0)
+        return
+    }
+
+    ; Otherwise: START scanning for this item!
+    g_ActiveScanningItems[itemId] := item
+    g_ScreenScannerLastTriggerTime[itemId] := 0
+    g_ScreenScannerLastFoundState[itemId] := false
+
+    ; Ensure scanning timer is running
+    ss := g_Config.Has("screenScanner") ? g_Config["screenScanner"] : Map()
+    rate := ss.Has("scanRate") ? Max(30, Integer(ss["scanRate"])) : 150
+    g_ScreenScannerActive := true
+    SetTimer(CheckScreenScannerRules, rate)
+
+    repLabel := (repeatRule = "once") ? "Once" : (repeatRule = "continuous" ? "Continuous" : "Cooldown")
+    if (!item.Has("osdAlert") || item["osdAlert"] = true || item["osdAlert"] = 1) {
+        ShowMouseOSD("SCREEN SCANNER", ruleName . " (Scanning " . repLabel . " started)", true, 1200)
+    }
+    if (item.Has("soundAlert") && (item["soundAlert"] = true || item["soundAlert"] = 1)) {
+        SoundBeep(850, 100)
+    }
+
+    if (g_Wv) {
+        try {
+            g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                "type", "screenScannerScanningStarted",
+                "id", itemId,
+                "name", ruleName,
+                "repeatRule", repeatRule
+            )))
+        }
+    }
+    NotifyWebScreenScannerMasterState(true)
 }
 
 StopScreenScanner() {
-    global g_ScreenScannerActive
+    global g_ScreenScannerActive, g_ActiveScanningItems
+    wasRunning := (g_ScreenScannerActive || g_ActiveScanningItems.Count > 0)
     g_ScreenScannerActive := false
+    g_ActiveScanningItems.Clear()
     try SetTimer(CheckScreenScannerRules, 0)
+    if (wasRunning) {
+        NotifyWebScreenScannerMasterState(false)
+    }
 }
 
 CheckScreenScannerRules() {
-    global g_Config, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
+    global g_Config, g_ScreenScannerActive, g_ActiveScanningItems, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
 
-    if (!g_ScreenScannerActive || !g_Config.Has("screenScanner"))
+    if (!g_ScreenScannerActive || g_ActiveScanningItems.Count = 0) {
+        StopScreenScanner()
         return
-
-    ss := g_Config["screenScanner"]
-    if (!ss.Has("items") || !IsObject(ss["items"]))
-        return
+    }
 
     nowTick := A_TickCount
+    itemsToRemove := []
 
-    for item in ss["items"] {
+    for itemId, item in g_ActiveScanningItems {
         if (!IsObject(item))
             continue
-
-        isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1)
-        if (!isEnabled)
-            continue
-
-        itemId := item.Has("id") ? item["id"] : ("ss-" . A_Index)
 
         foundX := 0, foundY := 0
         isFound := ExecuteScreenScannerDetection(item, &foundX, &foundY)
@@ -4860,19 +5036,39 @@ CheckScreenScannerRules() {
             g_ScreenScannerLastTriggerTime[itemId] := nowTick
             FireScreenScannerAction(item, foundX, foundY)
 
+            ; In "once" mode: automatically stop scanning as soon as the first match triggers!
             if (repeatRule = "once") {
-                item["enabled"] := false
-                SaveConfigToFile()
-                if (g_Wv) {
-                    try {
-                        g_Wv.PostWebMessageAsString(JSON.stringify(Map(
-                            "type", "screenScannerItemDisabled",
-                            "id", itemId
-                        )))
-                    }
+                itemsToRemove.Push(itemId)
+            }
+        }
+    }
+
+    for delId in itemsToRemove {
+        if (g_ActiveScanningItems.Has(delId)) {
+            itemObj := g_ActiveScanningItems[delId]
+            ruleName := itemObj.Has("name") ? itemObj["name"] : "Visual Trigger"
+            g_ActiveScanningItems.Delete(delId)
+
+            if (!itemObj.Has("osdAlert") || itemObj["osdAlert"] = true || itemObj["osdAlert"] = 1) {
+                ShowMouseOSD("SCREEN SCANNER", ruleName . " (Matched & Finished)", true, 1200)
+            }
+            if (g_Wv) {
+                try {
+                    g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                        "type", "screenScannerScanningStopped",
+                        "id", delId,
+                        "name", ruleName,
+                        "reason", "completedOnce"
+                    )))
                 }
             }
         }
+    }
+
+    if (g_ActiveScanningItems.Count = 0) {
+        StopScreenScanner()
+    } else if (itemsToRemove.Length > 0) {
+        NotifyWebScreenScannerMasterState(true)
     }
 }
 
@@ -6140,6 +6336,19 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                     }
                 } catch as err {
                     LogMessage("browseProfileApp error: " . err.Message)
+                }
+
+            case "toggleScreenScannerMaster":
+                ToggleScreenScannerMaster()
+
+            case "toggleScreenScannerItem":
+                if (msg.Has("id") && g_Config.Has("screenScanner") && g_Config["screenScanner"].Has("items")) {
+                    for item in g_Config["screenScanner"]["items"] {
+                        if (IsObject(item) && item.Has("id") && item["id"] = msg["id"]) {
+                            ToggleScreenScannerItem(item)
+                            break
+                        }
+                    }
                 }
 
             case "testScreenScan":
