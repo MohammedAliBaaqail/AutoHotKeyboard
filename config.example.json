@@ -9,7 +9,19 @@
       "name": "Default",
       "icon": "monitor",
       "color": "#d97706",
-      "enabled": 1
+      "enabled": 1,
+      "textExpander": {
+        "enabled": 1,
+        "items": [
+          {
+            "id": "te-1",
+            "input": "@@email",
+            "output": "user@example.com",
+            "multiline": 0,
+            "enabled": 1
+          }
+        ]
+      }
     }
   },
   "textExpander": {

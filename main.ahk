@@ -340,6 +340,7 @@ GetDefaultConfig() {
                 Map("id", "te-1", "input", "@@1", "output", "myemail@gmail.com", "multiline", false),
                 Map("id", "te-2", "input", "@@sig", "output", "Best regards,`nYour Name`nSenior Engineer", "multiline",
                     true)
+                Map("id", "te-1", "input", "@@email", "output", "user@example.com", "multiline", false, "enabled", 1)
             ]
         ),
         "keyRemapper", Map(
@@ -555,6 +556,7 @@ UnregisterAllHooks() {
     try SetTimer(CheckScreenHotCorners, 0)
 
     for trig in g_ActiveHotstrings {
+        try Hotstring(":?*:" . trig, , "Off")
         try Hotstring(":*:" . trig, , "Off")
     }
     g_ActiveHotstrings := []
@@ -592,6 +594,7 @@ ApplyTextExpander() {
         return
     }
 
+    HotIf() ; Clear any contextual HotIf condition so text expander triggers in all windows
     for item in modConfig["items"] {
         if (IsObject(item) && item.Has("input")) {
             trig := Trim(item["input"])
@@ -602,11 +605,13 @@ ApplyTextExpander() {
                 try {
                     handler := CreateExpanderHandler(trig, outText)
                     Hotstring(":*:" . trig, handler, "On")
+                    Hotstring(":?*:" . trig, handler, "On")
                     g_ActiveHotstrings.Push(trig)
                 } catch as err {
                     LogMessage("Expander error for " . trig . ": " . err.Message)
                 }
             } else if (trig != "") {
+                try Hotstring(":?*:" . trig, , "Off")
                 try Hotstring(":*:" . trig, , "Off")
             }
         }
@@ -1567,7 +1572,8 @@ CaptureScreenAreaToFile(x, y, w, h, outPngPath) {
     hBitmap := DllCall("CreateCompatibleBitmap", "ptr", hdcScreen, "int", w, "int", h, "ptr")
     hOld := DllCall("SelectObject", "ptr", hdcMem, "ptr", hBitmap, "ptr")
 
-    DllCall("BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", w, "int", h, "ptr", hdcScreen, "int", x, "int", y, "uint", 0x00CC0020)
+    DllCall("BitBlt", "ptr", hdcMem, "int", 0, "int", 0, "int", w, "int", h, "ptr", hdcScreen, "int", x, "int", y,
+        "uint", 0x00CC0020)
 
     DllCall("LoadLibrary", "Str", "gdiplus.dll", "Ptr")
     si := Buffer(A_PtrSize = 8 ? 24 : 16, 0)
@@ -1579,7 +1585,8 @@ CaptureScreenAreaToFile(x, y, w, h, outPngPath) {
         if (DllCall("gdiplus\GdipCreateBitmapFromHBITMAP", "Ptr", hBitmap, "Ptr", 0, "Ptr*", &pBitmap) == 0) {
             clsidPng := Buffer(16)
             DllCall("ole32\CLSIDFromString", "Str", "{557CF406-1A04-11D3-9A73-0000F81EF32E}", "Ptr", clsidPng.Ptr)
-            if (DllCall("gdiplus\GdipSaveImageToFile", "Ptr", pBitmap, "Str", outPngPath, "Ptr", clsidPng.Ptr, "Ptr", 0) == 0) {
+            if (DllCall("gdiplus\GdipSaveImageToFile", "Ptr", pBitmap, "Str", outPngPath, "Ptr", clsidPng.Ptr, "Ptr", 0
+            ) == 0) {
                 success := true
             }
             DllCall("gdiplus\GdipDisposeImage", "Ptr", pBitmap)
@@ -3747,7 +3754,8 @@ ExecuteMouseScript(item) {
     countdown := item.Has("countdown") ? Integer(item["countdown"]) : 0
     sId := item.Has("id") ? item["id"] : ""
 
-    SetTimer(() => PlayRecordedMousePath(events, spd, loopCnt, origin, clicksOnly, humanize, emergencyStop, countdown, sId), -1)
+    SetTimer(() => PlayRecordedMousePath(events, spd, loopCnt, origin, clicksOnly, humanize, emergencyStop, countdown,
+        sId), -1)
 }
 
 ToggleAutoClicker() {
@@ -4101,7 +4109,8 @@ StartMouseRecording(options := "") {
 }
 
 StopMouseRecording() {
-    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordTechnique, g_Wv, g_MouseKeyHook, g_MainGui, g_MouseRecordCountdownActive
+    global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordTechnique, g_Wv, g_MouseKeyHook, g_MainGui,
+        g_MouseRecordCountdownActive
 
     if (g_MouseRecordCountdownActive) {
         g_MouseRecordCountdownActive := false
@@ -4155,7 +4164,8 @@ StopMouseRecording() {
             if (st = "Down") {
                 CoordMode("Mouse", "Screen")
                 MouseGetPos(&upX, &upY)
-                g_MouseRecordedEvents.Push(Map("type", "click", "btn", btn, "action", "Up", "x", upX, "y", upY, "delay", 10))
+                g_MouseRecordedEvents.Push(Map("type", "click", "btn", btn, "action", "Up", "x", upX, "y", upY, "delay",
+                    10))
             }
         }
         g_MouseRecordBtnStates := Map()
@@ -4293,17 +4303,17 @@ RemoveMouseClickCapture() {
 }
 
 OnRecordedLButtonDown(*) => RecordMouseClickAction("Left", "Down")
-OnRecordedLButtonUp(*)   => RecordMouseClickAction("Left", "Up")
+OnRecordedLButtonUp(*) => RecordMouseClickAction("Left", "Up")
 OnRecordedRButtonDown(*) => RecordMouseClickAction("Right", "Down")
-OnRecordedRButtonUp(*)   => RecordMouseClickAction("Right", "Up")
+OnRecordedRButtonUp(*) => RecordMouseClickAction("Right", "Up")
 OnRecordedMButtonDown(*) => RecordMouseClickAction("Middle", "Down")
-OnRecordedMButtonUp(*)   => RecordMouseClickAction("Middle", "Up")
+OnRecordedMButtonUp(*) => RecordMouseClickAction("Middle", "Up")
 OnRecordedXButton1Down(*) => RecordMouseClickAction("XButton1", "Down")
-OnRecordedXButton1Up(*)   => RecordMouseClickAction("XButton1", "Up")
+OnRecordedXButton1Up(*) => RecordMouseClickAction("XButton1", "Up")
 OnRecordedXButton2Down(*) => RecordMouseClickAction("XButton2", "Down")
-OnRecordedXButton2Up(*)   => RecordMouseClickAction("XButton2", "Up")
-OnRecordedWheelUp(*)     => RecordMouseClickAction("WheelUp", "Click")
-OnRecordedWheelDown(*)   => RecordMouseClickAction("WheelDown", "Click")
+OnRecordedXButton2Up(*) => RecordMouseClickAction("XButton2", "Up")
+OnRecordedWheelUp(*) => RecordMouseClickAction("WheelUp", "Click")
+OnRecordedWheelDown(*) => RecordMouseClickAction("WheelDown", "Click")
 
 RecordMouseClickAction(btn, act) {
     global g_MouseRecordActive, g_MouseRecordedEvents, g_MouseRecordLastTime, g_MouseRecordLastX, g_MouseRecordLastY
@@ -4338,7 +4348,8 @@ StartMouseHookRecord() {
         StopMouseHookRecord()
     g_MouseHookCallback := CallbackCreate(LowLevelMouseProc, "Fast", 3)
     hMod := DllCall("GetModuleHandle", "Ptr", 0, "Ptr")
-    g_MouseHookHandle := DllCall("SetWindowsHookEx", "Int", 14, "Ptr", g_MouseHookCallback, "Ptr", hMod, "UInt", 0, "Ptr")
+    g_MouseHookHandle := DllCall("SetWindowsHookEx", "Int", 14, "Ptr", g_MouseHookCallback, "Ptr", hMod, "UInt", 0,
+        "Ptr")
 }
 
 StopMouseHookRecord() {
@@ -4427,7 +4438,8 @@ EnableEmergencyEscHotkey() {
 }
 
 DisableEmergencyEscHotkey() {
-    global g_EmergencyEscActive, g_MousePlaybackActive, g_MouseRecordActive, g_AutoClickerRunning, g_MouseRecordCountdownActive
+    global g_EmergencyEscActive, g_MousePlaybackActive, g_MouseRecordActive, g_AutoClickerRunning,
+        g_MouseRecordCountdownActive
     if (!g_MousePlaybackActive && !g_MouseRecordActive && !g_AutoClickerRunning && !g_MouseRecordCountdownActive) {
         if (g_EmergencyEscActive) {
             try {
@@ -4463,7 +4475,8 @@ OnMouseEmergencyStopHotkeyPressed(*) {
         SoundBeep(650, 90)
 }
 
-PlayRecordedMousePath(events, speed := 1.0, loopCount := 1, originMode := "absolute", clicksOnly := false, humanize := false, emergencyStop := false, countdown := 0, scriptId := "") {
+PlayRecordedMousePath(events, speed := 1.0, loopCount := 1, originMode := "absolute", clicksOnly := false, humanize :=
+    false, emergencyStop := false, countdown := 0, scriptId := "") {
     global g_MousePlaybackActive, g_MousePlaybackStopReq, g_MouseRecordWinX, g_MouseRecordWinY, g_MousePlaybackScriptId
     if (!IsObject(events) || events.Length = 0 || g_MousePlaybackActive)
         return
@@ -4583,7 +4596,7 @@ PlayRecordedMousePath(events, speed := 1.0, loopCount := 1, originMode := "absol
                 ; Emergency Hand-Move Stop detection: check periodically to avoid Win32 syscall flood on ultra-high speed (50x)
                 if (emergencyStop && lastSetX >= 0 && lastSetY >= 0 && (delayAccum >= 1.0 || (A_Index & 7) = 0)) {
                     MouseGetPos(&physX, &physY)
-                    distSq := (physX - lastSetX)**2 + (physY - lastSetY)**2
+                    distSq := (physX - lastSetX) ** 2 + (physY - lastSetY) ** 2
                     if (distSq > 400) { ; > 20 pixels physical move
                         SoundBeep(600, 120)
                         break 2
@@ -4591,7 +4604,8 @@ PlayRecordedMousePath(events, speed := 1.0, loopCount := 1, originMode := "absol
                 }
 
                 ; Skip movement travel events if Clicks-Only Instant Warp mode is active, UNLESS a button is currently held down (drag)
-                isAnyHeld := (heldButtons["Left"] || heldButtons["Right"] || heldButtons["Middle"] || heldButtons["XButton1"] || heldButtons["XButton2"])
+                isAnyHeld := (heldButtons["Left"] || heldButtons["Right"] || heldButtons["Middle"] || heldButtons[
+                    "XButton1"] || heldButtons["XButton2"])
                 if (clicksOnly && t = "move" && !isAnyHeld)
                     continue
 
@@ -4646,7 +4660,8 @@ PlayRecordedMousePath(events, speed := 1.0, loopCount := 1, originMode := "absol
                     } else if (btn = "WheelDown") {
                         Click("WheelDown")
                     } else {
-                        clickBtn := (btn = "Right") ? "Right" : ((btn = "Middle") ? "Middle" : ((btn = "XButton1") ? "X1" : ((btn = "XButton2") ? "X2" : "Left")))
+                        clickBtn := (btn = "Right") ? "Right" : ((btn = "Middle") ? "Middle" : ((btn = "XButton1") ?
+                            "X1" : ((btn = "XButton2") ? "X2" : "Left")))
                         if (act = "Down") {
                             Click("Down " . clickBtn)
                             heldButtons[btn] := true
@@ -4806,7 +4821,8 @@ ApplyScreenScanner() {
 }
 
 ToggleScreenScannerMaster() {
-    global g_IsEngineActive, g_Config, g_ActiveScanningItems, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
+    global g_IsEngineActive, g_Config, g_ActiveScanningItems, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime,
+        g_ScreenScannerLastFoundState, g_Wv
 
     if (!g_IsEngineActive)
         return
@@ -4851,7 +4867,8 @@ ToggleScreenScannerMaster() {
     SetTimer(CheckScreenScannerRules, rate)
 
     masterHk := ss.Has("hotkey") ? Trim(ss["hotkey"]) : "F9"
-    ShowMouseOSD("SCREEN SCANNER", "Scanning Started (" . enabledCount . " Triggers) • " . masterHk . " to stop", true, 1400)
+    ShowMouseOSD("SCREEN SCANNER", "Scanning Started (" . enabledCount . " Triggers) • " . masterHk . " to stop", true,
+        1400)
     SoundBeep(850, 100)
     NotifyWebScreenScannerMasterState(true)
 }
@@ -4891,7 +4908,8 @@ RegisterSingleScreenScannerTrigger(item) {
 }
 
 ToggleScreenScannerItem(item) {
-    global g_IsEngineActive, g_Config, g_ActiveScanningItems, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
+    global g_IsEngineActive, g_Config, g_ActiveScanningItems, g_ScreenScannerActive, g_ScreenScannerLastTriggerTime,
+        g_ScreenScannerLastFoundState, g_Wv
 
     if (!g_IsEngineActive)
         return
@@ -4979,7 +4997,8 @@ StopScreenScanner() {
 }
 
 CheckScreenScannerRules() {
-    global g_Config, g_ScreenScannerActive, g_ActiveScanningItems, g_ScreenScannerLastTriggerTime, g_ScreenScannerLastFoundState, g_Wv
+    global g_Config, g_ScreenScannerActive, g_ActiveScanningItems, g_ScreenScannerLastTriggerTime,
+        g_ScreenScannerLastFoundState, g_Wv
 
     if (!g_ScreenScannerActive || g_ActiveScanningItems.Count = 0) {
         StopScreenScanner()
@@ -6161,7 +6180,8 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                 emergencyStop := (msg.Has("emergencyStop") && (msg["emergencyStop"] = 1 || msg["emergencyStop"] = true))
                 countdown := msg.Has("countdown") ? Integer(msg["countdown"]) : 0
                 sId := msg.Has("scriptId") ? msg["scriptId"] : (msg.Has("id") ? msg["id"] : "")
-                SetTimer(() => PlayRecordedMousePath(events, spd, loopCnt, origin, clicksOnly, humanize, emergencyStop, countdown, sId), -1)
+                SetTimer(() => PlayRecordedMousePath(events, spd, loopCnt, origin, clicksOnly, humanize, emergencyStop,
+                    countdown, sId), -1)
 
             case "stopMousePlayback":
                 StopMousePlayback()
