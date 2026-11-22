@@ -250,7 +250,16 @@ InitWebView2() {
             g_Wvc := WebView2.CreateControllerAsync(g_MainGui.Hwnd, envOpts, tempDataDir, "", loaderDll).await2(8000)
         } catch as err2 {
             LogMessage("FATAL: Failed to initialize WebView2 component: " . err2.Message)
-            MsgBox("Failed to initialize WebView2 component: " . err2.Message, "AutoHotKeyboard Error", 16)
+            userChoice := MsgBox(
+                "Microsoft Edge WebView2 Runtime is missing or could not be loaded.`n`n" .
+                "AutoHotKeyboard requires the WebView2 Runtime to display its user interface.`n`n" .
+                "Would you like to open the official Microsoft download page to install it now?",
+                "AutoHotKeyboard - Missing Runtime",
+                52
+            )
+            if (userChoice = "Yes") {
+                try Run("https://go.microsoft.com/fwlink/p/?LinkId=2124703")
+            }
             ExitApp()
         }
     }

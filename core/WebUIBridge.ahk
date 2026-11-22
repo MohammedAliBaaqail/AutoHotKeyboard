@@ -193,6 +193,28 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
             case "openConfig":
                 try Run('explorer.exe /select,"' . CONFIG_FILE . '"')
 
+            case "getStartupStatus":
+                if (g_Wv) {
+                    g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                        "type", "startupStatus",
+                        "enabled", IsStartupEnabled(),
+                        "isAdmin", !!A_IsAdmin
+                    )))
+                }
+
+            case "toggleStartup":
+                ToggleStartupFromTray()
+                if (g_Wv) {
+                    g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                        "type", "startupStatus",
+                        "enabled", IsStartupEnabled(),
+                        "isAdmin", !!A_IsAdmin
+                    )))
+                }
+
+            case "restartAsAdmin":
+                RestartAsAdmin()
+
             case "browseApp":
                 try {
                     selectedFile := FileSelect(1, , "Select Application or Executable",

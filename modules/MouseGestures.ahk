@@ -6,8 +6,9 @@ ApplyMouseGestures() {
     global g_Config, g_ActiveHotkeys, g_IsEngineActive, g_WheelGesturesActive, g_RockerGesturesActive,
         g_WheelTriggerBtn
 
-    if (!g_Config.Has("mouseGestures")) {
-        return
+    if (!g_Config.Has("mouseGestures") || !IsObject(g_Config["mouseGestures"])) {
+        defaults := GetDefaultConfig()
+        g_Config["mouseGestures"] := defaults["mouseGestures"]
     }
 
     mg := g_Config["mouseGestures"]
@@ -125,8 +126,13 @@ HandleRockerRight() {
 CheckScreenHotCorners() {
     global g_Config, g_CornerActive, g_CornerTick, g_CornerTriggered, g_IsEngineActive
 
-    if (!g_IsEngineActive || !g_Config.Has("mouseGestures")) {
+    if (!g_IsEngineActive) {
         return
+    }
+
+    if (!g_Config.Has("mouseGestures") || !IsObject(g_Config["mouseGestures"])) {
+        defaults := GetDefaultConfig()
+        g_Config["mouseGestures"] := defaults["mouseGestures"]
     }
 
     mg := g_Config["mouseGestures"]

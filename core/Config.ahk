@@ -212,6 +212,47 @@ GetDefaultConfig() {
             "scanRate", 150,
             "items", []
         ),
+        "mouseGestures", Map(
+            "cornersEnabled", 1,
+            "dwellDuration", 50,
+            "cornerSize", 6,
+            "monitorMode", "all",
+            "cornerTopLeft", "EmojiPicker",
+            "cornerTopRight", "MinimizeWindow",
+            "cornerBottomLeft", "MuteVolume",
+            "cornerBottomRight", "ShowDesktop",
+            "gesturesEnabled", 1,
+            "triggerButton", "RButton",
+            "gestureTimeout", 700,
+            "strokeThreshold", 45,
+            "actionLeft", "Back",
+            "actionRight", "Forward",
+            "actionUp", "MaximizeWindow",
+            "actionDown", "MinimizeWindow",
+            "actionDownRight", "CloseWindow",
+            "wheelGestureEnabled", 0,
+            "wheelMode", "volume",
+            "rockerEnabled", 0,
+            "actionRockerLeft", "MuteVolume",
+            "actionRockerRight", "MuteVolume"
+        ),
+        "radialMenu", Map(
+            "enabled", 1,
+            "triggerButton", "^SPACE",
+            "wheelRadius", 180,
+            "sliceCount", 8,
+            "centerAction", "EmojiPicker",
+            "slices", [
+                "ScreenOcr",
+                "NextDesktop",
+                "ColorPicker",
+                "AlwaysOnTop",
+                "MuteVolume",
+                "CleanText",
+                "PrevDesktop",
+                "TaskView"
+            ]
+        ),
         "theme", Map(
             "bgColor", "#e8dfd5",
             "accentColor", "#d97706",

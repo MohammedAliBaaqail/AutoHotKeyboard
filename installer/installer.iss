@@ -61,3 +61,31 @@ Name: "{autostartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDi
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function IsWebView2Installed(): Boolean;
+var
+  Installed: Boolean;
+  Val: String;
+begin
+  Installed := RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-D32A-42F9-B334-8872D66E33F1}', 'pv', Val) or
+               RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-D32A-42F9-B334-8872D66E33F1}', 'pv', Val) or
+               RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-D32A-42F9-B334-8872D66E33F1}', 'pv', Val);
+  Result := Installed and (Val <> '') and (Val <> '0.0.0.0');
+end;
+
+function InitializeSetup(): Boolean;
+var
+  ErrorCode: Integer;
+begin
+  Result := True;
+  if not IsWebView2Installed() then
+  begin
+    if MsgBox('AutoHotKeyboard requires the Microsoft Edge WebView2 Runtime to display its user interface.' + #13#10 + #13#10 +
+              'It was not detected on this system. Would you like to download it now from Microsoft?',
+              mbConfirmation, MB_YESNO) = IDYES then
+    begin
+      ShellExec('open', 'https://go.microsoft.com/fwlink/p/?LinkId=2124703', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+    end;
+  end;
+end;

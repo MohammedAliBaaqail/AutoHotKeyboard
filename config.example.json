@@ -21,6 +21,47 @@
             "enabled": 1
           }
         ]
+      },
+      "mouseGestures": {
+        "cornersEnabled": 1,
+        "dwellDuration": 50,
+        "cornerSize": 6,
+        "monitorMode": "all",
+        "cornerTopLeft": "EmojiPicker",
+        "cornerTopRight": "MinimizeWindow",
+        "cornerBottomLeft": "MuteVolume",
+        "cornerBottomRight": "ShowDesktop",
+        "gesturesEnabled": 1,
+        "triggerButton": "RButton",
+        "gestureTimeout": 700,
+        "strokeThreshold": 45,
+        "actionLeft": "Back",
+        "actionRight": "Forward",
+        "actionUp": "MaximizeWindow",
+        "actionDown": "MinimizeWindow",
+        "actionDownRight": "CloseWindow",
+        "wheelGestureEnabled": 0,
+        "wheelMode": "volume",
+        "rockerEnabled": 0,
+        "actionRockerLeft": "MuteVolume",
+        "actionRockerRight": "MuteVolume"
+      },
+      "radialMenu": {
+        "enabled": 1,
+        "triggerButton": "^SPACE",
+        "wheelRadius": 180,
+        "sliceCount": 8,
+        "centerAction": "EmojiPicker",
+        "slices": [
+          "ScreenOcr",
+          "NextDesktop",
+          "ColorPicker",
+          "AlwaysOnTop",
+          "MuteVolume",
+          "CleanText",
+          "PrevDesktop",
+          "TaskView"
+        ]
       }
     }
   },
@@ -44,13 +85,46 @@
     "enabled": 1,
     "items": []
   },
-  "gesturesAndCorners": {
-    "enabled": 1,
-    "items": []
+  "mouseGestures": {
+    "cornersEnabled": 1,
+    "dwellDuration": 50,
+    "cornerSize": 6,
+    "monitorMode": "all",
+    "cornerTopLeft": "EmojiPicker",
+    "cornerTopRight": "MinimizeWindow",
+    "cornerBottomLeft": "MuteVolume",
+    "cornerBottomRight": "ShowDesktop",
+    "gesturesEnabled": 1,
+    "triggerButton": "RButton",
+    "gestureTimeout": 700,
+    "strokeThreshold": 45,
+    "actionLeft": "Back",
+    "actionRight": "Forward",
+    "actionUp": "MaximizeWindow",
+    "actionDown": "MinimizeWindow",
+    "actionDownRight": "CloseWindow",
+    "wheelGestureEnabled": 0,
+    "wheelMode": "volume",
+    "rockerEnabled": 0,
+    "actionRockerLeft": "MuteVolume",
+    "actionRockerRight": "MuteVolume"
   },
   "radialMenu": {
     "enabled": 1,
-    "items": []
+    "triggerButton": "^SPACE",
+    "wheelRadius", 180,
+    "sliceCount": 8,
+    "centerAction": "EmojiPicker",
+    "slices": [
+      "ScreenOcr",
+      "NextDesktop",
+      "ColorPicker",
+      "AlwaysOnTop",
+      "MuteVolume",
+      "CleanText",
+      "PrevDesktop",
+      "TaskView"
+    ]
   },
   "appLauncher": {
     "enabled": 1,

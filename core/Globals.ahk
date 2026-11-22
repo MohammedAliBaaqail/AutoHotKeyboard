@@ -2,7 +2,52 @@
 global APP_NAME := "AutoHotKeyboard"
 global DEFAULT_WINDOW_WIDTH_PCT := 70   ; Default 70% of screen work area
 global DEFAULT_WINDOW_HEIGHT_PCT := 75  ; Default 75% of screen work area
-global CONFIG_FILE := A_ScriptDir . "\config.json"
+
+; Determine writable configuration and data directory (supports both portable and installed modes)
+ResolveDataPaths(&cfgFile, &logFile) {
+    isWritable := false
+    testPath := A_ScriptDir . "\.writetest_" . A_TickCount . ".tmp"
+    try {
+        f := FileOpen(testPath, "w")
+        if (f) {
+            f.Write("ok")
+            f.Close()
+            try FileDelete(testPath)
+            isWritable := true
+        }
+    } catch {
+        isWritable := false
+    }
+
+    inProgFiles := InStr(A_ScriptDir, "Program Files") > 0
+    if (isWritable && !inProgFiles) {
+        cfgFile := A_ScriptDir . "\config.json"
+        logFile := A_ScriptDir . "\debug.log"
+        return
+    }
+
+    ; If installed in Program Files or folder is read-only, use user's AppData
+    appDataFolder := A_AppData . "\AutoHotKeyboard"
+    if (!DirExist(appDataFolder)) {
+        try DirCreate(appDataFolder)
+    }
+
+    cfgFile := appDataFolder . "\config.json"
+    logFile := appDataFolder . "\debug.log"
+
+    ; Populate user config from template on first launch if not present
+    if (!FileExist(cfgFile)) {
+        if (FileExist(A_ScriptDir . "\config.json")) {
+            try FileCopy(A_ScriptDir . "\config.json", cfgFile, 0)
+        } else if (FileExist(A_ScriptDir . "\config.example.json")) {
+            try FileCopy(A_ScriptDir . "\config.example.json", cfgFile, 0)
+        }
+    }
+}
+
+global CONFIG_FILE := ""
+global LOG_FILE := ""
+ResolveDataPaths(&CONFIG_FILE, &LOG_FILE)
 
 GetDefaultWindowSize(&defW, &defH, &defX, &defY, monIndex := 0) {
     global DEFAULT_WINDOW_WIDTH_PCT, DEFAULT_WINDOW_HEIGHT_PCT
@@ -133,9 +178,10 @@ global g_SleepTimerSecondsLeft := 0
 global g_SleepTimerMode := "Sleep"
 
 LogMessage(msg) {
+    global LOG_FILE
     OutputDebug("[AutoHotKeyboard] " . msg)
-    try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") . " [AutoHotKeyboard] " . msg . "`n", A_ScriptDir . "\debug.log",
-    "UTF-8")
+    targetLog := (LOG_FILE != "") ? LOG_FILE : (A_ScriptDir . "\debug.log")
+    try FileAppend(FormatTime(, "yyyy-MM-dd HH:mm:ss") . " [AutoHotKeyboard] " . msg . "`n", targetLog, "UTF-8")
 }
 
 GlobalErrorHandler(thrown, mode) {
