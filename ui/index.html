@@ -2664,7 +2664,7 @@
       <!-- ====================================================================
            7. SCREEN SCANNER & VISUAL TRIGGERS PANEL
            ==================================================================== -->
-            <section class="module-panel" id="panel-screenScanner">
+      <section class="module-panel" id="panel-screenScanner">
         <div class="ss-panel-container">
 
           <!-- Master Switch Header Card -->
@@ -2683,12 +2683,15 @@
               </div>
               <div class="mg-title-group">
                 <h3 class="mg-col-title">Screen Scanner & Visual Triggers</h3>
-                <span class="mg-col-subtitle">Real-time pattern recognition, image search, and pixel color trigger automation</span>
+                <span class="mg-col-subtitle">Real-time pattern recognition, image search, and pixel color trigger
+                  automation</span>
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
               <!-- Master Start/Stop Shortcut Display -->
-              <div class="ac-hotkey-display" id="ssMasterHotkeyBox" title="Click to record master shortcut (Default: F9)" style="height:36px; padding:0 12px; cursor:pointer;">
+              <div class="ac-hotkey-display" id="ssMasterHotkeyBox"
+                title="Click to record master shortcut (Default: F9)"
+                style="height:36px; padding:0 12px; cursor:pointer;">
                 <svg class="hotkey-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                 </svg>
@@ -2696,7 +2699,9 @@
               </div>
 
               <!-- Master Start / Stop Scan Button -->
-              <button type="button" class="neumorphic-btn ac-toggle-btn ss-master-toggle-btn" id="btnToggleScreenScannerMaster" style="height:36px; padding:0 16px; font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+              <button type="button" class="neumorphic-btn ac-toggle-btn ss-master-toggle-btn"
+                id="btnToggleScreenScannerMaster"
+                style="height:36px; padding:0 16px; font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
@@ -2732,16 +2737,21 @@
                       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
                       <line x1="7" y1="7" x2="7.01" y2="7"></line>
                     </svg>
-                    <input type="text" id="ssInputName" placeholder="Trigger Name (e.g. Auto-Accept, Skip Ad)" autocomplete="off" spellcheck="false" />
+                    <input type="text" id="ssInputName" placeholder="Trigger Name (e.g. Auto-Accept, Skip Ad)"
+                      autocomplete="off" spellcheck="false" />
                   </div>
                   <!-- Shortcut Hotkey Box -->
-                  <div class="inset-input-box key-combo-box" id="ssTriggerBox" style="flex:1; max-width:210px;" title="Click to record trigger shortcut">
+                  <div class="inset-input-box key-combo-box" id="ssTriggerBox" style="flex:1; max-width:210px;"
+                    title="Click to record trigger shortcut">
                     <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                      <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path>
+                      <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10">
+                      </path>
                     </svg>
-                    <input type="text" id="ssInputTrigger" class="key-combo-input" placeholder="Shortcut (e.g. F9)..." readonly autocomplete="off" spellcheck="false" />
-                    <button type="button" class="btn-combo-clear hidden-field" id="ssBtnClearTrigger" title="Clear">&times;</button>
+                    <input type="text" id="ssInputTrigger" class="key-combo-input" placeholder="Shortcut (e.g. F9)..."
+                      readonly autocomplete="off" spellcheck="false" />
+                    <button type="button" class="btn-combo-clear hidden-field" id="ssBtnClearTrigger"
+                      title="Clear">&times;</button>
                   </div>
                 </div>
 
@@ -2750,7 +2760,8 @@
                   <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Detection Method</span>
                   <div class="ac-pill-selector" id="ssModeSelector" style="width:100%;">
                     <button class="ac-pill-btn active" data-mode="image" id="ssBtnModeImage">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:5px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"
+                        style="margin-right:5px;">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         <circle cx="8.5" cy="8.5" r="1.5"></circle>
                         <polyline points="21 15 16 10 5 21"></polyline>
@@ -2758,7 +2769,8 @@
                       Image Search
                     </button>
                     <button class="ac-pill-btn" data-mode="pixel" id="ssBtnModePixel">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:5px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"
+                        style="margin-right:5px;">
                         <path d="m15 11-1 9"></path>
                         <path d="m19 11-4-7"></path>
                         <path d="M2 11h20"></path>
@@ -2767,7 +2779,8 @@
                       Pixel Area
                     </button>
                     <button class="ac-pill-btn" data-mode="point" id="ssBtnModePoint">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:5px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"
+                        style="margin-right:5px;">
                         <circle cx="12" cy="12" r="10"></circle>
                         <line x1="22" y1="12" x2="18" y2="12"></line>
                         <line x1="6" y1="12" x2="2" y2="12"></line>
@@ -2793,13 +2806,18 @@
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                       <polyline points="14 2 14 8 20 8"></polyline>
                     </svg>
-                    <input type="text" id="ssInputImagePath" placeholder="Image File Path..." autocomplete="off" spellcheck="false" />
+                    <input type="text" id="ssInputImagePath" placeholder="Image File Path..." autocomplete="off"
+                      spellcheck="false" />
                   </div>
-                  <button class="neumorphic-btn btn-chip" id="ssBtnBrowseImage" title="Browse for image file" style="padding:0 12px; height:34px;">
+                  <button class="neumorphic-btn btn-chip" id="ssBtnBrowseImage" title="Browse for image file"
+                    style="padding:0 12px; height:34px;">
                     <span>Browse</span>
                   </button>
-                  <button class="neumorphic-btn btn-chip" id="ssBtnSnipImage" title="Crop & Snip image directly from screen" style="color:var(--accent); padding:0 12px; height:34px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:4px;">
+                  <button class="neumorphic-btn btn-chip" id="ssBtnSnipImage"
+                    title="Crop & Snip image directly from screen"
+                    style="color:var(--accent); padding:0 12px; height:34px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"
+                      style="margin-right:4px;">
                       <circle cx="6" cy="6" r="3"></circle>
                       <circle cx="6" cy="18" r="3"></circle>
                       <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
@@ -2811,13 +2829,16 @@
 
                 <!-- Preview & Image Parameters -->
                 <div style="display:flex; gap:14px; align-items:center;">
-                  <div id="ssImagePreviewBox" style="width:48px; height:48px; border-radius:var(--radius-btn); background:var(--bg-inset); border:1px solid var(--border-soft); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+                  <div id="ssImagePreviewBox"
+                    style="width:48px; height:48px; border-radius:var(--radius-btn); background:var(--bg-inset); border:1px solid var(--border-soft); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
                     <span style="font-size:9px; color:var(--text-muted); text-align:center;">No Image</span>
                   </div>
                   <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Shade Tolerance (*n)</span>
-                      <span class="slider-value-badge" id="ssImageVariationVal" style="padding:1px 6px; font-size:11px;">30</span>
+                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Shade Tolerance
+                        (*n)</span>
+                      <span class="slider-value-badge" id="ssImageVariationVal"
+                        style="padding:1px 6px; font-size:11px;">30</span>
                     </div>
                     <input type="range" id="ssImageVariation" min="0" max="100" value="30" class="neumorphic-slider" />
                   </div>
@@ -2832,11 +2853,16 @@
                 </div>
                 <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
                   <div class="inset-input-box" style="flex:1;">
-                    <input type="text" id="ssInputPixelColor" placeholder="#FF0000" value="#FF0000" autocomplete="off" spellcheck="false" />
+                    <input type="text" id="ssInputPixelColor" placeholder="#FF0000" value="#FF0000" autocomplete="off"
+                      spellcheck="false" />
                   </div>
-                  <div id="ssPixelChip" style="width:34px; height:34px; border-radius:var(--radius-btn); background:#FF0000; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;"></div>
-                  <button class="neumorphic-btn btn-chip" id="ssBtnPickColor" title="Pick color directly from screen using loupe" style="height:34px; padding:0 12px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:4px;">
+                  <div id="ssPixelChip"
+                    style="width:34px; height:34px; border-radius:var(--radius-btn); background:#FF0000; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;">
+                  </div>
+                  <button class="neumorphic-btn btn-chip" id="ssBtnPickColor"
+                    title="Pick color directly from screen using loupe" style="height:34px; padding:0 12px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"
+                      style="margin-right:4px;">
                       <path d="m2 22 1-1h3l9-9"></path>
                       <path d="M3 21v-3l9-9"></path>
                       <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9"></path>
@@ -2847,7 +2873,8 @@
                 <div style="display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Shade Tolerance</span>
-                    <span class="slider-value-badge" id="ssPixelVariationVal" style="padding:1px 6px; font-size:11px;">15</span>
+                    <span class="slider-value-badge" id="ssPixelVariationVal"
+                      style="padding:1px 6px; font-size:11px;">15</span>
                   </div>
                   <input type="range" id="ssPixelVariation" min="0" max="100" value="15" class="neumorphic-slider" />
                 </div>
@@ -2863,25 +2890,32 @@
                   <div style="display:flex; align-items:center; gap:5px;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X:</span>
                     <div class="inset-input-box" style="width:76px; height:34px; padding:0 6px;">
-                      <input type="number" id="ssPointX" placeholder="960" value="960" style="text-align:center; font-weight:700;" />
+                      <input type="number" id="ssPointX" placeholder="960" value="960"
+                        style="text-align:center; font-weight:700;" />
                     </div>
                   </div>
                   <div style="display:flex; align-items:center; gap:5px;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y:</span>
                     <div class="inset-input-box" style="width:76px; height:34px; padding:0 6px;">
-                      <input type="number" id="ssPointY" placeholder="540" value="540" style="text-align:center; font-weight:700;" />
+                      <input type="number" id="ssPointY" placeholder="540" value="540"
+                        style="text-align:center; font-weight:700;" />
                     </div>
                   </div>
                   <div style="display:flex; align-items:center; gap:5px;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Color:</span>
                     <div class="inset-input-box" style="width:95px; height:34px; padding:0 6px;">
-                      <input type="text" id="ssInputPointColor" placeholder="#00FF00" value="#00FF00" style="text-align:center; font-weight:700;" />
+                      <input type="text" id="ssInputPointColor" placeholder="#00FF00" value="#00FF00"
+                        style="text-align:center; font-weight:700;" />
                     </div>
-                    <div id="ssPointChip" style="width:30px; height:30px; border-radius:var(--radius-btn); background:#00FF00; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;"></div>
+                    <div id="ssPointChip"
+                      style="width:30px; height:30px; border-radius:var(--radius-btn); background:#00FF00; border:2px solid var(--border-soft); box-shadow:var(--shadow-inset); flex-shrink:0;">
+                    </div>
                   </div>
                 </div>
-                <button class="neumorphic-btn btn-chip" id="ssBtnPickPoint" title="Click anywhere on screen to grab both coordinates and color" style="height:34px; width:100%;">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="margin-right:4px;">
+                <button class="neumorphic-btn btn-chip" id="ssBtnPickPoint"
+                  title="Click anywhere on screen to grab both coordinates and color" style="height:34px; width:100%;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"
+                    style="margin-right:4px;">
                     <circle cx="12" cy="12" r="10"></circle>
                     <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
                   </svg>
@@ -2900,32 +2934,38 @@
                   <button class="ac-pill-btn" data-reg="activeWindow">Active Window</button>
                   <button class="ac-pill-btn" data-reg="custom">Custom Box</button>
                 </div>
-                <div class="hidden-field" id="ssCustomRegionBox" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div class="hidden-field" id="ssCustomRegionBox"
+                  style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                   <div style="display:flex; align-items:center; gap:4px;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X1:</span>
                     <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                      <input type="number" id="ssBoxX1" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
+                      <input type="number" id="ssBoxX1" placeholder="0" value="0"
+                        style="text-align:center; font-weight:700;" />
                     </div>
                   </div>
                   <div style="display:flex; align-items:center; gap:4px;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y1:</span>
                     <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                      <input type="number" id="ssBoxY1" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
+                      <input type="number" id="ssBoxY1" placeholder="0" value="0"
+                        style="text-align:center; font-weight:700;" />
                     </div>
                   </div>
                   <div style="display:flex; align-items:center; gap:4px;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">X2:</span>
                     <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                      <input type="number" id="ssBoxX2" placeholder="1920" value="1920" style="text-align:center; font-weight:700;" />
+                      <input type="number" id="ssBoxX2" placeholder="1920" value="1920"
+                        style="text-align:center; font-weight:700;" />
                     </div>
                   </div>
                   <div style="display:flex; align-items:center; gap:4px;">
                     <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Y2:</span>
                     <div class="inset-input-box" style="width:68px; height:32px; padding:0 4px;">
-                      <input type="number" id="ssBoxY2" placeholder="1080" value="1080" style="text-align:center; font-weight:700;" />
+                      <input type="number" id="ssBoxY2" placeholder="1080" value="1080"
+                        style="text-align:center; font-weight:700;" />
                     </div>
                   </div>
-                  <button class="neumorphic-btn btn-chip" id="ssBtnSelectArea" title="Drag rectangle on screen to set coordinates" style="height:32px; padding:0 10px;">
+                  <button class="neumorphic-btn btn-chip" id="ssBtnSelectArea"
+                    title="Drag rectangle on screen to set coordinates" style="height:32px; padding:0 10px;">
                     <span>Draw Box</span>
                   </button>
                 </div>
@@ -2942,7 +2982,8 @@
                   <span class="setting-title">Action When Detected</span>
                   <span class="hint-tag">Execute</span>
                 </div>
-                <div class="ac-pill-selector" id="ssActionSelector" style="width:100%; margin-bottom:12px; flex-wrap:wrap;">
+                <div class="ac-pill-selector" id="ssActionSelector"
+                  style="width:100%; margin-bottom:12px; flex-wrap:wrap;">
                   <button class="ac-pill-btn active" data-act="click">Click</button>
                   <button class="ac-pill-btn" data-act="mouseScript">Mouse Script</button>
                   <button class="ac-pill-btn" data-act="macro">Macro</button>
@@ -2953,7 +2994,8 @@
                 <!-- Action Details: Click -->
                 <div id="ssActionDetailClick" style="display:flex; flex-direction:column; gap:10px;">
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Button:</span>
+                    <span
+                      style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Button:</span>
                     <div class="ac-pill-selector" id="ssClickBtnSelector" style="flex:1;">
                       <button class="ac-pill-btn active" data-btn="Left">Left</button>
                       <button class="ac-pill-btn" data-btn="Double">Double</button>
@@ -2964,16 +3006,19 @@
                   </div>
                   <div style="display:flex; align-items:center; gap:16px;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Offset X:</span>
+                      <span style="font-size:11px; font-weight:600; color:var(--text-secondary); width:48px;">Offset
+                        X:</span>
                       <div class="inset-input-box" style="width:72px; height:32px; padding:0 6px;">
-                        <input type="number" id="ssClickOffsetX" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
+                        <input type="number" id="ssClickOffsetX" placeholder="0" value="0"
+                          style="text-align:center; font-weight:700;" />
                       </div>
                       <span style="font-size:10px; color:var(--text-muted);">px</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
                       <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Offset Y:</span>
                       <div class="inset-input-box" style="width:72px; height:32px; padding:0 6px;">
-                        <input type="number" id="ssClickOffsetY" placeholder="0" value="0" style="text-align:center; font-weight:700;" />
+                        <input type="number" id="ssClickOffsetY" placeholder="0" value="0"
+                          style="text-align:center; font-weight:700;" />
                       </div>
                       <span style="font-size:10px; color:var(--text-muted);">px</span>
                     </div>
@@ -2981,7 +3026,8 @@
                 </div>
 
                 <!-- Action Details: Mouse Script -->
-                <div class="hidden-field" id="ssActionDetailMouseScript" style="display:flex; gap:10px; align-items:center;">
+                <div class="hidden-field" id="ssActionDetailMouseScript"
+                  style="display:flex; gap:10px; align-items:center;">
                   <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Script:</span>
                   <div class="custom-select-wrapper" style="flex:1;">
                     <select id="ssSelectMouseScript" class="custom-select"></select>
@@ -3059,7 +3105,8 @@
                     <span style="font-size:10px; font-weight:600; color:var(--text-secondary);">Cooldown Delay</span>
                     <div style="display:flex; align-items:center; gap:4px;">
                       <div class="inset-input-box" style="flex:1; height:32px; padding:0 6px;">
-                        <input type="number" id="ssDebounceInput" min="0.1" max="60" step="0.5" value="2.0" style="text-align:center; font-weight:700;" />
+                        <input type="number" id="ssDebounceInput" min="0.1" max="60" step="0.5" value="2.0"
+                          style="text-align:center; font-weight:700;" />
                       </div>
                       <span style="font-size:10px; color:var(--text-muted);">sec</span>
                     </div>
@@ -3067,7 +3114,8 @@
                 </div>
 
                 <!-- Alert Toggles -->
-                <div style="display:flex; gap:16px; align-items:center; padding-top:10px; border-top:1px solid var(--border-soft);">
+                <div
+                  style="display:flex; gap:16px; align-items:center; padding-top:10px; border-top:1px solid var(--border-soft);">
                   <div style="display:flex; align-items:center; gap:6px;">
                     <div class="toggle-wrapper">
                       <input class="toggle-checkbox" type="checkbox" id="ssOptSound" checked>
@@ -3094,32 +3142,39 @@
           </div>
 
           <!-- Centered High-Visibility Action Buttons -->
-          <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin: 18px 0 16px 0; width:100%;">
+          <div
+            style="display:flex; justify-content:center; align-items:center; gap:12px; margin: 18px 0 16px 0; width:100%;">
             <button class="neumorphic-btn ss-btn-add-primary" id="ssBtnAddTrigger" type="button">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" style="margin-right:8px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"
+                style="margin-right:8px;">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
               <span id="ssBtnAddTriggerText">ADD VISUAL TRIGGER</span>
             </button>
-            <button class="neumorphic-btn btn-chip hidden-field" id="ssBtnCancelEdit" type="button" style="height:44px; padding:0 22px; font-size:12px; font-weight:700; color:var(--text-muted);" title="Cancel editing">
+            <button class="neumorphic-btn btn-chip hidden-field" id="ssBtnCancelEdit" type="button"
+              style="height:44px; padding:0 22px; font-size:12px; font-weight:700; color:var(--text-muted);"
+              title="Cancel editing">
               <span>Cancel</span>
             </button>
           </div>
 
           <!-- Active Visual Triggers List Section -->
           <div class="list-section" style="margin-top:4px; width:100%;">
-            <div class="list-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div class="list-header"
+              style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <div class="list-header-left" style="display:flex; align-items:center; gap:8px;">
                 <span class="section-label">Configured Visual Triggers</span>
                 <span class="section-count" id="ssCountBadge">0</span>
               </div>
               <div class="inset-input-box search-box" style="width:240px; height:34px;">
-                <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; margin-left:8px;">
+                <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  style="width:14px; height:14px; margin-left:8px;">
                   <circle cx="11" cy="11" r="8"></circle>
                   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <input type="text" id="ssSearchFilter" placeholder="Filter triggers..." autocomplete="off" spellcheck="false" style="padding-left:4px;" />
+                <input type="text" id="ssSearchFilter" placeholder="Filter triggers..." autocomplete="off"
+                  spellcheck="false" style="padding-left:4px;" />
               </div>
             </div>
             <div class="shortcuts-list" id="ssListContainer" style="width:100%;"></div>
@@ -3128,852 +3183,854 @@
         </div>
       </section>
 
-  
 
-  </main>
 
-  <!-- Window Resize Handles (Full perimeter: 4 edges + 4 corners) -->
-  <div class="resize-handle handle-n" data-direction="n" title="Resize Height"></div>
-  <div class="resize-handle handle-s" data-direction="s" title="Resize Height"></div>
-  <div class="resize-handle handle-e" data-direction="e" title="Resize Width"></div>
-  <div class="resize-handle handle-w" data-direction="w" title="Resize Width"></div>
-  <div class="resize-handle handle-nw" data-direction="nw" title="Resize Window"></div>
-  <div class="resize-handle handle-ne" data-direction="ne" title="Resize Window"></div>
-  <div class="resize-handle handle-sw" data-direction="sw" title="Resize Window"></div>
-  <div class="resize-handle handle-se" data-direction="se" title="Resize Window">
-    <span class="resize-grip-line"></span>
-    <span class="resize-grip-line"></span>
-  </div>
+    </main>
 
-  <!-- Neumorphic Theme Customizer Full Page View -->
-  <div class="modal-overlay theme-page-view hidden-field" id="themeModal">
-    <div class="theme-modal-card">
-      <div class="theme-page-header">
-        <div class="theme-header-left">
-          <button class="squircle-btn btn-back" id="btnBackThemeModal" title="Back to Dashboard">
-            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-          </button>
-          <div class="theme-header-info">
-            <h2 class="modal-title">Theme & Appearance Studio</h2>
-            <span class="modal-subtitle">Customize palettes, accent colors, and 3D neumorphic lighting geometry</span>
+    <!-- Window Resize Handles (Full perimeter: 4 edges + 4 corners) -->
+    <div class="resize-handle handle-n" data-direction="n" title="Resize Height"></div>
+    <div class="resize-handle handle-s" data-direction="s" title="Resize Height"></div>
+    <div class="resize-handle handle-e" data-direction="e" title="Resize Width"></div>
+    <div class="resize-handle handle-w" data-direction="w" title="Resize Width"></div>
+    <div class="resize-handle handle-nw" data-direction="nw" title="Resize Window"></div>
+    <div class="resize-handle handle-ne" data-direction="ne" title="Resize Window"></div>
+    <div class="resize-handle handle-sw" data-direction="sw" title="Resize Window"></div>
+    <div class="resize-handle handle-se" data-direction="se" title="Resize Window">
+      <span class="resize-grip-line"></span>
+      <span class="resize-grip-line"></span>
+    </div>
+
+    <!-- Neumorphic Theme Customizer Full Page View -->
+    <div class="modal-overlay theme-page-view hidden-field" id="themeModal">
+      <div class="theme-modal-card">
+        <div class="theme-page-header">
+          <div class="theme-header-left">
+            <button class="squircle-btn btn-back" id="btnBackThemeModal" title="Back to Dashboard">
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </button>
+            <div class="theme-header-info">
+              <h2 class="modal-title">Theme & Appearance Studio</h2>
+              <span class="modal-subtitle">Customize palettes, accent colors, and 3D neumorphic lighting geometry</span>
+            </div>
+          </div>
+          <div class="theme-header-actions">
+            <button class="neumorphic-btn btn-chip" id="btnResetTheme" title="Reset to Warm Clay Default">
+              <span>Reset to Default</span>
+            </button>
+            <button class="neumorphic-btn btn-go" id="btnSaveTheme" title="Apply and save current theme">
+              <span>APPLY</span>
+            </button>
+            <button class="squircle-btn btn-mini" id="btnCloseThemeModal" title="Close Theme Studio">
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
         </div>
-        <div class="theme-header-actions">
-          <button class="neumorphic-btn btn-chip" id="btnResetTheme" title="Reset to Warm Clay Default">
-            <span>Reset to Default</span>
-          </button>
-          <button class="neumorphic-btn btn-go" id="btnSaveTheme" title="Apply and save current theme">
-            <span>APPLY</span>
-          </button>
-          <button class="squircle-btn btn-mini" id="btnCloseThemeModal" title="Close Theme Studio">
+
+        <div class="theme-modal-body">
+          <!-- Left Column: Curated & Custom Presets -->
+          <div class="theme-page-col theme-page-col-presets">
+            <!-- Curated Presets Section -->
+            <div class="theme-section">
+              <div class="theme-section-header">
+                <span class="theme-section-title">Curated Neumorphic Themes</span>
+                <span class="theme-section-subtitle">Handcrafted palettes with harmonic shadow depths and accent
+                  colors</span>
+              </div>
+              <div class="theme-swatches-grid" id="bgSwatchesGrid">
+                <button class="theme-swatch-chip theme-card-chip active" data-preset="custom-default"
+                  data-color="#e8dfd5" title="Warm Clay (Default) (Balanced warm clay with warm amber accent)"
+                  aria-label="Warm Clay (Default)"
+                  style="background-color: #e8dfd5; border-color: #d97706; color: #d97706; border-radius: 5px; box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.08), -2px -2px 6px rgba(255, 255, 255, 0.8);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="brutalist-amber" data-color="#f59e0b"
+                  title="Brutalist Amber (Vivid amber pop with zero blur hard-edge comic shadows and chiseled edges)"
+                  aria-label="Brutalist Amber"
+                  style="background-color: #f59e0b; border-color: #1e1b4b; color: #1e1b4b; border-radius: 2px; box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.55), -5px -5px 0px rgba(255, 255, 255, 0.65);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="marshmallow-indigo" data-color="#4f46e5"
+                  title="Marshmallow Indigo (Electric indigo with soft lemon cream in an ultra-pill marshmallow 3D cloud)"
+                  aria-label="Marshmallow Indigo"
+                  style="background-color: #4f46e5; border-color: #fde047; color: #fde047; border-radius: 42px; box-shadow: 6px 6px 18px rgba(0, 0, 0, 0.53), -6px -6px 18px rgba(255, 255, 255, 0.44);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="porcelain-ceramic" data-color="#f1f5f9"
+                  title="Porcelain Ceramic (High-key sculpted slate white ceramic with royal sapphire blue and specular glow)"
+                  aria-label="Porcelain Ceramic"
+                  style="background-color: #f1f5f9; border-color: #2563eb; color: #2563eb; border-radius: 28px; box-shadow: 5px 5px 16px rgba(0, 0, 0, 0.22), -5px -5px 16px rgba(255, 255, 255, 0.65);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="solar-tangerine" data-color="#ea580c"
+                  title="Solar Tangerine (Punchy fire tangerine orange clay with radiant sunbeam cream highlights)"
+                  aria-label="Solar Tangerine"
+                  style="background-color: #ea580c; border-color: #fef08a; color: #fef08a; border-radius: 34px; box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.46), -4px -4px 12px rgba(255, 255, 255, 0.42);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="matrix-terminal" data-color="#052e16"
+                  title="Matrix CRT (Deep phosphor CRT green terminal with crisp sunken bevel and phosphor laser text)"
+                  aria-label="Matrix CRT"
+                  style="background-color: #052e16; border-color: #22c55e; color: #22c55e; border-radius: 4px; box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.55), -2px -2px 2px rgba(255, 255, 255, 0.44);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="cyber-cyan" data-color="#0891b2"
+                  title="Cyber Cyan (Vivid Mediterranean electric cyan clay with high-saturation lemon triggers)"
+                  aria-label="Cyber Cyan"
+                  style="background-color: #0891b2; border-color: #fef08a; color: #fef08a; border-radius: 18px; box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.35), -3px -3px 6px rgba(255, 255, 255, 0.39);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="brutalist-concrete" data-color="#78716c"
+                  title="Brutalist Concrete (Raw architectural concrete stone with safety orange and 1px hard-relief shadow)"
+                  aria-label="Brutalist Concrete"
+                  style="background-color: #78716c; border-color: #f97316; color: #f97316; border-radius: 3px; box-shadow: 4px 4px 1px rgba(0, 0, 0, 0.55), -4px -4px 1px rgba(255, 255, 255, 0.55);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="midnight-violet" data-color="#3b0764"
+                  title="Midnight Violet (Deep royal ultraviolet plum with fluorescent neon fuchsia pop)"
+                  aria-label="Midnight Violet"
+                  style="background-color: #3b0764; border-color: #f43f5e; color: #f43f5e; border-radius: 24px; box-shadow: 5px 5px 14px rgba(0, 0, 0, 0.55), -5px -5px 14px rgba(255, 255, 255, 0.35);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="spearmint-gelato" data-color="#6ee7b7"
+                  title="Spearmint Gelato (Fresh spearmint gelato clay with deep blackberry wine contrast and high-radius curve)"
+                  aria-label="Spearmint Gelato"
+                  style="background-color: #6ee7b7; border-color: #831843; color: #831843; border-radius: 38px; box-shadow: 5px 5px 14px rgba(0, 0, 0, 0.31), -5px -5px 14px rgba(255, 255, 255, 0.53);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="garnet-obsidian" data-color="#450a0a"
+                  title="Garnet Obsidian (Deep chiseled crimson mahogany gemstone with coral rose illumination)"
+                  aria-label="Garnet Obsidian"
+                  style="background-color: #450a0a; border-color: #fb7185; color: #fb7185; border-radius: 8px; box-shadow: 3px 3px 9px rgba(0, 0, 0, 0.55), -3px -3px 9px rgba(255, 255, 255, 0.26);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="abyssal-ocean" data-color="#0e2a47"
+                  title="Abyssal Ocean (Deep navy sapphire oceanic abyss with electric cyan telemetry glow)"
+                  aria-label="Abyssal Ocean"
+                  style="background-color: #0e2a47; border-color: #38bdf8; color: #38bdf8; border-radius: 16px; box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.55), -4px -4px 10px rgba(255, 255, 255, 0.29);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="roasted-cocoa" data-color="#351c14"
+                  title="Roasted Cocoa (Dark artisanal roasted coffee and cocoa bean with molten amber gold accents)"
+                  aria-label="Roasted Cocoa"
+                  style="background-color: #351c14; border-color: #fbbf24; color: #fbbf24; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.55), -2px -2px 5px rgba(255, 255, 255, 0.24);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="bubblegum-magenta" data-color="#db2777"
+                  title="Bubblegum Magenta (Bold electric hot magenta clay with sunburst yellow highlights)"
+                  aria-label="Bubblegum Magenta"
+                  style="background-color: #db2777; border-color: #fef08a; color: #fef08a; border-radius: 30px; box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.42), -5px -5px 15px rgba(255, 255, 255, 0.46);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="lilac-cloud" data-color="#c4b5fd"
+                  title="Lilac Cloud (Soft dream lavender lilac clay with regal royal violet depth)"
+                  aria-label="Lilac Cloud"
+                  style="background-color: #c4b5fd; border-color: #4c1d95; color: #4c1d95; border-radius: 22px; box-shadow: 3px 3px 11px rgba(0, 0, 0, 0.24), -3px -3px 11px rgba(255, 255, 255, 0.40);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="matte-titanium" data-color="#1e293b"
+                  title="Matte Titanium (Tactical gunmetal stealth titanium with hyper cyan aerospace accents)"
+                  aria-label="Matte Titanium"
+                  style="background-color: #1e293b; border-color: #06b6d4; color: #06b6d4; border-radius: 12px; box-shadow: 2px 2px 7px rgba(0, 0, 0, 0.50), -2px -2px 7px rgba(255, 255, 255, 0.24);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="dribbble-soft-gray" data-color="#e0e5ec"
+                  title="Dribbble Soft Canvas (The iconic Dribbble benchmark Neumorphic soft clay canvas with electric royal blue accent)"
+                  aria-label="Dribbble Soft Canvas"
+                  style="background-color: #e0e5ec; border-color: #3b82f6; color: #3b82f6; border-radius: 16px; box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.20), -4px -4px 10px rgba(255, 255, 255, 0.65);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+
+                <button class="theme-swatch-chip theme-card-chip" data-preset="graphite-carbon" data-color="#24272c"
+                  title="Graphite Studio (Hi-Fi studio dark graphite with glowing neon cyan indicators)"
+                  aria-label="Graphite Studio"
+                  style="background-color: #24272c; border-color: #00f2fe; color: #00f2fe; border-radius: 12px; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.46), -3px -3px 8px rgba(255, 255, 255, 0.20);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="nordic-linen" data-color="#dfd9ce"
+                  title="Nordic Linen (Minimalist Scandinavian warm linen clay with rich cognac amber accents)"
+                  aria-label="Nordic Linen"
+                  style="background-color: #dfd9ce; border-color: #92400e; color: #92400e; border-radius: 10px; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.22), -3px -3px 8px rgba(255, 255, 255, 0.65);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="eucalyptus-mist" data-color="#d4ded6"
+                  title="Eucalyptus Mist (Organic calming herbal eucalyptus clay with deep emerald accents)"
+                  aria-label="Eucalyptus Mist"
+                  style="background-color: #d4ded6; border-color: #065f46; color: #065f46; border-radius: 16px; box-shadow: 3px 3px 9px rgba(0, 0, 0, 0.24), -3px -3px 9px rgba(255, 255, 255, 0.65);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="obsidian-gold" data-color="#1e1e24"
+                  title="Obsidian Gold (Luxury executive dark obsidian clay with polished gold accents)"
+                  aria-label="Obsidian Gold"
+                  style="background-color: #1e1e24; border-color: #f59e0b; color: #f59e0b; border-radius: 10px; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.53), -3px -3px 8px rgba(255, 255, 255, 0.18);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="dusty-blush" data-color="#ebdcd9"
+                  title="Dusty Blush (Soft rose quartz cosmetic clay with rich deep crimson accents)"
+                  aria-label="Dusty Blush"
+                  style="background-color: #ebdcd9; border-color: #9f1239; color: #9f1239; border-radius: 18px; box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.22), -4px -4px 10px rgba(255, 255, 255, 0.65);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button class="theme-swatch-chip theme-card-chip" data-preset="synth-slate" data-color="#2b2d42"
+                  title="Synthwave Slate (Deep twilight slate console with vibrant electric neon magenta accents)"
+                  aria-label="Synthwave Slate"
+                  style="background-color: #2b2d42; border-color: #ff007f; color: #ff007f; border-radius: 12px; box-shadow: 4px 4px 9px rgba(0, 0, 0, 0.42), -4px -4px 9px rgba(255, 255, 255, 0.24);">
+                  <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom Theme Presets Section -->
+            <div class="theme-section">
+              <div class="theme-section-header">
+                <span class="theme-section-title">Custom Theme Presets</span>
+                <span class="theme-section-subtitle">Save your current color and geometry configuration as a reusable
+                  preset</span>
+              </div>
+
+              <div class="custom-preset-save-row">
+                <div class="inset-input-box custom-preset-input-box">
+                  <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                  <input type="text" id="inputCustomPresetName" placeholder="Preset name (e.g. My Dark Clay)..."
+                    autocomplete="off" spellcheck="false" class="custom-preset-name-input" />
+                </div>
+                <button type="button" class="neumorphic-btn btn-go btn-save-preset" id="btnSaveCustomPreset"
+                  title="Save current theme as a custom preset">
+                  <span>SAVE PRESET</span>
+                </button>
+              </div>
+
+              <div class="theme-swatches-grid custom-presets-grid" id="customPresetsGrid"></div>
+            </div>
+          </div>
+
+          <!-- Right Column: Color Pickers, Geometry Sliders & Live Preview -->
+          <div class="theme-page-col theme-page-col-controls">
+            <!-- Interactive Live Preview Box -->
+            <div class="theme-live-preview-box">
+              <div class="theme-preview-label">Live Neumorphic Preview</div>
+              <div class="theme-preview-components">
+                <button type="button" class="neumorphic-btn btn-go"
+                  style="height: 38px; min-width: 80px; font-size: 12px; pointer-events: none;">
+                  <span>BUTTON</span>
+                </button>
+                <div class="inset-input-box" style="height: 38px; flex: 1; pointer-events: none; padding: 0 12px;">
+                  <span style="font-size: 11px; color: var(--text-muted);">Inset Input...</span>
+                </div>
+                <button type="button" class="neumorphic-toggle-pill active" style="height: 38px; pointer-events: none;">
+                  <span>ACTIVE</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Background Color Section -->
+            <div class="theme-section">
+              <div class="theme-section-header">
+                <span class="theme-section-title">Background Color</span>
+              </div>
+              <div class="custom-color-row">
+                <span class="custom-label">Custom Background Color:</span>
+                <div class="color-picker-input-wrap">
+                  <div class="color-picker-chip" title="Click to open color palette">
+                    <input type="color" id="themeBgColorPicker" value="#e8dfd5" class="neumorphic-color-picker" />
+                    <svg class="color-picker-badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2.2">
+                      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+                      <path
+                        d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.992 6.012 17.461 2 12 2z">
+                      </path>
+                    </svg>
+                  </div>
+                  <input type="text" id="themeBgHex" value="#E8DFD5" maxlength="7" spellcheck="false"
+                    class="color-hex-input" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Elements (Secondary / Accent) Color Section -->
+            <div class="theme-section">
+              <div class="theme-section-header">
+                <span class="theme-section-title">Elements Color (Secondary / Accent)</span>
+              </div>
+              <div class="custom-color-row">
+                <span class="custom-label">Custom Accent Color:</span>
+                <div class="color-picker-input-wrap">
+                  <div class="color-picker-chip" title="Click to open color palette">
+                    <input type="color" id="themeAccentColorPicker" value="#d97706" class="neumorphic-color-picker" />
+                    <svg class="color-picker-badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2.2">
+                      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+                      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+                      <path
+                        d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.992 6.012 17.461 2 12 2z">
+                      </path>
+                    </svg>
+                  </div>
+                  <input type="text" id="themeAccentHex" value="#D97706" maxlength="7" spellcheck="false"
+                    class="color-hex-input" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Neumorphism Controls Section (Radius, Distance, Intensity, Blur) -->
+            <div class="theme-section">
+              <div class="theme-section-header">
+                <span class="theme-section-title">Neumorphism Effect Controls</span>
+              </div>
+              <div class="neo-sliders-grid">
+                <!-- Radius Slider -->
+                <div class="neo-slider-row">
+                  <div class="neo-slider-label-group">
+                    <span class="neo-slider-label">Radius</span>
+                    <span class="neo-slider-badge" id="badgeRadius">5px</span>
+                  </div>
+                  <div class="neo-slider-track-wrap">
+                    <input type="range" id="themeSliderRadius" min="0" max="60" step="1" value="5"
+                      class="neumorphic-slider" />
+                  </div>
+                </div>
+
+                <!-- Distance Slider -->
+                <div class="neo-slider-row">
+                  <div class="neo-slider-label-group">
+                    <span class="neo-slider-label">Distance</span>
+                    <span class="neo-slider-badge" id="badgeDistance">4px</span>
+                  </div>
+                  <div class="neo-slider-track-wrap">
+                    <input type="range" id="themeSliderDistance" min="1" max="10" step="1" value="4"
+                      class="neumorphic-slider" />
+                  </div>
+                </div>
+
+                <!-- Top Light Shadow Intensity Slider -->
+                <div class="neo-slider-row">
+                  <div class="neo-slider-label-group">
+                    <span class="neo-slider-label">Light Shadow</span>
+                    <span class="neo-slider-badge" id="badgeLightIntensity">39%</span>
+                  </div>
+                  <div class="neo-slider-track-wrap">
+                    <input type="range" id="themeSliderLightIntensity" min="1" max="100" step="1" value="39"
+                      class="neumorphic-slider" />
+                  </div>
+                </div>
+
+                <!-- Bottom Dark Shadow Intensity Slider -->
+                <div class="neo-slider-row">
+                  <div class="neo-slider-label-group">
+                    <span class="neo-slider-label">Dark Shadow</span>
+                    <span class="neo-slider-badge" id="badgeDarkIntensity">5%</span>
+                  </div>
+                  <div class="neo-slider-track-wrap">
+                    <input type="range" id="themeSliderDarkIntensity" min="1" max="100" step="1" value="5"
+                      class="neumorphic-slider" />
+                  </div>
+                </div>
+
+                <!-- Blur Slider -->
+                <div class="neo-slider-row">
+                  <div class="neo-slider-label-group">
+                    <span class="neo-slider-label">Blur</span>
+                    <span class="neo-slider-badge" id="badgeBlur">9px</span>
+                  </div>
+                  <div class="neo-slider-track-wrap">
+                    <input type="range" id="themeSliderBlur" min="0" max="25" step="1" value="9"
+                      class="neumorphic-slider" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profile Switch Notification Style Section -->
+            <div class="theme-section">
+              <div class="theme-section-header">
+                <span class="theme-section-title">Profile Switch Notification</span>
+                <span class="theme-section-subtitle">Choose how profile switches are displayed on your screen</span>
+              </div>
+              <div class="theme-toggle-row">
+                <div class="theme-toggle-label-group">
+                  <span class="theme-toggle-label">Icon Only Notification</span>
+                  <span class="theme-toggle-desc">Show only the profile icon without the text pill</span>
+                </div>
+                <div class="toggle-wrapper" title="Show only icon in profile notification">
+                  <input class="toggle-checkbox" type="checkbox" id="themeOsdIconOnly">
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Setup & Auto-Switch Configuration Modal -->
+    <div class="modal-overlay hidden-field" id="profileModal">
+      <div class="profile-config-dialog" id="profileConfigCard">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <svg class="icon-svg" style="color:var(--accent-primary);" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <h3 class="modal-title" id="profileModalTitle">CREATE APP PROFILE</h3>
+          </div>
+          <button class="squircle-btn btn-mini" id="btnCloseProfileModal" title="Close (Esc)">
             <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
         </div>
-      </div>
 
-      <div class="theme-modal-body">
-        <!-- Left Column: Curated & Custom Presets -->
-        <div class="theme-page-col theme-page-col-presets">
-          <!-- Curated Presets Section -->
-          <div class="theme-section">
-            <div class="theme-section-header">
-              <span class="theme-section-title">Curated Neumorphic Themes</span>
-              <span class="theme-section-subtitle">Handcrafted palettes with harmonic shadow depths and accent
-                colors</span>
-            </div>
-            <div class="theme-swatches-grid" id="bgSwatchesGrid">
-              <button class="theme-swatch-chip theme-card-chip active" data-preset="custom-default" data-color="#e8dfd5"
-                title="Warm Clay (Default) (Balanced warm clay with warm amber accent)" aria-label="Warm Clay (Default)"
-                style="background-color: #e8dfd5; border-color: #d97706; color: #d97706; border-radius: 5px; box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.08), -2px -2px 6px rgba(255, 255, 255, 0.8);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="brutalist-amber" data-color="#f59e0b"
-                title="Brutalist Amber (Vivid amber pop with zero blur hard-edge comic shadows and chiseled edges)"
-                aria-label="Brutalist Amber"
-                style="background-color: #f59e0b; border-color: #1e1b4b; color: #1e1b4b; border-radius: 2px; box-shadow: 5px 5px 0px rgba(0, 0, 0, 0.55), -5px -5px 0px rgba(255, 255, 255, 0.65);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="marshmallow-indigo" data-color="#4f46e5"
-                title="Marshmallow Indigo (Electric indigo with soft lemon cream in an ultra-pill marshmallow 3D cloud)"
-                aria-label="Marshmallow Indigo"
-                style="background-color: #4f46e5; border-color: #fde047; color: #fde047; border-radius: 42px; box-shadow: 6px 6px 18px rgba(0, 0, 0, 0.53), -6px -6px 18px rgba(255, 255, 255, 0.44);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="porcelain-ceramic" data-color="#f1f5f9"
-                title="Porcelain Ceramic (High-key sculpted slate white ceramic with royal sapphire blue and specular glow)"
-                aria-label="Porcelain Ceramic"
-                style="background-color: #f1f5f9; border-color: #2563eb; color: #2563eb; border-radius: 28px; box-shadow: 5px 5px 16px rgba(0, 0, 0, 0.22), -5px -5px 16px rgba(255, 255, 255, 0.65);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="solar-tangerine" data-color="#ea580c"
-                title="Solar Tangerine (Punchy fire tangerine orange clay with radiant sunbeam cream highlights)"
-                aria-label="Solar Tangerine"
-                style="background-color: #ea580c; border-color: #fef08a; color: #fef08a; border-radius: 34px; box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.46), -4px -4px 12px rgba(255, 255, 255, 0.42);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="matrix-terminal" data-color="#052e16"
-                title="Matrix CRT (Deep phosphor CRT green terminal with crisp sunken bevel and phosphor laser text)"
-                aria-label="Matrix CRT"
-                style="background-color: #052e16; border-color: #22c55e; color: #22c55e; border-radius: 4px; box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.55), -2px -2px 2px rgba(255, 255, 255, 0.44);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="cyber-cyan" data-color="#0891b2"
-                title="Cyber Cyan (Vivid Mediterranean electric cyan clay with high-saturation lemon triggers)"
-                aria-label="Cyber Cyan"
-                style="background-color: #0891b2; border-color: #fef08a; color: #fef08a; border-radius: 18px; box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.35), -3px -3px 6px rgba(255, 255, 255, 0.39);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="brutalist-concrete" data-color="#78716c"
-                title="Brutalist Concrete (Raw architectural concrete stone with safety orange and 1px hard-relief shadow)"
-                aria-label="Brutalist Concrete"
-                style="background-color: #78716c; border-color: #f97316; color: #f97316; border-radius: 3px; box-shadow: 4px 4px 1px rgba(0, 0, 0, 0.55), -4px -4px 1px rgba(255, 255, 255, 0.55);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="midnight-violet" data-color="#3b0764"
-                title="Midnight Violet (Deep royal ultraviolet plum with fluorescent neon fuchsia pop)"
-                aria-label="Midnight Violet"
-                style="background-color: #3b0764; border-color: #f43f5e; color: #f43f5e; border-radius: 24px; box-shadow: 5px 5px 14px rgba(0, 0, 0, 0.55), -5px -5px 14px rgba(255, 255, 255, 0.35);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="spearmint-gelato" data-color="#6ee7b7"
-                title="Spearmint Gelato (Fresh spearmint gelato clay with deep blackberry wine contrast and high-radius curve)"
-                aria-label="Spearmint Gelato"
-                style="background-color: #6ee7b7; border-color: #831843; color: #831843; border-radius: 38px; box-shadow: 5px 5px 14px rgba(0, 0, 0, 0.31), -5px -5px 14px rgba(255, 255, 255, 0.53);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="garnet-obsidian" data-color="#450a0a"
-                title="Garnet Obsidian (Deep chiseled crimson mahogany gemstone with coral rose illumination)"
-                aria-label="Garnet Obsidian"
-                style="background-color: #450a0a; border-color: #fb7185; color: #fb7185; border-radius: 8px; box-shadow: 3px 3px 9px rgba(0, 0, 0, 0.55), -3px -3px 9px rgba(255, 255, 255, 0.26);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="abyssal-ocean" data-color="#0e2a47"
-                title="Abyssal Ocean (Deep navy sapphire oceanic abyss with electric cyan telemetry glow)"
-                aria-label="Abyssal Ocean"
-                style="background-color: #0e2a47; border-color: #38bdf8; color: #38bdf8; border-radius: 16px; box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.55), -4px -4px 10px rgba(255, 255, 255, 0.29);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="roasted-cocoa" data-color="#351c14"
-                title="Roasted Cocoa (Dark artisanal roasted coffee and cocoa bean with molten amber gold accents)"
-                aria-label="Roasted Cocoa"
-                style="background-color: #351c14; border-color: #fbbf24; color: #fbbf24; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.55), -2px -2px 5px rgba(255, 255, 255, 0.24);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="bubblegum-magenta" data-color="#db2777"
-                title="Bubblegum Magenta (Bold electric hot magenta clay with sunburst yellow highlights)"
-                aria-label="Bubblegum Magenta"
-                style="background-color: #db2777; border-color: #fef08a; color: #fef08a; border-radius: 30px; box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.42), -5px -5px 15px rgba(255, 255, 255, 0.46);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="lilac-cloud" data-color="#c4b5fd"
-                title="Lilac Cloud (Soft dream lavender lilac clay with regal royal violet depth)"
-                aria-label="Lilac Cloud"
-                style="background-color: #c4b5fd; border-color: #4c1d95; color: #4c1d95; border-radius: 22px; box-shadow: 3px 3px 11px rgba(0, 0, 0, 0.24), -3px -3px 11px rgba(255, 255, 255, 0.40);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="matte-titanium" data-color="#1e293b"
-                title="Matte Titanium (Tactical gunmetal stealth titanium with hyper cyan aerospace accents)"
-                aria-label="Matte Titanium"
-                style="background-color: #1e293b; border-color: #06b6d4; color: #06b6d4; border-radius: 12px; box-shadow: 2px 2px 7px rgba(0, 0, 0, 0.50), -2px -2px 7px rgba(255, 255, 255, 0.24);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="dribbble-soft-gray" data-color="#e0e5ec"
-                title="Dribbble Soft Canvas (The iconic Dribbble benchmark Neumorphic soft clay canvas with electric royal blue accent)"
-                aria-label="Dribbble Soft Canvas"
-                style="background-color: #e0e5ec; border-color: #3b82f6; color: #3b82f6; border-radius: 16px; box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.20), -4px -4px 10px rgba(255, 255, 255, 0.65);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-
-              <button class="theme-swatch-chip theme-card-chip" data-preset="graphite-carbon" data-color="#24272c"
-                title="Graphite Studio (Hi-Fi studio dark graphite with glowing neon cyan indicators)"
-                aria-label="Graphite Studio"
-                style="background-color: #24272c; border-color: #00f2fe; color: #00f2fe; border-radius: 12px; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.46), -3px -3px 8px rgba(255, 255, 255, 0.20);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="nordic-linen" data-color="#dfd9ce"
-                title="Nordic Linen (Minimalist Scandinavian warm linen clay with rich cognac amber accents)"
-                aria-label="Nordic Linen"
-                style="background-color: #dfd9ce; border-color: #92400e; color: #92400e; border-radius: 10px; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.22), -3px -3px 8px rgba(255, 255, 255, 0.65);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="eucalyptus-mist" data-color="#d4ded6"
-                title="Eucalyptus Mist (Organic calming herbal eucalyptus clay with deep emerald accents)"
-                aria-label="Eucalyptus Mist"
-                style="background-color: #d4ded6; border-color: #065f46; color: #065f46; border-radius: 16px; box-shadow: 3px 3px 9px rgba(0, 0, 0, 0.24), -3px -3px 9px rgba(255, 255, 255, 0.65);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="obsidian-gold" data-color="#1e1e24"
-                title="Obsidian Gold (Luxury executive dark obsidian clay with polished gold accents)"
-                aria-label="Obsidian Gold"
-                style="background-color: #1e1e24; border-color: #f59e0b; color: #f59e0b; border-radius: 10px; box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.53), -3px -3px 8px rgba(255, 255, 255, 0.18);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="dusty-blush" data-color="#ebdcd9"
-                title="Dusty Blush (Soft rose quartz cosmetic clay with rich deep crimson accents)"
-                aria-label="Dusty Blush"
-                style="background-color: #ebdcd9; border-color: #9f1239; color: #9f1239; border-radius: 18px; box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.22), -4px -4px 10px rgba(255, 255, 255, 0.65);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-              <button class="theme-swatch-chip theme-card-chip" data-preset="synth-slate" data-color="#2b2d42"
-                title="Synthwave Slate (Deep twilight slate console with vibrant electric neon magenta accents)"
-                aria-label="Synthwave Slate"
-                style="background-color: #2b2d42; border-color: #ff007f; color: #ff007f; border-radius: 12px; box-shadow: 4px 4px 9px rgba(0, 0, 0, 0.42), -4px -4px 9px rgba(255, 255, 255, 0.24);">
-                <svg class="theme-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Custom Theme Presets Section -->
-          <div class="theme-section">
-            <div class="theme-section-header">
-              <span class="theme-section-title">Custom Theme Presets</span>
-              <span class="theme-section-subtitle">Save your current color and geometry configuration as a reusable
-                preset</span>
+        <div class="profile-config-body" id="profileConfigBody">
+          <!-- Left Column: Form & Toggles -->
+          <div class="profile-form-column">
+            <!-- Delete Mode Confirmation Prompt -->
+            <div id="profileDeleteNotice" class="profile-delete-box hidden-field">
+              <p class="profile-modal-desc" id="profileModalDesc">Are you sure you want to delete this profile?</p>
             </div>
 
-            <div class="custom-preset-save-row">
-              <div class="inset-input-box custom-preset-input-box">
-                <svg class="input-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                  <polyline points="7 3 7 8 15 8"></polyline>
-                </svg>
-                <input type="text" id="inputCustomPresetName" placeholder="Preset name (e.g. My Dark Clay)..."
-                  autocomplete="off" spellcheck="false" class="custom-preset-name-input" />
-              </div>
-              <button type="button" class="neumorphic-btn btn-go btn-save-preset" id="btnSaveCustomPreset"
-                title="Save current theme as a custom preset">
-                <span>SAVE PRESET</span>
-              </button>
-            </div>
-
-            <div class="theme-swatches-grid custom-presets-grid" id="customPresetsGrid"></div>
-          </div>
-        </div>
-
-        <!-- Right Column: Color Pickers, Geometry Sliders & Live Preview -->
-        <div class="theme-page-col theme-page-col-controls">
-          <!-- Interactive Live Preview Box -->
-          <div class="theme-live-preview-box">
-            <div class="theme-preview-label">Live Neumorphic Preview</div>
-            <div class="theme-preview-components">
-              <button type="button" class="neumorphic-btn btn-go"
-                style="height: 38px; min-width: 80px; font-size: 12px; pointer-events: none;">
-                <span>BUTTON</span>
-              </button>
-              <div class="inset-input-box" style="height: 38px; flex: 1; pointer-events: none; padding: 0 12px;">
-                <span style="font-size: 11px; color: var(--text-muted);">Inset Input...</span>
-              </div>
-              <button type="button" class="neumorphic-toggle-pill active" style="height: 38px; pointer-events: none;">
-                <span>ACTIVE</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Background Color Section -->
-          <div class="theme-section">
-            <div class="theme-section-header">
-              <span class="theme-section-title">Background Color</span>
-            </div>
-            <div class="custom-color-row">
-              <span class="custom-label">Custom Background Color:</span>
-              <div class="color-picker-input-wrap">
-                <div class="color-picker-chip" title="Click to open color palette">
-                  <input type="color" id="themeBgColorPicker" value="#e8dfd5" class="neumorphic-color-picker" />
-                  <svg class="color-picker-badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.2">
-                    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
-                    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
-                    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
-                    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
-                    <path
-                      d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.992 6.012 17.461 2 12 2z">
-                    </path>
-                  </svg>
-                </div>
-                <input type="text" id="themeBgHex" value="#E8DFD5" maxlength="7" spellcheck="false"
-                  class="color-hex-input" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Elements (Secondary / Accent) Color Section -->
-          <div class="theme-section">
-            <div class="theme-section-header">
-              <span class="theme-section-title">Elements Color (Secondary / Accent)</span>
-            </div>
-            <div class="custom-color-row">
-              <span class="custom-label">Custom Accent Color:</span>
-              <div class="color-picker-input-wrap">
-                <div class="color-picker-chip" title="Click to open color palette">
-                  <input type="color" id="themeAccentColorPicker" value="#d97706" class="neumorphic-color-picker" />
-                  <svg class="color-picker-badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.2">
-                    <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
-                    <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
-                    <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
-                    <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
-                    <path
-                      d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.992 6.012 17.461 2 12 2z">
-                    </path>
-                  </svg>
-                </div>
-                <input type="text" id="themeAccentHex" value="#D97706" maxlength="7" spellcheck="false"
-                  class="color-hex-input" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Neumorphism Controls Section (Radius, Distance, Intensity, Blur) -->
-          <div class="theme-section">
-            <div class="theme-section-header">
-              <span class="theme-section-title">Neumorphism Effect Controls</span>
-            </div>
-            <div class="neo-sliders-grid">
-              <!-- Radius Slider -->
-              <div class="neo-slider-row">
-                <div class="neo-slider-label-group">
-                  <span class="neo-slider-label">Radius</span>
-                  <span class="neo-slider-badge" id="badgeRadius">5px</span>
-                </div>
-                <div class="neo-slider-track-wrap">
-                  <input type="range" id="themeSliderRadius" min="0" max="60" step="1" value="5"
-                    class="neumorphic-slider" />
-                </div>
-              </div>
-
-              <!-- Distance Slider -->
-              <div class="neo-slider-row">
-                <div class="neo-slider-label-group">
-                  <span class="neo-slider-label">Distance</span>
-                  <span class="neo-slider-badge" id="badgeDistance">4px</span>
-                </div>
-                <div class="neo-slider-track-wrap">
-                  <input type="range" id="themeSliderDistance" min="1" max="10" step="1" value="4"
-                    class="neumorphic-slider" />
-                </div>
-              </div>
-
-              <!-- Top Light Shadow Intensity Slider -->
-              <div class="neo-slider-row">
-                <div class="neo-slider-label-group">
-                  <span class="neo-slider-label">Light Shadow</span>
-                  <span class="neo-slider-badge" id="badgeLightIntensity">39%</span>
-                </div>
-                <div class="neo-slider-track-wrap">
-                  <input type="range" id="themeSliderLightIntensity" min="1" max="100" step="1" value="39"
-                    class="neumorphic-slider" />
-                </div>
-              </div>
-
-              <!-- Bottom Dark Shadow Intensity Slider -->
-              <div class="neo-slider-row">
-                <div class="neo-slider-label-group">
-                  <span class="neo-slider-label">Dark Shadow</span>
-                  <span class="neo-slider-badge" id="badgeDarkIntensity">5%</span>
-                </div>
-                <div class="neo-slider-track-wrap">
-                  <input type="range" id="themeSliderDarkIntensity" min="1" max="100" step="1" value="5"
-                    class="neumorphic-slider" />
-                </div>
-              </div>
-
-              <!-- Blur Slider -->
-              <div class="neo-slider-row">
-                <div class="neo-slider-label-group">
-                  <span class="neo-slider-label">Blur</span>
-                  <span class="neo-slider-badge" id="badgeBlur">9px</span>
-                </div>
-                <div class="neo-slider-track-wrap">
-                  <input type="range" id="themeSliderBlur" min="0" max="25" step="1" value="9"
-                    class="neumorphic-slider" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Profile Switch Notification Style Section -->
-          <div class="theme-section">
-            <div class="theme-section-header">
-              <span class="theme-section-title">Profile Switch Notification</span>
-              <span class="theme-section-subtitle">Choose how profile switches are displayed on your screen</span>
-            </div>
-            <div class="theme-toggle-row">
-              <div class="theme-toggle-label-group">
-                <span class="theme-toggle-label">Icon Only Notification</span>
-                <span class="theme-toggle-desc">Show only the profile icon without the text pill</span>
-              </div>
-              <div class="toggle-wrapper" title="Show only icon in profile notification">
-                <input class="toggle-checkbox" type="checkbox" id="themeOsdIconOnly">
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Profile Setup & Auto-Switch Configuration Modal -->
-  <div class="modal-overlay hidden-field" id="profileModal">
-    <div class="profile-config-dialog" id="profileConfigCard">
-      <div class="modal-header">
-        <div class="modal-title-row">
-          <svg class="icon-svg" style="color:var(--accent-primary);" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-          </svg>
-          <h3 class="modal-title" id="profileModalTitle">CREATE APP PROFILE</h3>
-        </div>
-        <button class="squircle-btn btn-mini" id="btnCloseProfileModal" title="Close (Esc)">
-          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
-      <div class="profile-config-body" id="profileConfigBody">
-        <!-- Left Column: Form & Toggles -->
-        <div class="profile-form-column">
-          <!-- Delete Mode Confirmation Prompt -->
-          <div id="profileDeleteNotice" class="profile-delete-box hidden-field">
-            <p class="profile-modal-desc" id="profileModalDesc">Are you sure you want to delete this profile?</p>
-          </div>
-
-          <!-- Profile Name -->
-          <div class="form-group-field" id="profileNameGroup">
-            <label for="profileNameInput" class="form-field-lbl">Profile Name:</label>
-            <input type="text" class="profile-modal-input" id="profileNameInput"
-              placeholder="e.g. Chrome, Blender, Gaming, VS Code..." maxlength="28" autocomplete="off"
-              spellcheck="false" />
-          </div>
-
-          <!-- Default Profile Info (shown when editing Default) -->
-          <div class="default-profile-badge-notice hidden-field" id="defaultProfileBadgeNotice">
-            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon
-                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
-              </polygon>
-            </svg>
-            <div class="notice-meta">
-              <strong>System Default Profile</strong>
-              <span>Fallback profile activated when no application-specific profile matches.</span>
-            </div>
-          </div>
-
-          <!-- Target Executables -->
-          <div class="form-group-field" id="profileExeGroup">
-            <div class="form-field-header-row">
-              <label for="profInputExe" class="form-field-lbl">Target Executable(s):</label>
-              <div class="form-field-actions">
-                <button type="button" class="neumorphic-btn btn-chip btn-sm-chip" id="btnBrowseProfileExe"
-                  title="Browse your PC for an executable file">
-                  <svg class="icon-svg-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                  </svg>
-                  <span>Browse .exe</span>
-                </button>
-                <button type="button" class="neumorphic-btn btn-chip btn-sm-chip" id="btnRescanRunningApps"
-                  title="Rescan currently open application windows">
-                  <svg class="icon-svg-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <polyline points="1 20 1 14 7 14"></polyline>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                  </svg>
-                  <span>Rescan</span>
-                </button>
-              </div>
-            </div>
-            <input type="text" class="profile-modal-input" id="profInputExe"
-              placeholder="e.g. chrome.exe, code.exe (comma-separated)" autocomplete="off" spellcheck="false" />
-            <span class="form-field-hint">Multiple executables supported. Click any window card on the right to toggle
-              assignment.</span>
-          </div>
-
-          <!-- Option 1: Profile Auto-Switch (Normal Switch + Focus vs Hover Pills) -->
-          <div class="profile-option-row profile-trigger-card" id="profHoverRow">
-            <div class="profile-option-header">
-              <div class="profile-option-text">
-                <span class="option-title" id="profHoverTitle">Auto-Switch Profile</span>
-                <span class="option-desc" id="profTriggerDesc">Active. Switches to this profile whenever its target
-                  window gains focus.</span>
-              </div>
-              <div class="toggle-wrapper" title="Enable / Disable Auto-Switch for this profile">
-                <input class="toggle-checkbox" type="checkbox" id="profSwitchAutoSwitch" checked>
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
-              </div>
-            </div>
-            <div class="trigger-mode-pills" id="profAutoSwitchPills" role="toolbar" aria-label="Auto Switch Trigger">
-              <button type="button" class="trigger-pill active" id="chipTriggerFocus" data-trigger="focus">Window
-                Focus</button>
-              <button type="button" class="trigger-pill" id="chipTriggerHover" data-trigger="hover">Mouse
-                Hover</button>
-            </div>
-          </div>
-
-          <!-- Option 2: Show App Icon on Switch (OSD HUD) -->
-          <div class="profile-option-row profile-trigger-card" id="profOsdRow">
-            <div class="profile-option-header">
-              <div class="profile-option-text">
-                <span class="option-title">Show App Icon on Switch</span>
-                <span class="option-desc">Display a sleek floating on-screen HUD badge showing the target app icon
-                  whenever switched.</span>
-              </div>
-              <div class="toggle-wrapper" title="Show app icon popup on profile switch">
-                <input class="toggle-checkbox" type="checkbox" id="profSwitchOsdIcon" checked>
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Profile Info Tip -->
-          <div class="profile-info-tip" id="profileInfoTip">
-            <svg class="icon-svg-xs" style="color:var(--accent-primary);" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            <span>Auto-Switching detects active windows automatically in real time across all your displays.</span>
-          </div>
-        </div>
-
-        <!-- Right Column: Pick From Open Windows & Running Applications Explorer -->
-        <div class="profile-apps-column" id="profileAppsColumn">
-          <div class="apps-column-header">
-            <div class="apps-header-titles">
-              <span class="apps-col-title">SHOWING CURRENT OPEN APP(S)</span>
-              <span class="apps-col-subtitle">Click any open application window card below to bind it to this
-                profile</span>
-            </div>
-            <div class="apps-filter-box">
-              <svg class="icon-svg-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-              <input type="text" id="runningAppsFilterInput" placeholder="Filter open apps..." autocomplete="off"
+            <!-- Profile Name -->
+            <div class="form-group-field" id="profileNameGroup">
+              <label for="profileNameInput" class="form-field-lbl">Profile Name:</label>
+              <input type="text" class="profile-modal-input" id="profileNameInput"
+                placeholder="e.g. Chrome, Blender, Gaming, VS Code..." maxlength="28" autocomplete="off"
                 spellcheck="false" />
             </div>
+
+            <!-- Default Profile Info (shown when editing Default) -->
+            <div class="default-profile-badge-notice hidden-field" id="defaultProfileBadgeNotice">
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                </polygon>
+              </svg>
+              <div class="notice-meta">
+                <strong>System Default Profile</strong>
+                <span>Fallback profile activated when no application-specific profile matches.</span>
+              </div>
+            </div>
+
+            <!-- Target Executables -->
+            <div class="form-group-field" id="profileExeGroup">
+              <div class="form-field-header-row">
+                <label for="profInputExe" class="form-field-lbl">Target Executable(s):</label>
+                <div class="form-field-actions">
+                  <button type="button" class="neumorphic-btn btn-chip btn-sm-chip" id="btnBrowseProfileExe"
+                    title="Browse your PC for an executable file">
+                    <svg class="icon-svg-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Browse .exe</span>
+                  </button>
+                  <button type="button" class="neumorphic-btn btn-chip btn-sm-chip" id="btnRescanRunningApps"
+                    title="Rescan currently open application windows">
+                    <svg class="icon-svg-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>Rescan</span>
+                  </button>
+                </div>
+              </div>
+              <input type="text" class="profile-modal-input" id="profInputExe"
+                placeholder="e.g. chrome.exe, code.exe (comma-separated)" autocomplete="off" spellcheck="false" />
+              <span class="form-field-hint">Multiple executables supported. Click any window card on the right to toggle
+                assignment.</span>
+            </div>
+
+            <!-- Option 1: Profile Auto-Switch (Normal Switch + Focus vs Hover Pills) -->
+            <div class="profile-option-row profile-trigger-card" id="profHoverRow">
+              <div class="profile-option-header">
+                <div class="profile-option-text">
+                  <span class="option-title" id="profHoverTitle">Auto-Switch Profile</span>
+                  <span class="option-desc" id="profTriggerDesc">Active. Switches to this profile whenever its target
+                    window gains focus.</span>
+                </div>
+                <div class="toggle-wrapper" title="Enable / Disable Auto-Switch for this profile">
+                  <input class="toggle-checkbox" type="checkbox" id="profSwitchAutoSwitch" checked>
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="trigger-mode-pills" id="profAutoSwitchPills" role="toolbar" aria-label="Auto Switch Trigger">
+                <button type="button" class="trigger-pill active" id="chipTriggerFocus" data-trigger="focus">Window
+                  Focus</button>
+                <button type="button" class="trigger-pill" id="chipTriggerHover" data-trigger="hover">Mouse
+                  Hover</button>
+              </div>
+            </div>
+
+            <!-- Option 2: Show App Icon on Switch (OSD HUD) -->
+            <div class="profile-option-row profile-trigger-card" id="profOsdRow">
+              <div class="profile-option-header">
+                <div class="profile-option-text">
+                  <span class="option-title">Show App Icon on Switch</span>
+                  <span class="option-desc">Display a sleek floating on-screen HUD badge showing the target app icon
+                    whenever switched.</span>
+                </div>
+                <div class="toggle-wrapper" title="Show app icon popup on profile switch">
+                  <input class="toggle-checkbox" type="checkbox" id="profSwitchOsdIcon" checked>
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profile Info Tip -->
+            <div class="profile-info-tip" id="profileInfoTip">
+              <svg class="icon-svg-xs" style="color:var(--accent-primary);" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>Auto-Switching detects active windows automatically in real time across all your displays.</span>
+            </div>
           </div>
 
-          <div class="running-apps-scroll-area" id="runningAppsList">
-            <div class="apps-empty-state">Scanning active open windows...</div>
+          <!-- Right Column: Pick From Open Windows & Running Applications Explorer -->
+          <div class="profile-apps-column" id="profileAppsColumn">
+            <div class="apps-column-header">
+              <div class="apps-header-titles">
+                <span class="apps-col-title">SHOWING CURRENT OPEN APP(S)</span>
+                <span class="apps-col-subtitle">Click any open application window card below to bind it to this
+                  profile</span>
+              </div>
+              <div class="apps-filter-box">
+                <svg class="icon-svg-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="runningAppsFilterInput" placeholder="Filter open apps..." autocomplete="off"
+                  spellcheck="false" />
+              </div>
+            </div>
+
+            <div class="running-apps-scroll-area" id="runningAppsList">
+              <div class="apps-empty-state">Scanning active open windows...</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="modal-footer profile-modal-footer">
-        <button class="neumorphic-btn btn-chip" id="btnCancelProfileModal">Cancel</button>
-        <button class="neumorphic-btn btn-chip btn-primary-chip" id="btnConfirmProfileModal">Save Profile</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Active Scripts Overview Modal (Quick Switchboard for Current Profile) -->
-  <div class="modal-overlay hidden-field" id="activeScriptsModal">
-    <div class="modal-card active-scripts-modal-card">
-      <div class="modal-header">
-        <div class="modal-title-row">
-          <svg class="icon-svg" style="color:var(--accent-primary);" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-          </svg>
-          <div style="display:flex; flex-direction:column; gap:2px;">
-            <h3 class="modal-title" id="activeScriptsModalTitle">ACTIVE SCRIPTS</h3>
-            <span class="active-scripts-subtitle" id="activeScriptsModalSubtitle">Current Profile • 0 Scripts
-              Active</span>
-          </div>
+        <div class="modal-footer profile-modal-footer">
+          <button class="neumorphic-btn btn-chip" id="btnCancelProfileModal">Cancel</button>
+          <button class="neumorphic-btn btn-chip btn-primary-chip" id="btnConfirmProfileModal">Save Profile</button>
         </div>
-        <button class="squircle-btn btn-mini" id="btnCloseActiveScriptsModal" title="Close (Esc)">
-          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
-      <div class="active-scripts-modal-body" id="activeScriptsModalBody">
-        <!-- Rendered active script cards injected here -->
       </div>
     </div>
-  </div>
 
-  <!-- Mouse Path Script Full Options Configuration Modal -->
-  <div class="modal-overlay hidden-field" id="mouseScriptEditModal">
-    <div class="modal-card mouse-script-edit-card" id="mouseScriptEditCard">
-      <div class="modal-header">
-        <div class="modal-title-row">
-          <div class="wm-icon-badge" style="width:34px;height:34px;border-radius:var(--radius-btn);">
-            <svg class="wm-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2a5 5 0 0 0-5 5v6a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5z"></path>
-              <line x1="12" y1="6" x2="12" y2="10"></line>
+    <!-- Active Scripts Overview Modal (Quick Switchboard for Current Profile) -->
+    <div class="modal-overlay hidden-field" id="activeScriptsModal">
+      <div class="modal-card active-scripts-modal-card">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <svg class="icon-svg" style="color:var(--accent-primary);" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
             </svg>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:2px;">
-            <h3 class="modal-title" id="mseModalTitle">EDIT MOUSE PATH SCRIPT</h3>
-            <span class="active-scripts-subtitle" id="mseModalSubtitle">Configure playback options, trigger hotkey,
-              speed & behavior</span>
-          </div>
-        </div>
-        <button class="squircle-btn btn-mini" id="btnCloseMseModal" title="Close (Esc)">
-          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
-      <div class="modal-body mse-modal-body" id="mseModalBody">
-        <!-- Script Name & Shortcut Row -->
-        <div class="mse-row-2col">
-          <div class="form-group-field" style="margin:0;">
-            <label class="form-field-lbl" for="mseNameInput">Script Name:</label>
-            <input type="text" class="profile-modal-input" id="mseNameInput" placeholder="e.g. Mouse Path 1"
-              maxlength="40" autocomplete="off" spellcheck="false" />
-          </div>
-          <div class="form-group-field" style="margin:0;">
-            <label class="form-field-lbl">Trigger Shortcut:</label>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <div class="wm-hotkey-badge" id="mseHotkeyBadge"
-                style="flex:1; height:42px; display:flex; align-items:center; justify-content:center; cursor:pointer;"
-                title="Click to record new shortcut, or Esc to cancel">None</div>
-              <button type="button" class="neumorphic-btn btn-chip btn-sm-chip" id="mseBtnClearHotkey"
-                title="Clear shortcut" style="height:42px; padding:0 12px;">Clear</button>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <h3 class="modal-title" id="activeScriptsModalTitle">ACTIVE SCRIPTS</h3>
+              <span class="active-scripts-subtitle" id="activeScriptsModalSubtitle">Current Profile • 0 Scripts
+                Active</span>
             </div>
           </div>
+          <button class="squircle-btn btn-mini" id="btnCloseActiveScriptsModal" title="Close (Esc)">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
 
-        <!-- Playback Speed -->
-        <div class="ac-setting-card" style="padding:12px 16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span class="setting-title" style="margin:0;">Playback Speed</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span class="hint-tag" id="mseSpeedLabel">1.0x</span>
-              <input type="number" id="mseSpeedInput" min="0.1" max="100" step="0.5" value="1.0"
-                style="width:58px; height:24px; padding:0 6px; font-size:11px; font-weight:700; border:none; background:var(--surface-color); box-shadow:var(--inset-sm); border-radius:var(--radius-badge); color:var(--text-primary); outline:none; text-align:center; font-family:'JetBrains Mono', monospace;"
-                title="Custom speed up to 100x" />
-            </div>
-          </div>
-          <div class="ac-pill-selector" id="mseSpeedSelector" style="width: auto; max-width: 100%; flex-wrap: wrap;">
-            <button class="ac-pill-btn" data-val="0.5">0.5x</button>
-            <button class="ac-pill-btn active" data-val="1.0">1.0x</button>
-            <button class="ac-pill-btn" data-val="2.0">2.0x</button>
-            <button class="ac-pill-btn" data-val="5.0">5.0x</button>
-            <button class="ac-pill-btn" data-val="10.0">10x</button>
-            <button class="ac-pill-btn" data-val="25.0">25x</button>
-            <button class="ac-pill-btn" data-val="50.0">50x</button>
-            <button class="ac-pill-btn" data-val="100.0">100x</button>
-          </div>
-        </div>
-
-        <!-- Playback Starting Point -->
-        <div class="ac-setting-card" style="padding:12px 16px;">
-          <span class="setting-title" style="margin-bottom:8px;">Playback Starting Point</span>
-          <div class="ac-pill-selector" id="mseOriginSelector" style="width:100%;">
-            <button class="ac-pill-btn active" data-val="absolute">Original (Screen)</button>
-            <button class="ac-pill-btn" data-val="relative">Relative to Mouse</button>
-            <button class="ac-pill-btn" data-val="window">Active Window</button>
-          </div>
-        </div>
-
-        <!-- Repeat Count & Countdown Delay Row -->
-        <div class="mse-row-2col">
-          <div class="ac-setting-card" style="padding:12px 16px; margin:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <span class="setting-title" style="margin:0;">Repeat Count</span>
-              <label
-                style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:11px; font-weight:700; color:var(--text-secondary);"
-                title="Loop continuously until stopped">
-                <input type="checkbox" id="mseRepeatInfinite"
-                  style="accent-color:var(--accent-primary); cursor:pointer;" />
-                <span>Infinite (∞)</span>
-              </label>
-            </div>
-            <div class="inset-input-box" style="height:38px; padding:0 12px; display:flex; align-items:center;">
-              <input type="number" id="mseRepeatCountInput" min="1" max="99999" value="1" placeholder="1"
-                style="width:100%; border:none; background:transparent; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; color:var(--text-primary); outline:none;" />
-            </div>
-          </div>
-
-          <div class="ac-setting-card" style="padding:12px 16px; margin:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <span class="setting-title" style="margin:0;">Start Countdown</span>
-              <span class="hint-tag">Audio Beep</span>
-            </div>
-            <div class="inset-input-box" style="height:38px; padding:0 12px; display:flex; align-items:center;">
-              <input type="number" id="mseCountdownInput" min="0" max="60" value="0" placeholder="0 = instant"
-                style="width:100%; border:none; background:transparent; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; color:var(--text-primary); outline:none;" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Advanced Playback Options -->
-        <div class="ac-setting-card" style="padding:12px 16px;">
-          <span class="setting-title" style="margin-bottom:10px;">Advanced Playback Tuning</span>
-          <div class="mr-advanced-grid" style="grid-template-columns: 1fr; gap:8px;">
-            <div class="mr-opt-item">
-              <div class="mr-opt-info">
-                <span class="mr-opt-title">Clicks-Only Replay (Instant Warp)</span>
-                <span class="mr-opt-desc">Skip travel glide; teleport cursor directly to click points for maximum
-                  speed.</span>
-              </div>
-              <div class="toggle-wrapper" title="Enable Clicks-Only Instant Warp">
-                <input class="toggle-checkbox" type="checkbox" id="mseOptClicksOnly">
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mr-opt-item">
-              <div class="mr-opt-info">
-                <span class="mr-opt-title">Humanizer & Timing Jitter</span>
-                <span class="mr-opt-desc">Inject ±15% natural speed variation to mimic realistic hand movement.</span>
-              </div>
-              <div class="toggle-wrapper" title="Enable Humanizer & Timing Jitter">
-                <input class="toggle-checkbox" type="checkbox" id="mseOptHumanize">
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mr-opt-item">
-              <div class="mr-opt-info">
-                <span class="mr-opt-title">Bezier Path Smoothing</span>
-                <span class="mr-opt-desc">Interpolate smooth curved trajectories between distant waypoints.</span>
-              </div>
-              <div class="toggle-wrapper" title="Enable Bezier Path Smoothing">
-                <input class="toggle-checkbox" type="checkbox" id="mseOptBezier">
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="mr-opt-item">
-              <div class="mr-opt-info">
-                <span class="mr-opt-title">Emergency Hand-Move Stop</span>
-                <span class="mr-opt-desc">Moving physical mouse abruptly (>20px) cancels replay immediately.</span>
-              </div>
-              <div class="toggle-wrapper" title="Emergency Hand-Move Stop">
-                <input class="toggle-checkbox" type="checkbox" id="mseOptEmergencyStop">
-                <div class="toggle-container">
-                  <div class="toggle-button"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Script Stats Summary -->
-        <div
-          style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--surface-color); border-radius:var(--radius-subcard); box-shadow:var(--pressed-sm); font-size:11px; font-weight:600; color:var(--text-secondary);">
-          <span id="mseStatEvents">0 points, 0 clicks</span>
-          <span id="mseStatDuration">0.0s duration</span>
-        </div>
-      </div>
-
-      <div class="modal-footer profile-modal-footer"
-        style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:10px;">
-        <button type="button" class="neumorphic-btn btn-chip" id="mseBtnTestPlay"
-          style="display:flex; align-items:center; gap:6px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px;">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          <span id="mseBtnTestPlayText">Test Play</span>
-        </button>
-        <div style="display:flex; gap:12px;">
-          <button type="button" class="neumorphic-btn btn-chip" id="btnCancelMseModal">Cancel</button>
-          <button type="button" class="neumorphic-btn btn-chip btn-primary-chip" id="btnSaveMseModal">Save
-            Changes</button>
+        <div class="active-scripts-modal-body" id="activeScriptsModalBody">
+          <!-- Rendered active script cards injected here -->
         </div>
       </div>
     </div>
-  </div>
+
+    <!-- Mouse Path Script Full Options Configuration Modal -->
+    <div class="modal-overlay hidden-field" id="mouseScriptEditModal">
+      <div class="modal-card mouse-script-edit-card" id="mouseScriptEditCard">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <div class="wm-icon-badge" style="width:34px;height:34px;border-radius:var(--radius-btn);">
+              <svg class="wm-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a5 5 0 0 0-5 5v6a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5z"></path>
+                <line x1="12" y1="6" x2="12" y2="10"></line>
+              </svg>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <h3 class="modal-title" id="mseModalTitle">EDIT MOUSE PATH SCRIPT</h3>
+              <span class="active-scripts-subtitle" id="mseModalSubtitle">Configure playback options, trigger hotkey,
+                speed & behavior</span>
+            </div>
+          </div>
+          <button class="squircle-btn btn-mini" id="btnCloseMseModal" title="Close (Esc)">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-body mse-modal-body" id="mseModalBody">
+          <!-- Script Name & Shortcut Row -->
+          <div class="mse-row-2col">
+            <div class="form-group-field" style="margin:0;">
+              <label class="form-field-lbl" for="mseNameInput">Script Name:</label>
+              <input type="text" class="profile-modal-input" id="mseNameInput" placeholder="e.g. Mouse Path 1"
+                maxlength="40" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="form-group-field" style="margin:0;">
+              <label class="form-field-lbl">Trigger Shortcut:</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div class="wm-hotkey-badge" id="mseHotkeyBadge"
+                  style="flex:1; height:42px; display:flex; align-items:center; justify-content:center; cursor:pointer;"
+                  title="Click to record new shortcut, or Esc to cancel">None</div>
+                <button type="button" class="neumorphic-btn btn-chip btn-sm-chip" id="mseBtnClearHotkey"
+                  title="Clear shortcut" style="height:42px; padding:0 12px;">Clear</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Playback Speed -->
+          <div class="ac-setting-card" style="padding:12px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span class="setting-title" style="margin:0;">Playback Speed</span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span class="hint-tag" id="mseSpeedLabel">1.0x</span>
+                <input type="number" id="mseSpeedInput" min="0.1" max="100" step="0.5" value="1.0"
+                  style="width:58px; height:24px; padding:0 6px; font-size:11px; font-weight:700; border:none; background:var(--surface-color); box-shadow:var(--inset-sm); border-radius:var(--radius-badge); color:var(--text-primary); outline:none; text-align:center; font-family:'JetBrains Mono', monospace;"
+                  title="Custom speed up to 100x" />
+              </div>
+            </div>
+            <div class="ac-pill-selector" id="mseSpeedSelector" style="width: auto; max-width: 100%; flex-wrap: wrap;">
+              <button class="ac-pill-btn" data-val="0.5">0.5x</button>
+              <button class="ac-pill-btn active" data-val="1.0">1.0x</button>
+              <button class="ac-pill-btn" data-val="2.0">2.0x</button>
+              <button class="ac-pill-btn" data-val="5.0">5.0x</button>
+              <button class="ac-pill-btn" data-val="10.0">10x</button>
+              <button class="ac-pill-btn" data-val="25.0">25x</button>
+              <button class="ac-pill-btn" data-val="50.0">50x</button>
+              <button class="ac-pill-btn" data-val="100.0">100x</button>
+            </div>
+          </div>
+
+          <!-- Playback Starting Point -->
+          <div class="ac-setting-card" style="padding:12px 16px;">
+            <span class="setting-title" style="margin-bottom:8px;">Playback Starting Point</span>
+            <div class="ac-pill-selector" id="mseOriginSelector" style="width:100%;">
+              <button class="ac-pill-btn active" data-val="absolute">Original (Screen)</button>
+              <button class="ac-pill-btn" data-val="relative">Relative to Mouse</button>
+              <button class="ac-pill-btn" data-val="window">Active Window</button>
+            </div>
+          </div>
+
+          <!-- Repeat Count & Countdown Delay Row -->
+          <div class="mse-row-2col">
+            <div class="ac-setting-card" style="padding:12px 16px; margin:0;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="setting-title" style="margin:0;">Repeat Count</span>
+                <label
+                  style="display:flex; align-items:center; gap:5px; cursor:pointer; font-size:11px; font-weight:700; color:var(--text-secondary);"
+                  title="Loop continuously until stopped">
+                  <input type="checkbox" id="mseRepeatInfinite"
+                    style="accent-color:var(--accent-primary); cursor:pointer;" />
+                  <span>Infinite (∞)</span>
+                </label>
+              </div>
+              <div class="inset-input-box" style="height:38px; padding:0 12px; display:flex; align-items:center;">
+                <input type="number" id="mseRepeatCountInput" min="1" max="99999" value="1" placeholder="1"
+                  style="width:100%; border:none; background:transparent; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; color:var(--text-primary); outline:none;" />
+              </div>
+            </div>
+
+            <div class="ac-setting-card" style="padding:12px 16px; margin:0;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span class="setting-title" style="margin:0;">Start Countdown</span>
+                <span class="hint-tag">Audio Beep</span>
+              </div>
+              <div class="inset-input-box" style="height:38px; padding:0 12px; display:flex; align-items:center;">
+                <input type="number" id="mseCountdownInput" min="0" max="60" value="0" placeholder="0 = instant"
+                  style="width:100%; border:none; background:transparent; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; color:var(--text-primary); outline:none;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced Playback Options -->
+          <div class="ac-setting-card" style="padding:12px 16px;">
+            <span class="setting-title" style="margin-bottom:10px;">Advanced Playback Tuning</span>
+            <div class="mr-advanced-grid" style="grid-template-columns: 1fr; gap:8px;">
+              <div class="mr-opt-item">
+                <div class="mr-opt-info">
+                  <span class="mr-opt-title">Clicks-Only Replay (Instant Warp)</span>
+                  <span class="mr-opt-desc">Skip travel glide; teleport cursor directly to click points for maximum
+                    speed.</span>
+                </div>
+                <div class="toggle-wrapper" title="Enable Clicks-Only Instant Warp">
+                  <input class="toggle-checkbox" type="checkbox" id="mseOptClicksOnly">
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mr-opt-item">
+                <div class="mr-opt-info">
+                  <span class="mr-opt-title">Humanizer & Timing Jitter</span>
+                  <span class="mr-opt-desc">Inject ±15% natural speed variation to mimic realistic hand movement.</span>
+                </div>
+                <div class="toggle-wrapper" title="Enable Humanizer & Timing Jitter">
+                  <input class="toggle-checkbox" type="checkbox" id="mseOptHumanize">
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mr-opt-item">
+                <div class="mr-opt-info">
+                  <span class="mr-opt-title">Bezier Path Smoothing</span>
+                  <span class="mr-opt-desc">Interpolate smooth curved trajectories between distant waypoints.</span>
+                </div>
+                <div class="toggle-wrapper" title="Enable Bezier Path Smoothing">
+                  <input class="toggle-checkbox" type="checkbox" id="mseOptBezier">
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mr-opt-item">
+                <div class="mr-opt-info">
+                  <span class="mr-opt-title">Emergency Hand-Move Stop</span>
+                  <span class="mr-opt-desc">Moving physical mouse abruptly (>20px) cancels replay immediately.</span>
+                </div>
+                <div class="toggle-wrapper" title="Emergency Hand-Move Stop">
+                  <input class="toggle-checkbox" type="checkbox" id="mseOptEmergencyStop">
+                  <div class="toggle-container">
+                    <div class="toggle-button"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Script Stats Summary -->
+          <div
+            style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--surface-color); border-radius:var(--radius-subcard); box-shadow:var(--pressed-sm); font-size:11px; font-weight:600; color:var(--text-secondary);">
+            <span id="mseStatEvents">0 points, 0 clicks</span>
+            <span id="mseStatDuration">0.0s duration</span>
+          </div>
+        </div>
+
+        <div class="modal-footer profile-modal-footer"
+          style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:10px;">
+          <button type="button" class="neumorphic-btn btn-chip" id="mseBtnTestPlay"
+            style="display:flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              style="width:13px;height:13px;">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span id="mseBtnTestPlayText">Test Play</span>
+          </button>
+          <div style="display:flex; gap:12px;">
+            <button type="button" class="neumorphic-btn btn-chip" id="btnCancelMseModal">Cancel</button>
+            <button type="button" class="neumorphic-btn btn-chip btn-primary-chip" id="btnSaveMseModal">Save
+              Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 
@@ -4064,6 +4121,26 @@
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
   <script src="app.js"></script>
+  <!-- Core Modular Subsystems -->
+  <script src="js/state.js"></script>
+  <script src="js/bridge.js"></script>
+  <script src="js/profiles.js"></script>
+  <script src="js/theme.js"></script>
+
+  <!-- Feature Modules -->
+  <script src="js/modules/textExpander.js"></script>
+  <script src="js/modules/keyRemapper.js"></script>
+  <script src="js/modules/systemTools.js"></script>
+  <script src="js/modules/gesturesAndCorners.js"></script>
+  <script src="js/modules/radialMenu.js"></script>
+  <script src="js/modules/appLauncher.js"></script>
+  <script src="js/modules/folderCreator.js"></script>
+  <script src="js/modules/mouseStudio.js"></script>
+  <script src="js/modules/macroRecorder.js"></script>
+  <script src="js/modules/screenScanner.js"></script>
+
+  <!-- Master Orchestrator -->
+  <script src="js/main.js"></script>
 </body>
 
 </html>
