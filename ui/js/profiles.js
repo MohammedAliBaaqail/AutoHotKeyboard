@@ -285,8 +285,8 @@
           }
         });
 
-        // If forced on all profiles: ONLY SHOW ONE ICON, NOT ALL PROFILES ICON!
-        if (isForcedAll || (totalProfCount > 1 && activeProfiles.length === totalProfCount)) {
+        // Only show single globe badge if explicitly forced across all profiles
+        if (isForcedAll) {
           const isItemActive = isCurrentEnabled && activeProfiles.length > 0;
           const statusClass = isItemActive ? 'is-active is-current' : 'is-disabled';
           const statusTitle = isItemActive
@@ -419,8 +419,7 @@
 
         const totalProfCount = Object.keys(profiles).length;
         const isForcedFeature = Boolean((state.config.forcedFeatures && state.config.forcedFeatures[`${module}.${key}`]) ||
-          (profiles[currentProf] && profiles[currentProf][module] && profiles[currentProf][module].forcedAllProfiles && profiles[currentProf][module].forcedAllProfiles[key]) ||
-          (totalProfCount > 1 && activeProfiles.length === totalProfCount));
+          (profiles[currentProf] && profiles[currentProf][module] && profiles[currentProf][module].forcedAllProfiles && profiles[currentProf][module].forcedAllProfiles[key]));
 
         if (isForcedFeature) {
           container.className = 'item-profiles-badges is-forced-all';
@@ -491,6 +490,20 @@
       }
     }
 
+    function updateBlockSysKeysButton() {
+      const btn = document.getElementById('btnBlockSysKeys');
+      if (!btn) return;
+      const curProfile = (state.config && state.config.activeProfile) || 'Default';
+      const prof = (state.config && state.config.profiles && state.config.profiles[curProfile]) || {};
+      const isBlocked = !!(prof.blockSystemKeys === 1 || prof.blockSystemKeys === true || (state.config && (state.config.blockSystemKeys === 1 || state.config.blockSystemKeys === true)));
+      btn.classList.toggle('is-blocked', isBlocked);
+      if (isBlocked) {
+        btn.title = 'Key Presses Blocked (Windows shortcuts like Win+D suppressed. Click to allow)';
+      } else {
+        btn.title = 'Prevent Key Presses from Activating (Click to Block Win+D Desktop, Win Key, etc.)';
+      }
+    }
+
     function renderProfilesRibbon() {
       const track = document.getElementById('lgsProfilesTrack');
       const defaultSlot = document.getElementById('lgsDefaultProfileSlot');
@@ -524,6 +537,7 @@
       }
 
       updateProfileLockButton();
+      updateBlockSysKeysButton();
 
       function createProfileCard(pName, isDef) {
         const prof = profiles[pName] || {};
@@ -734,6 +748,10 @@
       state.config.screenScanner = prof.screenScanner || { enabled: 1, scanRate: 150, items: [] };
 
       applyForcedItemStates();
+
+      state.config.blockSystemKeys = (prof.blockSystemKeys === 1 || prof.blockSystemKeys === true) ? 1 : 0;
+      updateBlockSysKeysButton();
+      sendToAhk('setBlockSystemKeys', { enabled: state.config.blockSystemKeys });
 
       // 1. Immediately update global active indicators so count badge refreshes instantaneously
       updateGlobalIndicators();

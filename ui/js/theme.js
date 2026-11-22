@@ -1347,10 +1347,9 @@
         if (badgeBlur) badgeBlur.textContent = `${blur}px`;
       }
 
-      const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
-      if (themeOsdIconOnly) {
-        themeOsdIconOnly.checked = !!(state.config && state.config.theme && (state.config.theme.osdIconOnly === 1 || state.config.theme.osdIconOnly === true));
-      }
+      const osdMode = (state.config && state.config.theme && state.config.theme.profileNotificationMode)
+        || ((state.config && state.config.theme && (state.config.theme.osdIconOnly === 1 || state.config.theme.osdIconOnly === true)) ? 'icon' : 'both');
+      updateThemeOsdModeUI(osdMode);
 
       // Refresh all neumorphic sliders so track fills dynamically adapt to the active theme colors
       document.querySelectorAll('.neumorphic-slider').forEach(sl => {
@@ -1361,6 +1360,27 @@
 
       if (save) {
         syncConfig();
+      }
+    }
+
+    function updateThemeOsdModeUI(mode) {
+      const pills = document.getElementById('themeOsdModePills');
+      if (pills) {
+        pills.querySelectorAll('.trigger-pill').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+      }
+      const desc = document.getElementById('themeOsdModeDesc');
+      if (desc) {
+        if (mode === 'icon') {
+          desc.textContent = 'Display floating icon badge only without text';
+        } else if (mode === 'text') {
+          desc.textContent = 'Display floating pill with profile name text only';
+        } else if (mode === 'off') {
+          desc.textContent = 'Notifications completely disabled for all profiles';
+        } else {
+          desc.textContent = 'Display both profile icon and name pill';
+        }
       }
     }
 

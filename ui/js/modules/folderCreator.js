@@ -17,7 +17,8 @@
       }
 
       items.forEach(item => {
-        const isHotkey = item.triggerType === 'hotkey';
+        const isCombo = /[\+\^\!\#]|(\b(Ctrl|Alt|Shift|Win|Meta|CapsLock)\b)/i.test(item.trigger || '');
+        const isHotkey = item.triggerType === 'hotkey' || isCombo;
         const isEnabled = item.enabled !== false && item.enabled !== 0;
         const card = document.createElement('div');
         card.className = `shortcut-card ${isEnabled ? '' : 'is-disabled'}`;
@@ -143,11 +144,13 @@
 
       if (editingFcId) {
         const idx = state.config.folderCreator.items.findIndex(s => s.id === editingFcId);
+        const isCombo = /[\+\^\!\#]|(\b(Ctrl|Alt|Shift|Win|Meta|CapsLock)\b)/i.test(trig);
+        const triggerType = isCombo ? 'hotkey' : currentFcType;
         if (idx !== -1) {
           state.config.folderCreator.items[idx] = {
             ...state.config.folderCreator.items[idx],
             trigger: trig,
-            triggerType: currentFcType,
+            triggerType: triggerType,
             targetLocation: currentFcLocation,
             customPath: customPath,
             folderPaths: paths,
@@ -161,10 +164,12 @@
         editingFcId = null;
         if (fcBtnSubmitText) fcBtnSubmitText.textContent = 'ADD';
       } else {
+        const isCombo = /[\+\^\!\#]|(\b(Ctrl|Alt|Shift|Win|Meta|CapsLock)\b)/i.test(trig);
+        const triggerType = isCombo ? 'hotkey' : currentFcType;
         const newFc = {
           id: 'fc-' + Date.now(),
           trigger: trig,
-          triggerType: currentFcType,
+          triggerType: triggerType,
           targetLocation: currentFcLocation,
           customPath: customPath,
           folderPaths: paths,
@@ -191,7 +196,8 @@
     function editFc(item) {
       editingFcId = item.id;
       if (fcBtnSubmitText) fcBtnSubmitText.textContent = 'SAVE';
-      setFcTriggerType(item.triggerType || 'string');
+      const isCombo = item.triggerType === 'hotkey' || /[\+\^\!\#]|(\b(Ctrl|Alt|Shift|Win|Meta|CapsLock)\b)/i.test(item.trigger || '');
+      setFcTriggerType(isCombo ? 'hotkey' : (item.triggerType || 'string'));
       fcInputTrigger.value = item.trigger || '';
       if (fcBtnClearTrigger && item.trigger) {
         fcBtnClearTrigger.classList.remove('hidden-field');

@@ -510,6 +510,28 @@ body {
   border-color: rgba(245, 158, 11, 0.7);
 }
 
+.lgs-mini-btn.btn-block-sys-keys {
+  color: var(--text-secondary);
+  transition: var(--transition-smooth);
+}
+
+.lgs-mini-btn.btn-block-sys-keys:hover {
+  color: var(--accent);
+}
+
+.lgs-mini-btn.btn-block-sys-keys.is-blocked {
+  color: #ef4444;
+  box-shadow: var(--inset-sm);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.lgs-mini-btn.btn-block-sys-keys.is-blocked:hover {
+  color: #f87171;
+  box-shadow: var(--inset-md);
+  border-color: rgba(239, 68, 68, 0.75);
+}
+
 .lgs-mini-btn:disabled,
 .lgs-mini-btn.is-disabled {
   opacity: 0.35;

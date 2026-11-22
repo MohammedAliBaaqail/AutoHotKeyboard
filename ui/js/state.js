@@ -9,6 +9,19 @@
     console.error('AutoHotKeyboard UI Error:', e.message, e.filename, e.lineno);
   });
 
+  // Global CapsLock modifier state tracking
+  let isCapsLockHeld = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'CapsLock') isCapsLockHeld = true;
+  }, true);
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'CapsLock') isCapsLockHeld = false;
+  }, true);
+  window.addEventListener('blur', () => {
+    isCapsLockHeld = false;
+  });
+  window.isCapsLockHeld = () => isCapsLockHeld;
+
   // Application State
   const initialTheme = (() => {
     try {

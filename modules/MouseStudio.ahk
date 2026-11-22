@@ -52,19 +52,11 @@ ApplyAutoClicker() {
 }
 
 RegisterSingleMouseScript(item) {
-    global g_ActiveHotkeys
     trig := Trim(item["trigger"])
     if (trig = "")
         return
 
-    ahkHk := NormalizeHotkeyToAhk(trig)
-    if (ahkHk = "")
-        ahkHk := trig
-
-    safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
-    HotIf()
-    Hotkey(safeHk, (*) => ExecuteMouseScript(item), "On")
-    g_ActiveHotkeys.Push(safeHk)
+    RegisterUniversalHotkey(trig, (*) => ExecuteMouseScript(item))
 }
 
 ExecuteMouseScript(item) {

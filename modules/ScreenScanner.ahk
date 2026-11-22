@@ -17,22 +17,7 @@ ApplyScreenScanner() {
     if (ss.Has("enabled") && (!ss["enabled"] || ss["enabled"] = "0"))
         return
 
-    ; 1. Register Master Screen Scanner Hotkey (Default: F9)
-    masterHk := ss.Has("hotkey") ? Trim(ss["hotkey"]) : "F9"
-    if (masterHk != "") {
-        ahkHk := NormalizeHotkeyToAhk(masterHk)
-        if (ahkHk = "")
-            ahkHk := masterHk
-        safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
-        try {
-            HotIf()
-            Hotkey(safeHk, (*) => ToggleScreenScannerMaster(), "On")
-            g_ActiveHotkeys.Push(safeHk)
-        } catch as err {
-            LogMessage("Screen scanner master hotkey error for " . masterHk . ": " . err.Message)
-        }
-    }
-
+    ; 1. Master hotkey removed - only individual script shortcuts are registered below
     if (!ss.Has("items") || !IsObject(ss["items"]) || ss["items"].Length = 0)
         return
 
@@ -97,9 +82,7 @@ ToggleScreenScannerMaster() {
     g_ScreenScannerActive := true
     SetTimer(CheckScreenScannerRules, rate)
 
-    masterHk := ss.Has("hotkey") ? Trim(ss["hotkey"]) : "F9"
-    ShowMouseOSD("SCREEN SCANNER", "Scanning Started (" . enabledCount . " Triggers) • " . masterHk . " to stop", true,
-        1400)
+    ShowMouseOSD("SCREEN SCANNER", "Scanning Started (" . enabledCount . " Triggers)", true, 1400)
     SoundBeep(850, 100)
     NotifyWebScreenScannerMasterState(true)
 }
@@ -123,19 +106,11 @@ NotifyWebScreenScannerMasterState(isRunning) {
 }
 
 RegisterSingleScreenScannerTrigger(item) {
-    global g_ActiveHotkeys
     trig := Trim(item["trigger"])
     if (trig = "")
         return
 
-    ahkHk := NormalizeHotkeyToAhk(trig)
-    if (ahkHk = "")
-        ahkHk := trig
-
-    safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
-    HotIf()
-    Hotkey(safeHk, (*) => ToggleScreenScannerItem(item), "On")
-    g_ActiveHotkeys.Push(safeHk)
+    RegisterUniversalHotkey(trig, (*) => ToggleScreenScannerItem(item))
 }
 
 ToggleScreenScannerItem(item) {
@@ -470,16 +445,25 @@ FireScreenScannerAction(item, foundX, foundY) {
             Click("Middle")
         }
 
+    } else if (actionType = "appLauncher") {
+        appId := item.Has("appLauncherId") ? item["appLauncherId"] : ""
+        if (appId != "") {
+            cleanId := SubStr(appId, 1, 3) = "al-" ? appId : ("al-" . appId)
+            ExecuteSystemAction(cleanId, "Screen Scanner: " . ruleName)
+        }
+
     } else if (actionType = "mouseScript") {
         mScriptId := item.Has("mouseScriptId") ? item["mouseScriptId"] : ""
         if (mScriptId != "") {
-            ExecuteSavedMouseScriptById(mScriptId)
+            cleanId := SubStr(mScriptId, 1, 3) = "ms-" ? SubStr(mScriptId, 4) : mScriptId
+            ExecuteSavedMouseScriptById(cleanId)
         }
 
     } else if (actionType = "macro") {
         macroId := item.Has("macroId") ? item["macroId"] : ""
         if (macroId != "") {
-            ExecuteMacroById(macroId)
+            cleanId := SubStr(macroId, 1, 6) = "macro-" ? SubStr(macroId, 7) : macroId
+            ExecuteMacroById(cleanId)
         }
 
     } else if (actionType = "key") {
@@ -496,6 +480,10 @@ FireScreenScannerAction(item, foundX, foundY) {
             SoundSetMute(-1)
         } else if (sysAct = "beep") {
             SoundBeep(1500, 200)
+        } else if (sysAct = "osd") {
+            ; On-screen alert handled by notification
+        } else {
+            ExecuteSystemAction(sysAct, "Screen Scanner: " . ruleName)
         }
     }
 

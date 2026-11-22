@@ -36,15 +36,17 @@
               return;
             }
 
-            const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+            const isCaps = (typeof isCapsLockHeld !== 'undefined' ? isCapsLockHeld : false) || evt.key === 'CapsLock';
+            const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS', 'CapsLock'].includes(evt.key);
             const parts = [];
             if (evt.ctrlKey) parts.push('Ctrl');
             if (evt.altKey) parts.push('Alt');
             if (evt.shiftKey) parts.push('Shift');
             if (evt.metaKey) parts.push('Win');
+            if (isCaps && !parts.includes('CapsLock')) parts.push('CapsLock');
 
             if (isModifier) {
-              pendingMod = (evt.key === 'Control') ? 'Ctrl' : ((evt.key === 'Shift') ? 'Shift' : ((evt.key === 'Alt') ? 'Alt' : 'Win'));
+              pendingMod = (evt.key === 'Control') ? 'Ctrl' : ((evt.key === 'Shift') ? 'Shift' : ((evt.key === 'Alt') ? 'Alt' : ((evt.key === 'CapsLock') ? 'CapsLock' : 'Win')));
               if (labelEl) labelEl.textContent = parts.join(' + ') + ' + ...';
               return;
             }
@@ -96,6 +98,22 @@
               key = '/';
             } else if (key.length === 1) {
               key = key.toUpperCase();
+            }
+
+            if ((key === 'Unidentified' || !key) && evt.keyCode) {
+              if (evt.keyCode >= 65 && evt.keyCode <= 90) {
+                key = String.fromCharCode(evt.keyCode);
+              } else if (evt.keyCode >= 48 && evt.keyCode <= 57) {
+                key = String.fromCharCode(evt.keyCode);
+              } else if (evt.keyCode >= 96 && evt.keyCode <= 105) {
+                key = 'Numpad' + (evt.keyCode - 96);
+              } else if (evt.keyCode >= 112 && evt.keyCode <= 123) {
+                key = 'F' + (evt.keyCode - 111);
+              }
+            }
+
+            if (!key || key === 'Unidentified') {
+              return;
             }
 
             if (!parts.includes(key)) {
@@ -905,12 +923,14 @@
             return;
           }
 
-          const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+          const isCaps = (typeof isCapsLockHeld !== 'undefined' ? isCapsLockHeld : false) || evt.key === 'CapsLock';
+          const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS', 'CapsLock'].includes(evt.key);
           const parts = [];
           if (evt.ctrlKey) parts.push('Ctrl');
           if (evt.altKey) parts.push('Alt');
           if (evt.shiftKey) parts.push('Shift');
           if (evt.metaKey) parts.push('Win');
+          if (isCaps && !parts.includes('CapsLock')) parts.push('CapsLock');
 
           if (isModifier) {
             badgeEl.textContent = parts.join(' + ') + ' + ...';
@@ -936,6 +956,24 @@
             key = 'Left';
           } else if (key === 'ArrowRight') {
             key = 'Right';
+          } else if (key.length === 1) {
+            key = key.toUpperCase();
+          }
+
+          if ((key === 'Unidentified' || !key) && evt.keyCode) {
+            if (evt.keyCode >= 65 && evt.keyCode <= 90) {
+              key = String.fromCharCode(evt.keyCode);
+            } else if (evt.keyCode >= 48 && evt.keyCode <= 57) {
+              key = String.fromCharCode(evt.keyCode);
+            } else if (evt.keyCode >= 96 && evt.keyCode <= 105) {
+              key = 'Numpad' + (evt.keyCode - 96);
+            } else if (evt.keyCode >= 112 && evt.keyCode <= 123) {
+              key = 'F' + (evt.keyCode - 111);
+            }
+          }
+
+          if (!key || key === 'Unidentified') {
+            return;
           }
 
           parts.push(key);
@@ -1275,12 +1313,14 @@
               return;
             }
 
-            const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
+            const isCaps = (typeof isCapsLockHeld !== 'undefined' ? isCapsLockHeld : false) || evt.key === 'CapsLock';
+            const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS', 'CapsLock'].includes(evt.key);
             const parts = [];
             if (evt.ctrlKey) parts.push('Ctrl');
             if (evt.altKey) parts.push('Alt');
             if (evt.shiftKey) parts.push('Shift');
             if (evt.metaKey) parts.push('Win');
+            if (isCaps && !parts.includes('CapsLock')) parts.push('CapsLock');
 
             if (isModifier) {
               badgeEl.textContent = parts.join(' + ') + ' + ...';
@@ -1306,6 +1346,24 @@
               key = 'Left';
             } else if (key === 'ArrowRight') {
               key = 'Right';
+            } else if (key.length === 1) {
+              key = key.toUpperCase();
+            }
+
+            if ((key === 'Unidentified' || !key) && evt.keyCode) {
+              if (evt.keyCode >= 65 && evt.keyCode <= 90) {
+                key = String.fromCharCode(evt.keyCode);
+              } else if (evt.keyCode >= 48 && evt.keyCode <= 57) {
+                key = String.fromCharCode(evt.keyCode);
+              } else if (evt.keyCode >= 96 && evt.keyCode <= 105) {
+                key = 'Numpad' + (evt.keyCode - 96);
+              } else if (evt.keyCode >= 112 && evt.keyCode <= 123) {
+                key = 'F' + (evt.keyCode - 111);
+              }
+            }
+
+            if (!key || key === 'Unidentified') {
+              return;
             }
 
             parts.push(key);

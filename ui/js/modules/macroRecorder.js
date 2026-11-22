@@ -744,7 +744,7 @@
     }
 
     function populateScannerActionDropdowns() {
-      // Populate Mouse Recording Scripts
+      // 1. Populate Mouse Recording Scripts
       const selMouse = document.getElementById('ssSelectMouseScript');
       if (selMouse) {
         selMouse.innerHTML = '';
@@ -763,7 +763,7 @@
         }
       }
 
-      // Populate Macros
+      // 2. Populate Macros
       const selMacro = document.getElementById('ssSelectMacro');
       if (selMacro) {
         selMacro.innerHTML = '';
@@ -781,6 +781,112 @@
           });
         }
       }
+
+      // 3. Populate App Launcher Scripts
+      const selAppLauncher = document.getElementById('ssSelectAppLauncher');
+      if (selAppLauncher) {
+        selAppLauncher.innerHTML = '';
+        const launchers = (state.config && state.config.appLauncher && Array.isArray(state.config.appLauncher.items))
+          ? state.config.appLauncher.items
+          : [];
+        if (launchers.length === 0) {
+          selAppLauncher.innerHTML = '<option value="">No App Launcher scripts available (create one in App Launcher)</option>';
+        } else {
+          launchers.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l.id;
+            const name = l.name || l.target || 'Application';
+            opt.textContent = `${name} (${l.trigger || 'No Hotkey'})`;
+            selAppLauncher.appendChild(opt);
+          });
+        }
+      }
+
+      // 4. Populate System Tools & Scripts inside System Action Dropdown
+      const selSys = document.getElementById('ssSelectSystemAction');
+      if (selSys) {
+        const curVal = selSys.value || 'beep';
+        selSys.innerHTML = `
+          <optgroup label="System Alerts">
+            <option value="beep">Play Sound Alert</option>
+            <option value="osd">On-Screen Alert Only</option>
+          </optgroup>
+          <optgroup label="System Tools">
+            <option value="ScreenOcr">Instant Screen OCR</option>
+            <option value="ColorPicker">Color Picker</option>
+            <option value="AlwaysOnTop">Toggle Always-on-Top</option>
+            <option value="GhostMode">Toggle Ghost Click-Through</option>
+            <option value="CleanText">Clean Plain Text</option>
+            <option value="Screenshot">Screen Snip (Win+Shift+S)</option>
+            <option value="ShowDesktop">Show Desktop (Win+D)</option>
+            <option value="TaskView">Task View (Win+Tab)</option>
+            <option value="LockWorkstation">Lock PC</option>
+            <option value="sleep">Put PC to Sleep</option>
+            <option value="Hibernate">Hibernate PC</option>
+            <option value="mute">Toggle Audio Mute</option>
+            <option value="VolumeUp">Volume Up (+4%)</option>
+            <option value="VolumeDown">Volume Down (-4%)</option>
+            <option value="NextDesktop">Next Virtual Desktop</option>
+            <option value="PrevDesktop">Previous Virtual Desktop</option>
+            <option value="ClipboardHistory">Clipboard History (Win+V)</option>
+            <option value="EmojiPicker">Emoji & Symbols (Win+.)</option>
+            <option value="FileExplorer">File Explorer (Win+E)</option>
+            <option value="Calculator">Calculator</option>
+          </optgroup>
+        `;
+
+        // App Launcher saved scripts inside System dropdown
+        const launchers = (state.config && state.config.appLauncher && Array.isArray(state.config.appLauncher.items))
+          ? state.config.appLauncher.items : [];
+        if (launchers.length > 0) {
+          const grp = document.createElement('optgroup');
+          grp.label = 'App Launcher Scripts';
+          launchers.forEach(l => {
+            const opt = document.createElement('option');
+            const cleanId = String(l.id).startsWith('al-') ? l.id : `al-${l.id}`;
+            opt.value = cleanId;
+            opt.textContent = `Launch: ${l.name || l.target || 'App'}`;
+            grp.appendChild(opt);
+          });
+          selSys.appendChild(grp);
+        }
+
+        // Mouse Studio scripts inside System dropdown
+        const mouseScripts = (state.config && state.config.autoClicker && Array.isArray(state.config.autoClicker.items))
+          ? state.config.autoClicker.items : [];
+        if (mouseScripts.length > 0) {
+          const grp = document.createElement('optgroup');
+          grp.label = 'Mouse Studio Scripts';
+          mouseScripts.forEach(s => {
+            const opt = document.createElement('option');
+            const cleanId = String(s.id).startsWith('ms-') ? s.id : `ms-${s.id}`;
+            opt.value = cleanId;
+            opt.textContent = `Mouse Script: ${s.name || 'Script'}`;
+            grp.appendChild(opt);
+          });
+          selSys.appendChild(grp);
+        }
+
+        // Macro Recorder scripts inside System dropdown
+        const macros = (state.config && state.config.macroRecorder && Array.isArray(state.config.macroRecorder.items))
+          ? state.config.macroRecorder.items : [];
+        if (macros.length > 0) {
+          const grp = document.createElement('optgroup');
+          grp.label = 'Macro Recorder Scripts';
+          macros.forEach(m => {
+            const opt = document.createElement('option');
+            const cleanId = String(m.id).startsWith('macro-') ? m.id : `macro-${m.id}`;
+            opt.value = cleanId;
+            opt.textContent = `Macro: ${m.name || 'Macro'}`;
+            grp.appendChild(opt);
+          });
+          selSys.appendChild(grp);
+        }
+
+        if (curVal) {
+          selSys.value = curVal;
+        }
+      }
     }
 
     function updateScreenScannerEngineStatus() {
@@ -792,15 +898,12 @@
         hint.textContent = 'Engine Suspended';
         return;
       }
-      const ss = (state.config && state.config.screenScanner) || {};
-      const hk = (ss.hotkey && String(ss.hotkey).trim() !== '') ? String(ss.hotkey).trim() : 'F9';
-      const hkDisplay = formatKeyDisplay(hk);
 
       if (screenScannerRunning || (activeScanningScreenTriggers && activeScanningScreenTriggers.size > 0)) {
         const cnt = (activeScanningScreenTriggers && activeScanningScreenTriggers.size > 0) ? activeScanningScreenTriggers.size : 1;
         hint.className = 'hint-tag ss-active-engine-badge is-scanning';
         hint.style.color = '#ef4444';
-        hint.innerHTML = `<span class="ss-running-dot" style="background:#ef4444;"></span> SCANNING ACTIVE (${cnt}) • Press ${escapeHtml(hkDisplay)} or Stop to halt`;
+        hint.innerHTML = `<span class="ss-running-dot" style="background:#ef4444;"></span> SCANNING ACTIVE (${cnt}) • Click Stop to halt`;
       } else if (activeRunningScreenTriggers && activeRunningScreenTriggers.size > 0) {
         const first = activeRunningScreenTriggers.values().next().value;
         hint.className = 'hint-tag ss-active-engine-badge';
@@ -809,28 +912,19 @@
       } else {
         hint.className = 'hint-tag';
         hint.style.color = 'var(--text-muted)';
-        hint.innerHTML = `<span>Ready (Press ${escapeHtml(hkDisplay)} or Start to Scan)</span>`;
+        hint.innerHTML = `<span>Ready (Click Start to Scan All)</span>`;
       }
     }
 
     function updateScreenScannerMasterUI(isRunning) {
       screenScannerRunning = Boolean(isRunning);
-      const ss = (state.config && state.config.screenScanner) || {};
-      const hk = (ss.hotkey && String(ss.hotkey).trim() !== '') ? String(ss.hotkey).trim() : 'F9';
-      const hkDisplay = formatKeyDisplay(hk);
-
-      const hotkeyBox = document.getElementById('ssMasterHotkeyBox');
-      const hotkeyLabel = document.getElementById('ssMasterHotkeyLabel');
-      if (hotkeyLabel) hotkeyLabel.textContent = hkDisplay;
-      if (hotkeyBox) hotkeyBox.title = `Click to record master shortcut (Current: ${hkDisplay})`;
-
       const btnToggle = document.getElementById('btnToggleScreenScannerMaster');
       const btnText = document.getElementById('ssMasterToggleBtnText');
       if (btnToggle) {
         btnToggle.classList.toggle('is-running', screenScannerRunning);
       }
       if (btnText) {
-        btnText.textContent = screenScannerRunning ? `STOP SCAN (${hkDisplay})` : `START SCAN (${hkDisplay})`;
+        btnText.textContent = screenScannerRunning ? 'STOP SCAN ALL' : 'START SCAN ALL';
       }
       updateScreenScannerEngineStatus();
     }

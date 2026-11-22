@@ -229,6 +229,15 @@
                   <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
                 </svg>
               </button>
+              <button class="squircle-btn lgs-mini-btn btn-block-sys-keys" id="btnBlockSysKeys"
+                title="Prevent Key Presses from Activating (Block Win+D Desktop, Win Key, etc.)">
+                <svg class="icon-svg" id="iconBlockSysKeys" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2">
+                  <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                  <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"></path>
+                  <line x1="2" y1="2" x2="22" y2="22"></line>
+                </svg>
+              </button>
               <button class="squircle-btn lgs-mini-btn btn-danger-profile" id="btnDeleteProfile" title="Delete Profile">
                 <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"></polyline>
@@ -2685,24 +2694,14 @@
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
-              <!-- Master Start/Stop Shortcut Display -->
-              <div class="ac-hotkey-display" id="ssMasterHotkeyBox"
-                title="Click to record master shortcut (Default: F9)"
-                style="height:36px; padding:0 12px; cursor:pointer;">
-                <svg class="hotkey-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                </svg>
-                <span id="ssMasterHotkeyLabel">F9</span>
-              </div>
-
               <!-- Master Start / Stop Scan Button -->
               <button type="button" class="neumorphic-btn ac-toggle-btn ss-master-toggle-btn"
                 id="btnToggleScreenScannerMaster"
-                style="height:36px; padding:0 16px; font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+                style="height:36px; padding:0 18px; font-weight:700; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>
                 </svg>
-                <span id="ssMasterToggleBtnText">START SCAN (F9)</span>
+                <span id="ssMasterToggleBtnText">START SCAN ALL</span>
               </button>
 
               <!-- Master On/Off Toggle Switch -->
@@ -2725,7 +2724,7 @@
               <div class="ac-setting-card" style="padding: 16px 18px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                   <span class="setting-title">Visual Trigger Setup</span>
-                  <span class="hint-tag" id="ssEngineStatusHint">Ready (Press Shortcut to Scan)</span>
+                  <span class="hint-tag" id="ssEngineStatusHint">Ready (Click Start to Scan All)</span>
                 </div>
 
                 <div class="inputs-row" style="display:flex; gap:10px; margin-bottom:12px;">
@@ -2984,6 +2983,7 @@
                   <button class="ac-pill-btn active" data-act="click">Click</button>
                   <button class="ac-pill-btn" data-act="mouseScript">Mouse Script</button>
                   <button class="ac-pill-btn" data-act="macro">Macro</button>
+                  <button class="ac-pill-btn" data-act="appLauncher">App Launcher</button>
                   <button class="ac-pill-btn" data-act="key">Key Combo</button>
                   <button class="ac-pill-btn" data-act="system">System</button>
                 </div>
@@ -3036,6 +3036,15 @@
                   <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Macro:</span>
                   <div class="custom-select-wrapper" style="flex:1;">
                     <select id="ssSelectMacro" class="custom-select"></select>
+                  </div>
+                </div>
+
+                <!-- Action Details: App Launcher -->
+                <div class="hidden-field" id="ssActionDetailAppLauncher"
+                  style="display:flex; gap:10px; align-items:center;">
+                  <span style="font-size:11px; font-weight:600; color:var(--text-secondary);">Launcher / Script:</span>
+                  <div class="custom-select-wrapper" style="flex:1;">
+                    <select id="ssSelectAppLauncher" class="custom-select"></select>
                   </div>
                 </div>
 
@@ -3624,18 +3633,18 @@
             <div class="theme-section">
               <div class="theme-section-header">
                 <span class="theme-section-title">Profile Switch Notification</span>
-                <span class="theme-section-subtitle">Choose how profile switches are displayed on your screen</span>
+                <span class="theme-section-subtitle">Global on-screen notification style applied across all profiles</span>
               </div>
-              <div class="theme-toggle-row">
-                <div class="theme-toggle-label-group">
-                  <span class="theme-toggle-label">Icon Only Notification</span>
-                  <span class="theme-toggle-desc">Show only the profile icon without the text pill</span>
+              <div class="theme-toggle-row" style="align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div class="theme-toggle-label-group" style="flex: 1; min-width: 180px;">
+                  <span class="theme-toggle-label">Notification Mode</span>
+                  <span class="theme-toggle-desc" id="themeOsdModeDesc">Display both profile icon and name pill</span>
                 </div>
-                <div class="toggle-wrapper" title="Show only icon in profile notification">
-                  <input class="toggle-checkbox" type="checkbox" id="themeOsdIconOnly">
-                  <div class="toggle-container">
-                    <div class="toggle-button"></div>
-                  </div>
+                <div class="trigger-mode-pills" id="themeOsdModePills" role="toolbar" aria-label="Profile Notification Display Mode">
+                  <button type="button" class="trigger-pill active" id="btnOsdBoth" data-mode="both">Icon & Text</button>
+                  <button type="button" class="trigger-pill" id="btnOsdIcon" data-mode="icon">Icon Only</button>
+                  <button type="button" class="trigger-pill" id="btnOsdText" data-mode="text">Text Only</button>
+                  <button type="button" class="trigger-pill" id="btnOsdOff" data-mode="off">Disabled</button>
                 </div>
               </div>
             </div>
@@ -3745,22 +3754,7 @@
               </div>
             </div>
 
-            <!-- Option 2: Show App Icon on Switch (OSD HUD) -->
-            <div class="profile-option-row profile-trigger-card" id="profOsdRow">
-              <div class="profile-option-header">
-                <div class="profile-option-text">
-                  <span class="option-title">Show App Icon on Switch</span>
-                  <span class="option-desc">Display a sleek floating on-screen HUD badge showing the target app icon
-                    whenever switched.</span>
-                </div>
-                <div class="toggle-wrapper" title="Show app icon popup on profile switch">
-                  <input class="toggle-checkbox" type="checkbox" id="profSwitchOsdIcon" checked>
-                  <div class="toggle-container">
-                    <div class="toggle-button"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
+
 
             <!-- Profile Info Tip -->
             <div class="profile-info-tip" id="profileInfoTip">

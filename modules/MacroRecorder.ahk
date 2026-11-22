@@ -36,26 +36,25 @@ RegisterSingleMacro(item) {
 
     trig := Trim(item["trigger"])
     ahkHk := NormalizeHotkeyToAhk(trig)
-    if (ahkHk = "")
-        ahkHk := trig
-
-    safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*")) ? ahkHk : "$" . ahkHk
     mode := item.Has("playbackMode") ? item["playbackMode"] : "NoRepeat"
 
     switch mode {
         case "RepeatWhileHolding":
-            Hotkey(safeHk, (*) => StartMacroHold(item), "On")
-            Hotkey(safeHk . " Up", (*) => StopMacroHold(item), "On")
-            g_ActiveHotkeys.Push(safeHk)
-            g_ActiveHotkeys.Push(safeHk . " Up")
+            RegisterUniversalHotkey(trig, (*) => StartMacroHold(item))
+            if (!InStr(ahkHk, "CapsLock &")) {
+                safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*") || InStr(ahkHk, "&")) ? ahkHk : "$" . ahkHk
+                try {
+                    HotIf()
+                    Hotkey(safeHk . " Up", (*) => StopMacroHold(item), "On")
+                    g_ActiveHotkeys.Push(safeHk . " Up")
+                }
+            }
 
         case "Toggle":
-            Hotkey(safeHk, (*) => ToggleMacroLoop(item), "On")
-            g_ActiveHotkeys.Push(safeHk)
+            RegisterUniversalHotkey(trig, (*) => ToggleMacroLoop(item))
 
         default: ; NoRepeat / Once
-            Hotkey(safeHk, (*) => ExecuteMacroAsync(item), "On")
-            g_ActiveHotkeys.Push(safeHk)
+            RegisterUniversalHotkey(trig, (*) => ExecuteMacroAsync(item))
     }
 }
 
@@ -373,4 +372,3 @@ NormalizeRecordedKey(vk, sc) {
     }
     return kName
 }
-

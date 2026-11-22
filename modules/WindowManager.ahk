@@ -17,40 +17,19 @@ ApplyWindowManager() {
     ; Always-on-Top Hotkey
     if ((!wm.Has("alwaysOnTopEnabled") || wm["alwaysOnTopEnabled"]) && wm.Has("alwaysOnTopHotkey") && Trim(wm[
         "alwaysOnTopHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["alwaysOnTopHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => ToggleAlwaysOnTop(), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["alwaysOnTopHotkey"]), (*) => ToggleAlwaysOnTop())
     }
 
     ; Center Window Hotkey
     if ((!wm.Has("centerWindowEnabled") || wm["centerWindowEnabled"]) && wm.Has("centerWindowHotkey") && Trim(wm[
         "centerWindowHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["centerWindowHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => CenterActiveWindow(), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["centerWindowHotkey"]), (*) => CenterActiveWindow())
     }
 
     ; Boss Key / Hide Active Window Hotkey
     if ((!wm.Has("hideWindowEnabled") || wm["hideWindowEnabled"]) && wm.Has("hideWindowHotkey") && Trim(wm[
         "hideWindowHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["hideWindowHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => HideActiveWindow(), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["hideWindowHotkey"]), (*) => HideActiveWindow())
     }
 
     ; Mouse Wheel Transparency (#WheelUp / #WheelDown)
@@ -80,65 +59,30 @@ ApplyWindowManager() {
     ; Mute Active Application Hotkey
     if ((!wm.Has("appVolumeMuteEnabled") || wm["appVolumeMuteEnabled"]) && wm.Has("appVolumeMuteHotkey") && Trim(wm[
         "appVolumeMuteHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["appVolumeMuteHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => ToggleActiveAppMute(), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["appVolumeMuteHotkey"]), (*) => ToggleActiveAppMute())
     }
 
     ; Mute Master Audio Hotkey
     if ((!wm.Has("masterAudioMuteEnabled") || wm["masterAudioMuteEnabled"]) && wm.Has("masterAudioMuteHotkey") && Trim(
         wm["masterAudioMuteHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["masterAudioMuteHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => (SoundSetMute(-1), SoundBeep(650, 40)), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["masterAudioMuteHotkey"]), (*) => (SoundSetMute(-1), SoundBeep(650, 40)))
     }
 
     ; Click-Through Ghost Mode Hotkey
     if (wm.Has("clickThroughGhostHotkey") && Trim(wm["clickThroughGhostHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["clickThroughGhostHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => ToggleGhostMode(), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["clickThroughGhostHotkey"]), (*) => ToggleGhostMode())
     }
 
     ; Window Shade / Roll Up Hotkey
     if ((!wm.Has("windowShadeEnabled") || wm["windowShadeEnabled"]) && wm.Has("windowShadeHotkey") && Trim(wm[
         "windowShadeHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["windowShadeHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => ToggleWindowShade(), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["windowShadeHotkey"]), (*) => ToggleWindowShade())
     }
 
     ; Force Borderless Fullscreen Hotkey
     if ((!wm.Has("borderlessEnabled") || wm["borderlessEnabled"]) && wm.Has("borderlessHotkey") && Trim(wm[
         "borderlessHotkey"]) != "") {
-        try {
-            rawHk := Trim(wm["borderlessHotkey"])
-            hk := NormalizeHotkeyToAhk(rawHk)
-            if (hk = "")
-                hk := rawHk
-            Hotkey(hk, (*) => ToggleBorderlessFullscreen(), "On")
-            g_ActiveHotkeys.Push(hk)
-        }
+        RegisterUniversalHotkey(Trim(wm["borderlessHotkey"]), (*) => ToggleBorderlessFullscreen())
     }
 
     ; Text Transformer (Case Converters: UPPER, lower, Title Case)
@@ -149,72 +93,30 @@ ApplyWindowManager() {
             "textTransformLowerHotkey"]) : "^!l"
         rawTitle := (wm.Has("textTransformTitleHotkey") && Trim(wm["textTransformTitleHotkey"]) != "") ? Trim(wm[
             "textTransformTitleHotkey"]) : "^!t"
-        upperHk := NormalizeHotkeyToAhk(rawUpper)
-        if (upperHk = "") {
-            upperHk := rawUpper
-        }
-        lowerHk := NormalizeHotkeyToAhk(rawLower)
-        if (lowerHk = "") {
-            lowerHk := rawLower
-        }
-        titleHk := NormalizeHotkeyToAhk(rawTitle)
-        if (titleHk = "") {
-            titleHk := rawTitle
-        }
-        try {
-            Hotkey(upperHk, (*) => TransformSelectedText("upper"), "On")
-            g_ActiveHotkeys.Push(upperHk)
-        }
-        try {
-            Hotkey(lowerHk, (*) => TransformSelectedText("lower"), "On")
-            g_ActiveHotkeys.Push(lowerHk)
-        }
-        try {
-            Hotkey(titleHk, (*) => TransformSelectedText("title"), "On")
-            g_ActiveHotkeys.Push(titleHk)
-        }
+        RegisterUniversalHotkey(rawUpper, (*) => TransformSelectedText("upper"))
+        RegisterUniversalHotkey(rawLower, (*) => TransformSelectedText("lower"))
+        RegisterUniversalHotkey(rawTitle, (*) => TransformSelectedText("title"))
     }
 
     ; Clean Plain Text & Strip Formatting Hotkey
     if (!wm.Has("textTransformCleanEnabled") || wm["textTransformCleanEnabled"]) {
         rawClean := (wm.Has("textTransformCleanHotkey") && Trim(wm["textTransformCleanHotkey"]) != "") ? Trim(wm[
             "textTransformCleanHotkey"]) : "^!k"
-        cleanHk := NormalizeHotkeyToAhk(rawClean)
-        if (cleanHk = "") {
-            cleanHk := rawClean
-        }
-        try {
-            Hotkey(cleanHk, (*) => TransformSelectedText("clean"), "On")
-            g_ActiveHotkeys.Push(cleanHk)
-        }
+        RegisterUniversalHotkey(rawClean, (*) => TransformSelectedText("clean"))
     }
 
     ; Instant Screen OCR (Text Grabber) Hotkey
     if (!wm.Has("screenOcrEnabled") || wm["screenOcrEnabled"]) {
         rawOcr := (wm.Has("screenOcrHotkey") && Trim(wm["screenOcrHotkey"]) != "") ? Trim(wm["screenOcrHotkey"]) :
             "^!o"
-        ocrHk := NormalizeHotkeyToAhk(rawOcr)
-        if (ocrHk = "") {
-            ocrHk := rawOcr
-        }
-        try {
-            Hotkey(ocrHk, (*) => StartScreenOCR(), "On")
-            g_ActiveHotkeys.Push(ocrHk)
-        }
+        RegisterUniversalHotkey(rawOcr, (*) => StartScreenOCR())
     }
 
     ; Precision Screen Color Picker Hotkey
     if (!wm.Has("colorPickerEnabled") || wm["colorPickerEnabled"]) {
         rawCp := (wm.Has("colorPickerHotkey") && Trim(wm["colorPickerHotkey"]) != "") ? Trim(wm["colorPickerHotkey"]) :
             "^!p"
-        cpHk := NormalizeHotkeyToAhk(rawCp)
-        if (cpHk = "") {
-            cpHk := rawCp
-        }
-        try {
-            Hotkey(cpHk, (*) => StartColorPicker(), "On")
-            g_ActiveHotkeys.Push(cpHk)
-        }
+        RegisterUniversalHotkey(rawCp, (*) => StartColorPicker())
     }
 
     ; Fast Virtual Desktop Navigation Hotkeys & Taskbar Mouse Wheel Hopping
@@ -243,14 +145,7 @@ ApplyWindowManager() {
     ; Quick PC Sleep / Hibernate Hotkey (Win+S)
     if (!wm.Has("sleepEnabled") || wm["sleepEnabled"] = 1 || wm["sleepEnabled"] = true) {
         rawSleep := (wm.Has("sleepHotkey") && Trim(wm["sleepHotkey"]) != "") ? Trim(wm["sleepHotkey"]) : "#s"
-        sleepHk := NormalizeHotkeyToAhk(rawSleep)
-        if (sleepHk = "") {
-            sleepHk := rawSleep
-        }
-        try {
-            Hotkey(sleepHk, (*) => TriggerSleepOrHibernate(), "On")
-            g_ActiveHotkeys.Push(sleepHk)
-        }
+        RegisterUniversalHotkey(rawSleep, (*) => TriggerSleepOrHibernate())
 
         ; Register Esc cancellation hook while countdown is running
         try {

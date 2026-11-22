@@ -20,6 +20,10 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
             case "getInitialState":
                 SendInitialStateToWeb()
 
+            case "logError":
+                errMsg := msg.Has("error") ? msg["error"] : "Unknown WebUI error"
+                LogMessage(errMsg)
+
             case "launchColorPicker":
                 StartColorPicker()
 
@@ -27,6 +31,10 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                 profName := msg.Has("profile") ? msg["profile"] : (g_Config.Has("activeProfile") ? g_Config[
                     "activeProfile"] : "Default")
                 ProfileOsdHUD.ShowProfileHUD(profName)
+
+            case "setBlockSystemKeys":
+                enabled := msg.Has("enabled") ? (msg["enabled"] = true || msg["enabled"] = 1) : true
+                SetBlockSystemKeysState(enabled)
 
             case "previewCornerZones":
                 size := msg.Has("size") ? Integer(msg["size"]) : 14
@@ -181,6 +189,10 @@ OnWebMessageReceived(thisPtr, senderPtr, argsPtr) {
                 }
 
             case "close":
+                MinimizeToTray()
+
+            case "exit":
+            case "quit":
                 SetTimer(() => ExitApp(), -1)
 
             case "openLog":

@@ -85,6 +85,15 @@
             const foundM = state.config.macroRecorder.items.find(x => x.id === item.macroId);
             if (foundM && foundM.name) targetSubName = foundM.name;
           }
+        } else if (item.actionType === 'appLauncher') {
+          actionLabel = 'App Launcher';
+          if (state.config.appLauncher && Array.isArray(state.config.appLauncher.items)) {
+            const foundL = state.config.appLauncher.items.find(x => String(x.id) === String(item.appLauncherId) || `al-${x.id}` === String(item.appLauncherId));
+            if (foundL) {
+              targetSubName = foundL.name || foundL.target;
+              actionLabel = `Launch: ${targetSubName}`;
+            }
+          }
         } else if (item.actionType === 'key') {
           actionLabel = `Send Key: ${item.keyToSend || '{Key}'}`;
         } else if (item.actionType === 'system') {
@@ -108,6 +117,8 @@
             runText = `RUNNING SCRIPT: ${targetSubName || 'Mouse Path'}`;
           } else if (item.actionType === 'macro') {
             runText = `RUNNING MACRO: ${targetSubName || 'Macro'}`;
+          } else if (item.actionType === 'appLauncher') {
+            runText = `LAUNCHING: ${targetSubName || 'App'}`;
           } else if (item.actionType === 'click') {
             runText = `EXECUTING ${item.clickButton || 'Left'} Click`;
           } else if (item.actionType === 'key') {
@@ -131,7 +142,6 @@
           </div>
           <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${escapeHtml(item.name || 'Visual Trigger')}</span>
               <span class="ss-item-name" style="font-weight:700; font-size:13px; color:var(--text-primary); cursor:pointer;" title="Click to edit">${escapeHtml(item.name || 'Visual Trigger')}</span>
               ${triggerBadge}
               ${runningBadgeHtml}
@@ -145,7 +155,6 @@
             </div>
           </div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
         <div class="card-actions" style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
           <button class="neumorphic-btn btn-chip btn-scan-ss-item ${isScanning ? 'is-scanning' : ''}" style="${isScanning ? 'color:#ef4444; font-weight:700;' : ''}" title="${isScanning ? 'Scanning active • Click or press ' + (item.trigger || 'shortcut') + ' to Stop' : 'Start scan (or press ' + (item.trigger || 'shortcut') + ')'}">
             ${isScanning ? '<span class="ss-running-dot" style="background:#ef4444; margin-right:4px;"></span> Stop Scan' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="margin-right:4px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>Start Scan</span>'}
@@ -155,20 +164,16 @@
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
               <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
-          <button class="card-btn btn-edit btn-edit-ss" title="Edit Visual Trigger">
+            </svg>
+            <span>${isRunning ? 'Triggered!' : 'Test'}</span>
+          </button>
+          <button class="card-btn btn-edit btn-edit-ss" title="Edit Visual Trigger" data-id="${item.id}">
             <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-            <span>${isRunning ? 'Triggered!' : 'Test'}</span>
           </button>
-          <div class="toggle-wrapper" title="Toggle trigger active/inactive">
-            <input class="toggle-checkbox ss-item-toggle" type="checkbox" ${item.enabled !== 0 && item.enabled !== false ? 'checked' : ''} />
-            <div class="toggle-container"><div class="toggle-button"></div></div>
-          </div>
-          <button class="icon-btn btn-delete-ss" title="Delete trigger" style="color:var(--text-muted); width:30px; height:30px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-          <button class="card-btn btn-delete btn-delete-ss" title="Delete Visual Trigger">
+          <button class="card-btn btn-delete btn-delete-ss" title="Delete Visual Trigger" data-id="${item.id}">
             <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -363,11 +368,13 @@
       const detailClick = document.getElementById('ssActionDetailClick');
       const detailMouseScript = document.getElementById('ssActionDetailMouseScript');
       const detailMacro = document.getElementById('ssActionDetailMacro');
+      const detailAppLauncher = document.getElementById('ssActionDetailAppLauncher');
       const detailKey = document.getElementById('ssActionDetailKey');
       const detailSystem = document.getElementById('ssActionDetailSystem');
       if (detailClick) detailClick.classList.toggle('hidden-field', ssCurrentAction !== 'click');
       if (detailMouseScript) detailMouseScript.classList.toggle('hidden-field', ssCurrentAction !== 'mouseScript');
       if (detailMacro) detailMacro.classList.toggle('hidden-field', ssCurrentAction !== 'macro');
+      if (detailAppLauncher) detailAppLauncher.classList.toggle('hidden-field', ssCurrentAction !== 'appLauncher');
       if (detailKey) detailKey.classList.toggle('hidden-field', ssCurrentAction !== 'key');
       if (detailSystem) detailSystem.classList.toggle('hidden-field', ssCurrentAction !== 'system');
 
@@ -389,6 +396,8 @@
       if (selMouse && item.mouseScriptId) selMouse.value = item.mouseScriptId;
       const selMacro = document.getElementById('ssSelectMacro');
       if (selMacro && item.macroId) selMacro.value = item.macroId;
+      const selAppLauncher = document.getElementById('ssSelectAppLauncher');
+      if (selAppLauncher && item.appLauncherId) selAppLauncher.value = item.appLauncherId;
       const inputKey = document.getElementById('ssInputKey');
       if (inputKey) inputKey.value = item.keyToSend || '';
       const selSys = document.getElementById('ssSelectSystemAction');
@@ -464,186 +473,7 @@
       if (btnCancel) btnCancel.classList.add('hidden-field');
     }
 
-    let activeSsMasterRecording = false;
-    let activeSsMasterTargetBox = null;
-
-    function stopSsMasterRecording(restore = true) {
-      if (activeSsMasterRecording && activeSsMasterTargetBox && typeof activeSsMasterTargetBox._cancelSsMasterRecording === 'function') {
-        activeSsMasterTargetBox._cancelSsMasterRecording(restore);
-      }
-    }
-
-    function setupScreenScannerMasterHotkey() {
-      const boxEl = document.getElementById('ssMasterHotkeyBox');
-      const labelEl = document.getElementById('ssMasterHotkeyLabel');
-      if (!boxEl || boxEl.dataset.bound) return;
-      boxEl.dataset.bound = 'true';
-
-      boxEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        if (activeSsMasterRecording) {
-          stopSsMasterRecording(true);
-          return;
-        }
-
-        if (typeof stopActiveBadgeRecording === 'function') {
-          stopActiveBadgeRecording(true);
-        }
-        if (typeof stopAcRecording === 'function') {
-          stopAcRecording(true);
-        }
-
-        const ss = (state.config && state.config.screenScanner) || {};
-        const originalHk = (ss.hotkey && String(ss.hotkey).trim() !== '') ? String(ss.hotkey).trim() : 'F9';
-
-        activeSsMasterRecording = true;
-        activeSsMasterTargetBox = boxEl;
-        boxEl.classList.add('is-recording');
-        if (labelEl) labelEl.textContent = 'Press key...';
-
-        let pendingMod = null;
-
-        function onKeyDown(evt) {
-          evt.preventDefault();
-          evt.stopPropagation();
-
-          if (evt.key === 'Escape') {
-            cleanup(true);
-            showToast('Shortcut change cancelled');
-            return;
-          }
-
-          const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(evt.key);
-          const parts = [];
-          if (evt.ctrlKey) parts.push('Ctrl');
-          if (evt.altKey) parts.push('Alt');
-          if (evt.shiftKey) parts.push('Shift');
-          if (evt.metaKey) parts.push('Win');
-
-          if (isModifier) {
-            pendingMod = (evt.key === 'Control') ? 'Ctrl' : ((evt.key === 'Shift') ? 'Shift' : ((evt.key === 'Alt') ? 'Alt' : 'Win'));
-            if (labelEl) labelEl.textContent = parts.join(' + ') + ' + ...';
-            return;
-          }
-
-          pendingMod = null;
-
-          let key = evt.key;
-          if (evt.code && evt.code.startsWith('Key')) {
-            key = evt.code.slice(3).toUpperCase();
-          } else if (evt.code && evt.code.startsWith('Digit')) {
-            key = evt.code.slice(5);
-          } else if (evt.code && evt.code.startsWith('Numpad')) {
-            key = evt.code;
-          } else if (key === ' ') {
-            key = 'Space';
-          } else if (key === 'ArrowUp') {
-            key = 'Up';
-          } else if (key === 'ArrowDown') {
-            key = 'Down';
-          } else if (key === 'ArrowLeft') {
-            key = 'Left';
-          } else if (key === 'ArrowRight') {
-            key = 'Right';
-          } else if (key === 'PageUp') {
-            key = 'PgUp';
-          } else if (key === 'PageDown') {
-            key = 'PgDn';
-          } else if (evt.code === 'Minus') {
-            key = '-';
-          } else if (evt.code === 'Equal') {
-            key = '=';
-          } else if (evt.code === 'BracketLeft') {
-            key = '[';
-          } else if (evt.code === 'BracketRight') {
-            key = ']';
-          } else if (evt.code === 'Backslash') {
-            key = '\\';
-          } else if (evt.code === 'Semicolon') {
-            key = ';';
-          } else if (evt.code === 'Quote') {
-            key = "'";
-          } else if (evt.code === 'Backquote') {
-            key = '`';
-          } else if (evt.code === 'Comma') {
-            key = ',';
-          } else if (evt.code === 'Period') {
-            key = '.';
-          } else if (evt.code === 'Slash') {
-            key = '/';
-          } else if (key.length === 1) {
-            key = key.toUpperCase();
-          }
-
-          if (!parts.includes(key)) {
-            parts.push(key);
-          }
-
-          const combo = parts.join(' + ');
-          const ahkHk = comboToAhk(combo);
-
-          if (!state.config.screenScanner) state.config.screenScanner = {};
-          state.config.screenScanner.hotkey = ahkHk;
-
-          cleanup(false);
-          saveCurrentProfileState();
-          syncConfig();
-          updateScreenScannerMasterUI(screenScannerRunning);
-          showToast(`Screen Scanner shortcut set to: ${formatKeyDisplay(ahkHk)}`);
-        }
-
-        function onKeyUp(evt) {
-          if (pendingMod) {
-            const combo = pendingMod;
-            const ahkHk = comboToAhk(combo);
-            if (!state.config.screenScanner) state.config.screenScanner = {};
-            state.config.screenScanner.hotkey = ahkHk;
-            cleanup(false);
-            saveCurrentProfileState();
-            syncConfig();
-            updateScreenScannerMasterUI(screenScannerRunning);
-            showToast(`Screen Scanner shortcut set to: ${formatKeyDisplay(ahkHk)}`);
-            pendingMod = null;
-          }
-        }
-
-        function onDocClick(evt) {
-          if (!boxEl.contains(evt.target)) {
-            cleanup(true);
-          }
-        }
-
-        function cleanup(restore) {
-          activeSsMasterRecording = false;
-          activeSsMasterTargetBox = null;
-          boxEl.classList.remove('is-recording');
-          window.removeEventListener('keydown', onKeyDown, true);
-          window.removeEventListener('keyup', onKeyUp, true);
-          document.removeEventListener('click', onDocClick, true);
-          boxEl._cancelSsMasterRecording = null;
-          if (restore) {
-            const curSs = (state.config && state.config.screenScanner) || {};
-            const curHk = curSs.hotkey || 'F9';
-            if (labelEl) labelEl.textContent = formatKeyDisplay(curHk);
-          }
-        }
-
-        boxEl._cancelSsMasterRecording = cleanup;
-
-        window.addEventListener('keydown', onKeyDown, true);
-        window.addEventListener('keyup', onKeyUp, true);
-        setTimeout(() => {
-          document.addEventListener('click', onDocClick, true);
-        }, 50);
-      });
-    }
-
     function initScreenScanner() {
-      // Master Hotkey Setup
-      setupScreenScannerMasterHotkey();
-
       // Master Start/Stop Scan Button
       const btnToggleMaster = document.getElementById('btnToggleScreenScannerMaster');
       if (btnToggleMaster && !btnToggleMaster.dataset.bound) {
@@ -793,6 +623,7 @@
       const detailClick = document.getElementById('ssActionDetailClick');
       const detailMouseScript = document.getElementById('ssActionDetailMouseScript');
       const detailMacro = document.getElementById('ssActionDetailMacro');
+      const detailAppLauncher = document.getElementById('ssActionDetailAppLauncher');
       const detailKey = document.getElementById('ssActionDetailKey');
       const detailSystem = document.getElementById('ssActionDetailSystem');
 
@@ -806,6 +637,7 @@
             if (detailClick) detailClick.classList.toggle('hidden-field', ssCurrentAction !== 'click');
             if (detailMouseScript) detailMouseScript.classList.toggle('hidden-field', ssCurrentAction !== 'mouseScript');
             if (detailMacro) detailMacro.classList.toggle('hidden-field', ssCurrentAction !== 'macro');
+            if (detailAppLauncher) detailAppLauncher.classList.toggle('hidden-field', ssCurrentAction !== 'appLauncher');
             if (detailKey) detailKey.classList.toggle('hidden-field', ssCurrentAction !== 'key');
             if (detailSystem) detailSystem.classList.toggle('hidden-field', ssCurrentAction !== 'system');
           });
@@ -917,6 +749,7 @@
           const clickOffsetY = parseInt((document.getElementById('ssClickOffsetY') || {}).value, 10) || 0;
           const mouseScriptId = (document.getElementById('ssSelectMouseScript') || {}).value || '';
           const macroId = (document.getElementById('ssSelectMacro') || {}).value || '';
+          const appLauncherId = (document.getElementById('ssSelectAppLauncher') || {}).value || '';
           const keyToSend = (document.getElementById('ssInputKey') || {}).value || '';
           const systemAction = (document.getElementById('ssSelectSystemAction') || {}).value || 'beep';
 
@@ -946,6 +779,7 @@
             clickOffsetY: clickOffsetY,
             mouseScriptId: mouseScriptId,
             macroId: macroId,
+            appLauncherId: appLauncherId,
             keyToSend: keyToSend.trim(),
             systemAction: systemAction,
             condition: ssCondition,
@@ -976,6 +810,7 @@
               existing.clickOffsetY = clickOffsetY;
               existing.mouseScriptId = mouseScriptId;
               existing.macroId = macroId;
+              existing.appLauncherId = appLauncherId;
               existing.keyToSend = keyToSend.trim();
               existing.systemAction = systemAction;
               existing.condition = ssCondition;

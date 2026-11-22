@@ -19,18 +19,18 @@ ApplyFolderCreator() {
             trig := Trim(item["trigger"])
             paths := Trim(item["folderPaths"])
             type := item.Has("triggerType") ? item["triggerType"] : "string"
+            ; Automatically detect shortcuts/hotkeys even if triggerType was mislabeled
+            isHk := (type = "hotkey" || type = "shortcut") 
+                || InStr(trig, "+") || InStr(trig, "^") || InStr(trig, "!") || InStr(trig, "#") 
+                || InStr(trig, "Win") || InStr(trig, "Ctrl") || InStr(trig, "Alt") || InStr(trig, "Shift") || InStr(trig, "CapsLock")
 
             isEnabled := (!item.Has("enabled") || item["enabled"] = true || item["enabled"] = 1 || item["enabled"] =
             "1")
             if (trig != "" && paths != "" && isEnabled) {
                 try {
                     handler := CreateFolderCreatorHandler(item)
-                    if (type = "hotkey" || type = "shortcut") {
-                        ahkHk := NormalizeHotkeyToAhk(trig)
-                        if (ahkHk != "") {
-                            Hotkey(ahkHk, handler, "On")
-                            g_ActiveHotkeys.Push(ahkHk)
-                        }
+                    if (isHk) {
+                        RegisterUniversalHotkey(trig, handler)
                     } else {
                         Hotstring(":*:" . trig, handler, "On")
                         g_ActiveHotstrings.Push(trig)
@@ -38,7 +38,7 @@ ApplyFolderCreator() {
                 } catch as err {
                     LogMessage("FolderCreator error for " . trig . ": " . err.Message)
                 }
-            } else if (trig != "" && type != "hotkey" && type != "shortcut") {
+            } else if (trig != "" && !isHk) {
                 try Hotstring(":*:" . trig, , "Off")
             }
         }

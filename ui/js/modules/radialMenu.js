@@ -427,15 +427,16 @@
           return;
         }
 
-        const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS'].includes(e.key);
-        const hasModifier = e.ctrlKey || e.altKey || e.metaKey || (e.shiftKey && (e.ctrlKey || e.altKey || e.metaKey));
+        const isCaps = (typeof isCapsLockHeld !== 'undefined' ? isCapsLockHeld : false) || e.key === 'CapsLock';
+        const isModifier = ['Control', 'Alt', 'Shift', 'Meta', 'OS', 'CapsLock'].includes(e.key);
+        const hasModifier = e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || isCaps;
         const isSpecialKey = [
           'Escape', 'CapsLock', 'Space', 'Backspace', 'Delete', 'Insert',
           'Home', 'End', 'PageUp', 'PageDown', 'ArrowUp', 'ArrowDown',
           'ArrowLeft', 'ArrowRight', 'Tab', 'NumLock', 'ScrollLock', 'PrintScreen'
         ].includes(e.key) || /^F\d{1,2}$/i.test(e.key);
 
-        if ((e.key === 'Backspace' || e.key === 'Delete') && !hasModifier && !e.shiftKey) {
+        if ((e.key === 'Backspace' || e.key === 'Delete') && !hasModifier) {
           alInputTrigger.value = '';
           e.preventDefault();
           return;
@@ -449,6 +450,7 @@
           if (e.altKey) parts.push('Alt');
           if (e.shiftKey) parts.push('Shift');
           if (e.metaKey) parts.push('Win');
+          if (isCaps && !parts.includes('CapsLock')) parts.push('CapsLock');
 
           if (isModifier) {
             if (parts.length > 0) {
@@ -482,6 +484,22 @@
             key = 'PgDn';
           } else if (key.length === 1) {
             key = key.toUpperCase();
+          }
+
+          if ((key === 'Unidentified' || !key) && e.keyCode) {
+            if (e.keyCode >= 65 && e.keyCode <= 90) {
+              key = String.fromCharCode(e.keyCode);
+            } else if (e.keyCode >= 48 && e.keyCode <= 57) {
+              key = String.fromCharCode(e.keyCode);
+            } else if (e.keyCode >= 96 && e.keyCode <= 105) {
+              key = 'Numpad' + (e.keyCode - 96);
+            } else if (e.keyCode >= 112 && e.keyCode <= 123) {
+              key = 'F' + (e.keyCode - 111);
+            }
+          }
+
+          if (!key || key === 'Unidentified') {
+            return;
           }
 
           if (!parts.includes(key)) {

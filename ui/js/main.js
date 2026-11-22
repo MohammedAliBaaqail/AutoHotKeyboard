@@ -34,6 +34,24 @@
           syncConfig();
         });
       }
+      const btnBlockSysKeys = document.getElementById('btnBlockSysKeys');
+      if (btnBlockSysKeys && !btnBlockSysKeys.dataset.bound) {
+        btnBlockSysKeys.dataset.bound = 'true';
+        btnBlockSysKeys.addEventListener('click', () => {
+          const curProfile = (state.config && state.config.activeProfile) || 'Default';
+          const prof = (state.config && state.config.profiles && state.config.profiles[curProfile]) || {};
+          const isCurrentlyBlocked = !!(prof.blockSystemKeys === 1 || prof.blockSystemKeys === true || (state.config && (state.config.blockSystemKeys === 1 || state.config.blockSystemKeys === true)));
+          const newState = isCurrentlyBlocked ? 0 : 1;
+          state.config.blockSystemKeys = newState;
+          if (state.config.profiles && state.config.profiles[curProfile]) {
+            state.config.profiles[curProfile].blockSystemKeys = newState;
+          }
+          if (typeof updateBlockSysKeysButton === 'function') updateBlockSysKeysButton();
+          showToast(newState ? 'Key Presses Blocked: Windows Shortcuts (Win+D, etc.) suppressed' : 'Key Presses Allowed: Windows Shortcuts restored');
+          syncConfig();
+          sendToAhk('setBlockSystemKeys', { enabled: newState });
+        });
+      }
       if (btnRenameProfile) {
         btnRenameProfile.addEventListener('click', () => {
           openProfileModal('rename');
@@ -749,15 +767,22 @@
       });
     }
 
-    const themeOsdIconOnly = document.getElementById('themeOsdIconOnly');
-    if (themeOsdIconOnly && !themeOsdIconOnly.dataset.bound) {
-      themeOsdIconOnly.dataset.bound = 'true';
-      themeOsdIconOnly.addEventListener('change', () => {
+    const themeOsdModePills = document.getElementById('themeOsdModePills');
+    if (themeOsdModePills && !themeOsdModePills.dataset.bound) {
+      themeOsdModePills.dataset.bound = 'true';
+      themeOsdModePills.addEventListener('click', (e) => {
+        const btn = e.target.closest('.trigger-pill');
+        if (!btn || !btn.dataset.mode) return;
+        const mode = btn.dataset.mode;
         if (!state.config.theme) state.config.theme = {};
-        state.config.theme.osdIconOnly = themeOsdIconOnly.checked ? 1 : 0;
+        state.config.theme.profileNotificationMode = mode;
+        state.config.theme.osdIconOnly = (mode === 'icon' ? 1 : 0);
+        updateThemeOsdModeUI(mode);
         syncConfig();
-        const curProf = state.config.activeProfile || 'Default';
-        sendToAhk('showProfileOsd', { profile: curProf });
+        if (mode !== 'off') {
+          const curProf = (state.config && state.config.activeProfile) || 'Default';
+          sendToAhk('showProfileOsd', { profile: curProf });
+        }
       });
     }
 
@@ -933,10 +958,56 @@
     }
   }
 
+  let lastInterceptedKey = '';
+  let lastInterceptedTime = 0;
+
+  function handleSystemKeyIntercepted(combo) {
+    const now = Date.now();
+    if (combo === lastInterceptedKey && (now - lastInterceptedTime < 600)) {
+      lastInterceptedTime = now;
+      return;
+    }
+    lastInterceptedKey = combo;
+    lastInterceptedTime = now;
+
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+      if (activeEl.id === 'alInputTrigger' || activeEl.id === 'fcInputTrigger' || activeEl.id === 'ssInputTrigger' || activeEl.classList.contains('key-combo-input') || activeEl.dataset.recording === 'true') {
+        activeEl.value = combo;
+        activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+        const clearBtn = activeEl.parentElement ? activeEl.parentElement.querySelector('.btn-clear-input') : null;
+        if (clearBtn) clearBtn.classList.remove('hidden-field');
+        showToast(`Captured shortcut: ${combo}`);
+        return;
+      }
+    }
+    const recBox = document.querySelector('.key-combo-box.is-recording, .wm-hotkey-badge.is-recording, .ac-hotkey-display.is-recording, .wm-sub-hotkey-tag.is-recording');
+    if (recBox) {
+      const input = recBox.querySelector('input') || recBox;
+      if (input.tagName === 'INPUT') {
+        input.value = combo;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        recBox.textContent = combo;
+      }
+      showToast(`Captured shortcut: ${combo}`);
+      return;
+    }
+    showToast(`Prevented key press: ${combo} (System action suppressed)`, 'info');
+  }
+
   // Handle IPC Messages from AHK
   function onAhkMessage(event) {
     try {
       const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+      if (msg.type === 'systemKeyIntercepted') {
+        const combo = msg.combo || `Win + ${msg.key}`;
+        handleSystemKeyIntercepted(combo);
+        return;
+      }
 
       if (msg.type === 'sleepTimerState') {
         handleSleepTimerState(msg);
@@ -1349,13 +1420,25 @@
   }
 
   // Startup
-  initListeners();
-  renderAll(false);
+  try {
+    initListeners();
+  } catch (err) {
+    console.error('initListeners startup error:', err);
+  }
+  try {
+    renderAll(false);
+  } catch (err) {
+    console.error('renderAll startup error:', err);
+  }
   requestAnimationFrame(() => {
-    updateSegmentedGlider(true);
-    updateProfileGlider(true);
-    updateTabsScrollButtons();
-    updateProfilesScrollButtons();
+    try {
+      updateSegmentedGlider(true);
+      updateProfileGlider(true);
+      updateTabsScrollButtons();
+      updateProfilesScrollButtons();
+    } catch (err) {
+      console.warn('glider layout error:', err);
+    }
   });
   initAhkBridge();
 

@@ -256,6 +256,7 @@ GetDefaultConfig() {
         "theme", Map(
             "bgColor", "#e8dfd5",
             "accentColor", "#d97706",
+            "profileNotificationMode", "both",
             "radius", 5,
             "distance", 4,
             "lightIntensity", 39,

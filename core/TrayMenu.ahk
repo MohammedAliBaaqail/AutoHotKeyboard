@@ -12,7 +12,7 @@ SetupTrayMenu() {
 
     tray := A_TrayMenu
     tray.Delete()
-    tray.Add("Show AutoHotKeyboard", (*) => (g_MainGui.Restore(), g_MainGui.Show()))
+    tray.Add("Show AutoHotKeyboard", (*) => ShowMainWindow())
     tray.Add("Toggle Active/Suspended", (*) => ToggleEngineFromTray())
     tray.Add()
     tray.Add("Start with Windows", (*) => ToggleStartupFromTray())
@@ -26,6 +26,7 @@ SetupTrayMenu() {
     tray.Add("View Debug Log", (*) => OpenDebugLog())
     tray.Add("Exit", (*) => ExitApp())
     tray.Default := "Show AutoHotKeyboard"
+    tray.ClickCount := 1
 }
 
 GetStartupShortcutPath() {

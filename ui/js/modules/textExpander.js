@@ -246,6 +246,28 @@
 
       const mods = [];
       let rest = s;
+
+      // Handle custom combinations like "CapsLock & 3" or "+CapsLock & 3"
+      if (rest.includes('&')) {
+        const [prefixPart, suffixPart] = rest.split('&').map(t => t.trim());
+        rest = suffixPart;
+        let prefRest = prefixPart;
+        const prefMatch = prefRest.match(/^([<>]*[\^!+#]+)(.+)$/);
+        if (prefMatch) {
+          const syms = prefMatch[1];
+          prefRest = prefMatch[2];
+          for (let i = 0; i < syms.length; i++) {
+            const ch = syms[i];
+            if (ch === '^' && !mods.includes('Ctrl')) mods.push('Ctrl');
+            else if (ch === '!' && !mods.includes('Alt')) mods.push('Alt');
+            else if (ch === '+' && !mods.includes('Shift')) mods.push('Shift');
+            else if (ch === '#' && !mods.includes('Win')) mods.push('Win');
+          }
+        }
+        const prefName = prefRest.toLowerCase() === 'capslock' ? 'CapsLock' : prefRest;
+        if (!mods.includes(prefName)) mods.push(prefName);
+      }
+
       const ahkModPattern = /^([<>]*[\^!+#]+)(.+)$/;
       const match = rest.match(ahkModPattern);
       if (match) {
@@ -291,6 +313,8 @@
           if (!mods.includes('Shift')) mods.push('Shift');
         } else if (lower === 'win' || lower === 'windows' || lower === 'meta' || lower === 'cmd') {
           if (!mods.includes('Win')) mods.push('Win');
+        } else if (lower === 'capslock' || lower === 'caps') {
+          if (!mods.includes('CapsLock')) mods.push('CapsLock');
         } else if (keyMap[lower]) {
           keys.push(keyMap[lower]);
         } else if (tok.length === 1) {
@@ -302,7 +326,7 @@
         }
       });
 
-      const order = { 'Ctrl': 1, 'Alt': 2, 'Shift': 3, 'Win': 4 };
+      const order = { 'Ctrl': 1, 'Alt': 2, 'Shift': 3, 'Win': 4, 'CapsLock': 5 };
       mods.sort((a, b) => (order[a] || 99) - (order[b] || 99));
       const all = [...mods, ...keys];
       return all.length > 0 ? all.join(' + ') : raw;
@@ -313,19 +337,30 @@
       const clean = combo.trim();
       if (!clean) return '';
       if (/^[\$*~<>\^!+#]+[A-Za-z0-9_]+$/.test(clean)) return clean;
+      if (clean.includes('&')) return clean;
+
       const parts = clean.split('+').map(p => p.trim());
       let mods = '';
       let key = '';
+      let hasCaps = false;
+
       for (const part of parts) {
         const lower = part.toLowerCase();
         if (lower === 'ctrl' || lower === 'control') mods += '^';
         else if (lower === 'alt' || lower === 'menu') mods += '!';
         else if (lower === 'shift') mods += '+';
         else if (lower === 'win' || lower === 'windows' || lower === 'meta' || lower === 'cmd') mods += '#';
+        else if (lower === 'capslock' || lower === 'caps') hasCaps = true;
         else {
           key = part;
         }
       }
+
+      if (hasCaps) {
+        if (!key) return 'CapsLock';
+        return (mods ? mods : '') + 'CapsLock & ' + key;
+      }
+
       if (!key) return clean;
       return mods + key;
     }

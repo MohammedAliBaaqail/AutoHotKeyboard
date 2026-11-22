@@ -107,6 +107,7 @@ global g_IsWindowReady := false
 ; Module active hook tracking
 global g_ActiveHotstrings := []
 global g_ActiveHotkeys := []
+global g_CapsDispatch := Map()
 global g_AutoClickerRunning := false
 global g_AutoClickerCount := 0
 global g_MouseRecordActive := false
@@ -176,6 +177,10 @@ global g_CpLens := 0, g_CpTxtVal := 0, g_CpTxtSub := 0, g_CpSwatch := 0
 global g_SleepTimerActive := false
 global g_SleepTimerSecondsLeft := 0
 global g_SleepTimerMode := "Sleep"
+
+; Persistent WebView2 COM Event Handlers (protected from garbage collection)
+global g_WebMsgHandler := 0
+global g_NavCompletedHandler := 0
 
 LogMessage(msg) {
     global LOG_FILE

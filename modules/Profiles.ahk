@@ -430,8 +430,20 @@ class ProfileOsdHUD {
         bgHex := (g_Config.Has("theme") && g_Config["theme"].Has("bgColor")) ? g_Config["theme"]["bgColor"] : "#E8DFD5"
         accentHex := (g_Config.Has("theme") && g_Config["theme"].Has("accentColor")) ? g_Config["theme"]["accentColor"] :
             "#D97706"
-        isIconOnly := (g_Config.Has("theme") && g_Config["theme"].Has("osdIconOnly")) ? (g_Config["theme"][
-            "osdIconOnly"] = 1 || g_Config["theme"]["osdIconOnly"] = true) : false
+
+        osdMode := "both"
+        if (g_Config.Has("theme") && g_Config["theme"].Has("profileNotificationMode")) {
+            osdMode := g_Config["theme"]["profileNotificationMode"]
+        } else if (g_Config.Has("theme") && g_Config["theme"].Has("osdIconOnly") && (g_Config["theme"]["osdIconOnly"] = 1 || g_Config["theme"]["osdIconOnly"] = true)) {
+            osdMode := "icon"
+        }
+
+        if (osdMode = "off" || osdMode = "disabled" || osdMode = "none") {
+            return
+        }
+
+        isIconOnly := (osdMode = "icon")
+        isTextOnly := (osdMode = "text")
 
         ; Parse hex colors
         cleanBg := StrReplace(bgHex, "#", "")
@@ -513,9 +525,14 @@ class ProfileOsdHUD {
             guiH := Round(44 * dpiScale)
             cornerRadius := 12.0 * dpiScale
             iconBoxSize := Round(24 * dpiScale)
+        } else if (isTextOnly) {
+            guiH := Round(38 * dpiScale)
+            guiW := Round(padX + textW + padX + (4 * dpiScale))
+            cornerRadius := 10.0 * dpiScale
         } else {
             guiH := Round(38 * dpiScale)
             guiW := Round(padX + iconBoxSize + gap + textW + padX + (4 * dpiScale))
+            cornerRadius := 10.0 * dpiScale
         }
 
         bi := Buffer(40, 0)
@@ -565,45 +582,48 @@ class ProfileOsdHUD {
         DllCall("gdiplus\GdipCreatePen1", "uint", cBorder, "float", 1.2 * dpiScale, "int", 2, "ptr*", &pBorderPen)
         DllCall("gdiplus\GdipDrawPath", "ptr", pGraphics, "ptr", pBorderPen, "ptr", pPath)
 
-        ; Draw Profile Icon
-        iconX := isIconOnly ? (Float(guiW) - iconBoxSize) / 2.0 : Float(padX)
-        iconY := (Float(guiH) - iconBoxSize) / 2.0
+        ; Draw Profile Icon (if not text only)
+        iconX := 0.0, iconY := 0.0
+        if (!isTextOnly) {
+            iconX := isIconOnly ? (Float(guiW) - iconBoxSize) / 2.0 : Float(padX)
+            iconY := (Float(guiH) - iconBoxSize) / 2.0
 
-        pBitmap := 0
-        if (iconPath != "" && FileExist(iconPath)) {
-            DllCall("gdiplus\GdipCreateBitmapFromFile", "wstr", iconPath, "ptr*", &pBitmap)
-        }
-
-        if (pBitmap) {
-            imgW := 0, imgH := 0
-            DllCall("gdiplus\GdipGetImageWidth", "ptr", pBitmap, "uint*", &imgW)
-            DllCall("gdiplus\GdipGetImageHeight", "ptr", pBitmap, "uint*", &imgH)
-            if (imgW > 0 && imgH > 0) {
-                scale := Min(iconBoxSize / imgW, iconBoxSize / imgH)
-                drawW := imgW * scale
-                drawH := imgH * scale
-                dstX := iconX + (iconBoxSize - drawW) / 2.0
-                dstY := iconY + (iconBoxSize - drawH) / 2.0
-                DllCall("gdiplus\GdipSetInterpolationMode", "ptr", pGraphics, "int", 7)
-                DllCall("gdiplus\GdipDrawImageRectRect", "ptr", pGraphics, "ptr", pBitmap
-                    , "float", dstX, "float", dstY, "float", drawW, "float", drawH
-                    , "float", 0.0, "float", 0.0, "float", Float(imgW), "float", Float(imgH)
-                    , "int", 2, "ptr", 0, "ptr", 0, "ptr", 0)
+            pBitmap := 0
+            if (iconPath != "" && FileExist(iconPath)) {
+                DllCall("gdiplus\GdipCreateBitmapFromFile", "wstr", iconPath, "ptr*", &pBitmap)
             }
-            DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
-        } else {
-            pEmblemPen := 0
-            DllCall("gdiplus\GdipCreatePen1", "uint", cAccent, "float", 1.6 * dpiScale, "int", 2, "ptr*", &pEmblemPen)
-            DllCall("gdiplus\GdipDrawEllipse", "ptr", pGraphics, "ptr", pEmblemPen, "float", iconX + 1.0, "float",
-                iconY + 1.0, "float", Float(iconBoxSize - 2), "float", Float(iconBoxSize - 2))
-            DllCall("gdiplus\GdipDeletePen", "ptr", pEmblemPen)
+
+            if (pBitmap) {
+                imgW := 0, imgH := 0
+                DllCall("gdiplus\GdipGetImageWidth", "ptr", pBitmap, "uint*", &imgW)
+                DllCall("gdiplus\GdipGetImageHeight", "ptr", pBitmap, "uint*", &imgH)
+                if (imgW > 0 && imgH > 0) {
+                    scale := Min(iconBoxSize / imgW, iconBoxSize / imgH)
+                    drawW := imgW * scale
+                    drawH := imgH * scale
+                    dstX := iconX + (iconBoxSize - drawW) / 2.0
+                    dstY := iconY + (iconBoxSize - drawH) / 2.0
+                    DllCall("gdiplus\GdipSetInterpolationMode", "ptr", pGraphics, "int", 7)
+                    DllCall("gdiplus\GdipDrawImageRectRect", "ptr", pGraphics, "ptr", pBitmap
+                        , "float", dstX, "float", dstY, "float", drawW, "float", drawH
+                        , "float", 0.0, "float", 0.0, "float", Float(imgW), "float", Float(imgH)
+                        , "int", 2, "ptr", 0, "ptr", 0, "ptr", 0)
+                }
+                DllCall("gdiplus\GdipDisposeImage", "ptr", pBitmap)
+            } else {
+                pEmblemPen := 0
+                DllCall("gdiplus\GdipCreatePen1", "uint", cAccent, "float", 1.6 * dpiScale, "int", 2, "ptr*", &pEmblemPen)
+                DllCall("gdiplus\GdipDrawEllipse", "ptr", pGraphics, "ptr", pEmblemPen, "float", iconX + 1.0, "float",
+                    iconY + 1.0, "float", Float(iconBoxSize - 2), "float", Float(iconBoxSize - 2))
+                DllCall("gdiplus\GdipDeletePen", "ptr", pEmblemPen)
+            }
         }
 
         ; Draw Text (if not icon only)
         if (!isIconOnly) {
             pTextBrush := 0
             DllCall("gdiplus\GdipCreateSolidFill", "uint", cText, "ptr*", &pTextBrush)
-            tX := iconX + iconBoxSize + gap
+            tX := isTextOnly ? Float(padX) : (iconX + iconBoxSize + gap)
             tRect := Buffer(16, 0)
             NumPut("float", tX, tRect, 0)
             NumPut("float", 0.0, tRect, 4)
@@ -879,20 +899,24 @@ SwitchToProfileInternal(targetProfile, triggerExe := "") {
     ApplyAllModules()
 
     ; Notify WebUI of profile change
-    if (g_Wv) {
-        g_Wv.PostWebMessageAsString(JSON.stringify(Map(
-            "type", "profileAutoSwitched",
-            "activeProfile", targetProfile,
-            "triggerExe", triggerExe
-        )))
+    try {
+        if (g_Wv) {
+            g_Wv.PostWebMessageAsString(JSON.stringify(Map(
+                "type", "profileAutoSwitched",
+                "activeProfile", targetProfile,
+                "triggerExe", triggerExe
+            )))
+        }
     }
 
-    ; Trigger Profile OSD HUD notification on user's screen
-    showOsd := true
-    if (IsObject(prof) && prof.Has("showOsdIcon")) {
-        showOsd := (prof["showOsdIcon"] = 1 || prof["showOsdIcon"] = true)
+    ; Trigger Profile OSD HUD notification on user's screen based on global theme setting
+    osdMode := "both"
+    if (g_Config.Has("theme") && g_Config["theme"].Has("profileNotificationMode")) {
+        osdMode := g_Config["theme"]["profileNotificationMode"]
+    } else if (g_Config.Has("theme") && g_Config["theme"].Has("osdIconOnly") && (g_Config["theme"]["osdIconOnly"] = 1 || g_Config["theme"]["osdIconOnly"] = true)) {
+        osdMode := "icon"
     }
-    if (showOsd) {
+    if (osdMode != "off" && osdMode != "disabled" && osdMode != "none") {
         ProfileOsdHUD.ShowProfileHUD(targetProfile, triggerExe, 1600)
     }
 }

@@ -609,8 +609,13 @@ ExecuteSystemAction(actionName, triggerSource := "") {
         case "Calculator":
             try Run("calc.exe")
         default:
-            ; Check custom App Launcher item or Macro Recorder item by id prefix
+            ; Check custom Mouse Script, App Launcher item, or Macro Recorder item by id prefix
             displayActionName := actionName
+            if (SubStr(actionName, 1, 3) = "ms-") {
+                mCoreId := RegExReplace(actionName, "^(ms-)+", "")
+                ExecuteSavedMouseScriptById(mCoreId)
+                return
+            }
             if (SubStr(actionName, 1, 3) = "al-") {
                 actionCoreId := RegExReplace(actionName, "^(al-)+", "")
                 targetToRun := ""

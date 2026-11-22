@@ -1,3 +1,22 @@
+  // Global Error Handlers for WebView2 Diagnostics
+  window.addEventListener('error', (event) => {
+    const filename = event.filename ? event.filename.split('/').pop() : 'script';
+    const errText = `[WebUI JS Error] ${event.message} (${filename}:${event.lineno}:${event.colno})`;
+    console.error(errText, event.error);
+    if (typeof sendToAhk === 'function') {
+      sendToAhk('logError', { error: errText });
+    }
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason ? (event.reason.message || event.reason) : 'Unknown Promise Rejection';
+    const errText = `[WebUI Unhandled Rejection] ${reason}`;
+    console.error(errText, event.reason);
+    if (typeof sendToAhk === 'function') {
+      sendToAhk('logError', { error: errText });
+    }
+  });
+
   function sendToAhk(action, data = {}) {
     if (window.chrome && window.chrome.webview) {
       try {
@@ -47,8 +66,18 @@
   }
 
   // Global Toast Notification System
+  let lastToastMsg = '';
+  let lastToastTime = 0;
+
   function showToast(message, type = 'info', duration = 2500) {
     if (!message) return;
+    const now = Date.now();
+    if (message === lastToastMsg && (now - lastToastTime < 800)) {
+      return;
+    }
+    lastToastMsg = message;
+    lastToastTime = now;
+
     try {
       let container = document.getElementById('toastContainer');
       if (!container) {
@@ -56,6 +85,11 @@
         container.id = 'toastContainer';
         container.className = 'toast-container';
         document.body.appendChild(container);
+      }
+
+      // Limit max visible toasts to 4 to prevent screen flood
+      while (container.children.length >= 4) {
+        container.removeChild(container.firstChild);
       }
 
       const toast = document.createElement('div');
