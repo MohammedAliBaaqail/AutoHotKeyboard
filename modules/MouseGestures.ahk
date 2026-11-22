@@ -55,7 +55,8 @@ IsRockerRightActive(*) {
 
 IsWheelGestureActive(*) {
     global g_WheelGesturesActive, g_WheelTriggerBtn, g_GestureTriggerDown
-    return (IsSet(g_WheelGesturesActive) && g_WheelGesturesActive && ((IsSet(g_WheelTriggerBtn) && GetKeyState(g_WheelTriggerBtn, "P")) || (IsSet(g_GestureTriggerDown) && g_GestureTriggerDown)))
+    return (IsSet(g_WheelGesturesActive) && g_WheelGesturesActive && ((IsSet(g_WheelTriggerBtn) && GetKeyState(
+        g_WheelTriggerBtn, "P")) || (IsSet(g_GestureTriggerDown) && g_GestureTriggerDown)))
 }
 
 #HotIf IsRockerLeftActive()
@@ -145,7 +146,6 @@ CheckScreenHotCorners() {
         dwellMs := 20
     }
 
-    baseTol := mg.Has("cornerSize") ? Max(5, Min(40, Integer(mg["cornerSize"]))) : 14
     baseTol := mg.Has("cornerSize") ? Max(1, Min(40, Integer(mg["cornerSize"]))) : 14
 
     ; Switch thread to Per-Monitor v2 DPI context to guarantee true 1:1 physical pixel coordinates across mixed 4K/2K displays
@@ -730,4 +730,3 @@ ExecuteSystemAction(actionName, triggerSource := "") {
         }
     }
 }
-
