@@ -1800,7 +1800,7 @@
             const prof = state.config.profiles[pName];
             if (prof && prof[moduleName] && Array.isArray(prof[moduleName].items)) {
               if (!prof[moduleName].items.some(i => i.id === item.id)) {
-                prof[moduleName].items.unshift({ ...JSON.parse(JSON.stringify(item)), enabled: 0 });
+                prof[moduleName].items.unshift({ ...JSON.parse(JSON.stringify(item)), enabled: item.enabled !== undefined ? item.enabled : 1 });
               }
             }
           }

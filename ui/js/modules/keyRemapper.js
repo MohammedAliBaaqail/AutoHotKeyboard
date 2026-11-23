@@ -438,6 +438,27 @@
 
         let pendingMod = null;
 
+        function applyShortcut(combo) {
+          pendingMod = null;
+          const ahkHk = comboToAhk(combo);
+
+          if (!state.config.windowManager) state.config.windowManager = {};
+          state.config.windowManager[configPropKey] = ahkHk;
+
+          badgeEl.textContent = formatKeyDisplay(ahkHk);
+          cleanup(false);
+
+          saveCurrentProfileState();
+          syncConfig();
+          showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+
+          if (typeof onUpdateCallback === 'function') {
+            onUpdateCallback(ahkHk);
+          }
+        }
+
+        badgeEl._applyExternalShortcut = applyShortcut;
+
         function onKeyDown(evt) {
           evt.preventDefault();
           evt.stopPropagation();
@@ -533,39 +554,14 @@
           }
 
           const combo = parts.join(' + ');
-          const ahkHk = comboToAhk(combo);
-
-          if (!state.config.windowManager) state.config.windowManager = {};
-          state.config.windowManager[configPropKey] = ahkHk;
-
-          badgeEl.textContent = formatKeyDisplay(ahkHk);
-          cleanup(false);
-
-          saveCurrentProfileState();
-          syncConfig();
-          showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
-
-          if (typeof onUpdateCallback === 'function') {
-            onUpdateCallback(ahkHk);
-          }
+          applyShortcut(combo);
         }
 
         function onKeyUp(evt) {
-          if (pendingMod) {
-            const combo = pendingMod;
-            const ahkHk = comboToAhk(combo);
-            if (!state.config.windowManager) state.config.windowManager = {};
-            state.config.windowManager[configPropKey] = ahkHk;
-            badgeEl.textContent = formatKeyDisplay(ahkHk);
-            cleanup(false);
-            saveCurrentProfileState();
-            syncConfig();
-            showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
-            if (typeof onUpdateCallback === 'function') {
-              onUpdateCallback(ahkHk);
-            }
-            pendingMod = null;
+          if (pendingMod && pendingMod === 'CapsLock') {
+            applyShortcut('CapsLock');
           }
+          pendingMod = null;
         }
 
         function onDocClick(evt) {
@@ -575,6 +571,7 @@
         }
 
         function cleanup(restore) {
+          badgeEl._applyExternalShortcut = null;
           badgeEl.classList.remove('is-recording');
           window.removeEventListener('keydown', onKeyDown, true);
           window.removeEventListener('keyup', onKeyUp, true);

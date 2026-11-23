@@ -129,6 +129,11 @@
         fcInputTrigger.focus();
         return;
       }
+      if (['ctrl', 'alt', 'shift', 'win', 'meta', 'os'].includes(trig.toLowerCase())) {
+        showToast('Please include a key with the modifier (e.g. Win + D)', 'warning');
+        fcInputTrigger.focus();
+        return;
+      }
       if (!paths) {
         showToast('Please specify at least one folder path');
         fcTextareaFolders.focus();

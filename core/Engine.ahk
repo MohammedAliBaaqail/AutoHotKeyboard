@@ -147,9 +147,26 @@ RegisterUniversalHotkey(rawHk, callback) {
     }
 
     ; Standard Hotkey registration
-    ; If hotkey uses the Windows key (#), prepend * so it completely consumes and suppresses native Windows shell actions (e.g. *#d overrides Show Desktop)
+    ; If hotkey uses the Windows key (#), prepend * and $ to force low-level hook (WH_KEYBOARD_LL) so it completely consumes and suppresses native Windows shell actions (e.g. *$#d overrides Show Desktop)
     if InStr(ahkHk, "#") {
         safeHk := InStr(ahkHk, "*") ? ahkHk : "*" . ahkHk
+        if (!InStr(safeHk, "$"))
+            safeHk := "$" . safeHk
+
+        ; Also register explicit LWin & <key> and RWin & <key> custom combinations for 100% suppression of Windows shell shortcuts
+        cleanKey := StrLower(RegExReplace(ahkHk, "[\*\#\$~]+", ""))
+        if (cleanKey != "") {
+            try {
+                HotIf()
+                Hotkey("LWin & " . cleanKey, callback, "On")
+                g_ActiveHotkeys.Push("LWin & " . cleanKey)
+            }
+            try {
+                HotIf()
+                Hotkey("RWin & " . cleanKey, callback, "On")
+                g_ActiveHotkeys.Push("RWin & " . cleanKey)
+            }
+        }
     } else {
         safeHk := (InStr(ahkHk, "$") || InStr(ahkHk, "*") || InStr(ahkHk, "&")) ? ahkHk : "$" . ahkHk
     }
@@ -189,9 +206,9 @@ global g_BlockedSysKeys := []
 global g_SystemKeysBlocked := false
 
 global g_SysBlockHotkeys := [
-    "*#d", "*#e", "*#r", "*#m", "*#s", "*#a", "*#x", "*#Tab",
-    "*#g", "*#w", "*#c", "*#q", "*#f", "*#h", "*#k", "*#i", "*#p", "*#t", "*#b",
-    "*#1", "*#2", "*#3", "*#4", "*#5", "*#6", "*#7", "*#8", "*#9", "*#0"
+    "d", "e", "r", "m", "s", "a", "x", "Tab",
+    "g", "w", "c", "q", "f", "h", "k", "i", "p", "t", "b",
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0"
 ]
 
 ApplySystemKeyBlockFromConfig() {
@@ -224,12 +241,11 @@ EnableSystemKeyBlock() {
     if (g_SystemKeysBlocked)
         return
     for k in g_SysBlockHotkeys {
-        ; Do not overwrite hotkeys that are already registered by user scripts
-        cleanK := StrLower(RegExReplace(k, "^[\*\#\$~]+", ""))
+        cleanK := StrLower(k)
         alreadyInUse := false
         for existing in g_ActiveHotkeys {
-            cleanExisting := StrLower(RegExReplace(existing, "^[\*\#\$~]+", ""))
-            if (cleanK = cleanExisting && InStr(existing, "#")) {
+            cleanExisting := StrLower(RegExReplace(existing, "^[\*\#\$~&LWinRWin\s]+", ""))
+            if (cleanK = cleanExisting && (InStr(existing, "#") || InStr(existing, "Win &"))) {
                 alreadyInUse := true
                 break
             }
@@ -237,16 +253,22 @@ EnableSystemKeyBlock() {
         if (alreadyInUse)
             continue
 
+        hkHook := "*$#" . cleanK
+        hkLWin := "LWin & " . cleanK
+        hkRWin := "RWin & " . cleanK
+
         try {
-            Hotkey(k, HandleBlockedSysKey, "On")
-            g_BlockedSysKeys.Push(k)
+            Hotkey(hkHook, HandleBlockedSysKey, "On")
+            g_BlockedSysKeys.Push(hkHook)
         }
-    }
-    try {
-        Hotkey("~*LWin", (*) => 0, "On")
-        Hotkey("~*RWin", (*) => 0, "On")
-        g_BlockedSysKeys.Push("~*LWin")
-        g_BlockedSysKeys.Push("~*RWin")
+        try {
+            Hotkey(hkLWin, HandleBlockedSysKey, "On")
+            g_BlockedSysKeys.Push(hkLWin)
+        }
+        try {
+            Hotkey(hkRWin, HandleBlockedSysKey, "On")
+            g_BlockedSysKeys.Push(hkRWin)
+        }
     }
     g_SystemKeysBlocked := true
     LogMessage("System key blocking enabled (Windows shortcuts like Win+D suppressed)")
@@ -268,7 +290,11 @@ HandleBlockedSysKey(hk) {
     global g_Wv, g_MainGui
     static lastKey := ""
     static lastTick := 0
-    rawKey := RegExReplace(hk, "^[\*\#\$~]+", "")
+
+    ; Neutralize Windows shell modifier state
+    try SendEvent("{vkE8}")
+
+    rawKey := StrLower(RegExReplace(hk, "^[\*\#\$~&LWinRWin\s]+", ""))
     now := A_TickCount
 
     ; Suppress auto-repeat while key is held down

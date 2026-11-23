@@ -135,6 +135,11 @@
         alInputTrigger.focus();
         return;
       }
+      if (['ctrl', 'alt', 'shift', 'win', 'meta', 'os'].includes(trigger.toLowerCase())) {
+        showToast('Please include a key with the modifier (e.g. Win + D)', 'warning');
+        alInputTrigger.focus();
+        return;
+      }
       if (!target) {
         alInputTarget.focus();
         return;

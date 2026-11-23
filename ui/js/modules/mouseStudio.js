@@ -26,6 +26,22 @@
 
           let pendingMod = null;
 
+          function applyShortcut(combo) {
+            pendingMod = null;
+            const ahkHk = comboToAhk(combo);
+
+            if (!state.config.autoClicker) state.config.autoClicker = {};
+            state.config.autoClicker.hotkey = ahkHk;
+
+            cleanup(false);
+            saveCurrentProfileState();
+            syncConfig();
+            updateAutoClickerUI();
+            showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+          }
+
+          boxEl._applyExternalShortcut = applyShortcut;
+
           function onKeyDown(evt) {
             evt.preventDefault();
             evt.stopPropagation();
@@ -121,31 +137,14 @@
             }
 
             const combo = parts.join(' + ');
-            const ahkHk = comboToAhk(combo);
-
-            if (!state.config.autoClicker) state.config.autoClicker = {};
-            state.config.autoClicker.hotkey = ahkHk;
-
-            cleanup(false);
-            saveCurrentProfileState();
-            syncConfig();
-            updateAutoClickerUI();
-            showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
+            applyShortcut(combo);
           }
 
           function onKeyUp(evt) {
-            if (pendingMod) {
-              const combo = pendingMod;
-              const ahkHk = comboToAhk(combo);
-              if (!state.config.autoClicker) state.config.autoClicker = {};
-              state.config.autoClicker.hotkey = ahkHk;
-              cleanup(false);
-              saveCurrentProfileState();
-              syncConfig();
-              updateAutoClickerUI();
-              showToast(`Shortcut set to: ${formatKeyDisplay(ahkHk)}`);
-              pendingMod = null;
+            if (pendingMod && pendingMod === 'CapsLock') {
+              applyShortcut('CapsLock');
             }
+            pendingMod = null;
           }
 
           function onDocClick(evt) {
@@ -157,6 +156,7 @@
           function cleanup(restore) {
             activeAcRecording = false;
             activeAcTargetBox = null;
+            boxEl._applyExternalShortcut = null;
             boxEl.classList.remove('is-recording');
             window.removeEventListener('keydown', onKeyDown, true);
             window.removeEventListener('keyup', onKeyUp, true);
@@ -902,6 +902,18 @@
         badgeEl.textContent = 'Press keys...';
         badgeEl.title = 'Press shortcut keys, Backspace/Del to clear, or Esc to cancel';
 
+        function applyShortcut(combo) {
+          item.trigger = combo;
+          saveCurrentProfileState();
+          syncConfig();
+          cleanup(false);
+          badgeEl.textContent = formatKeyDisplay(combo);
+          badgeEl.title = `Click to change shortcut (Current: ${formatKeyDisplay(combo)})`;
+          showToast(`Shortcut set to ${formatKeyDisplay(combo)} for "${item.name}"`);
+        }
+
+        badgeEl._applyExternalShortcut = applyShortcut;
+
         function onKeyDown(evt) {
           evt.preventDefault();
           evt.stopPropagation();
@@ -978,16 +990,11 @@
 
           parts.push(key);
           const newShortcut = parts.join(' + ');
-          item.trigger = newShortcut;
-          saveCurrentProfileState();
-          syncConfig();
-          cleanup(false);
-          badgeEl.textContent = formatKeyDisplay(newShortcut);
-          badgeEl.title = `Click to change shortcut (Current: ${formatKeyDisplay(newShortcut)})`;
-          showToast(`Shortcut set to ${formatKeyDisplay(newShortcut)} for "${item.name}"`);
+          applyShortcut(newShortcut);
         }
 
         function cleanup(revert) {
+          badgeEl._applyExternalShortcut = null;
           window.removeEventListener('keydown', onKeyDown, true);
           badgeEl.classList.remove('is-recording');
           activeRecordingBadge = null;
@@ -1297,6 +1304,15 @@
           badgeEl.classList.add('is-recording');
           badgeEl.textContent = 'Press keys...';
 
+          function applyShortcut(combo) {
+            activeEditingMouseScriptHk = combo;
+            cleanup(false);
+            badgeEl.textContent = formatKeyDisplay(activeEditingMouseScriptHk);
+            showToast(`Shortcut set to: ${formatKeyDisplay(combo)}`);
+          }
+
+          badgeEl._applyExternalShortcut = applyShortcut;
+
           function onKeyDown(evt) {
             evt.preventDefault();
             evt.stopPropagation();
@@ -1367,12 +1383,11 @@
             }
 
             parts.push(key);
-            activeEditingMouseScriptHk = parts.join(' + ');
-            cleanup(false);
-            badgeEl.textContent = formatKeyDisplay(activeEditingMouseScriptHk);
+            applyShortcut(parts.join(' + '));
           }
 
           function cleanup(revert) {
+            badgeEl._applyExternalShortcut = null;
             window.removeEventListener('keydown', onKeyDown, true);
             badgeEl.classList.remove('is-recording');
             activeRecordingBadge = null;

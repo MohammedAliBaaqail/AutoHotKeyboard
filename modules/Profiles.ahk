@@ -949,7 +949,6 @@ SyncForcedItemsAcrossProfilesAhk() {
                 }
             }
         }
-        return
     }
 
     ; 2. Fallback heuristic: If any profile or root has a forced item disabled, it stays disabled everywhere

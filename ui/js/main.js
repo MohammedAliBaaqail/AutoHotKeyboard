@@ -982,15 +982,19 @@
         return;
       }
     }
-    const recBox = document.querySelector('.key-combo-box.is-recording, .wm-hotkey-badge.is-recording, .ac-hotkey-display.is-recording, .wm-sub-hotkey-tag.is-recording');
-    if (recBox) {
-      const input = recBox.querySelector('input') || recBox;
+    const recBadge = (typeof activeRecordingBadge !== 'undefined' && activeRecordingBadge) || document.querySelector('.wm-hotkey-badge.is-recording, .wm-sub-hotkey-tag.is-recording, .ac-hotkey-display.is-recording, .key-combo-box.is-recording');
+    if (recBadge) {
+      if (typeof recBadge._applyExternalShortcut === 'function') {
+        recBadge._applyExternalShortcut(combo);
+        return;
+      }
+      const input = recBadge.querySelector('input') || recBadge;
       if (input.tagName === 'INPUT') {
         input.value = combo;
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
       } else {
-        recBox.textContent = combo;
+        recBadge.textContent = combo;
       }
       showToast(`Captured shortcut: ${combo}`);
       return;

@@ -362,6 +362,13 @@
       }
 
       if (!key) return clean;
+
+      // In AutoHotkey v2, an uppercase single letter in a hotkey implicitly requires Shift.
+      // If Shift (+) is NOT explicitly part of the modifier string, lowercase single letters so AHK does not require Shift!
+      if (key.length === 1 && !mods.includes('+')) {
+        key = key.toLowerCase();
+      }
+
       return mods + key;
     }
 
